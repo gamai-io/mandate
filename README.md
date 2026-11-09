@@ -196,6 +196,29 @@ Loopback by default; a non-loopback daemon requires `--token` /
 (`503`). A Telegram notification channel can be added in front of the same
 signer without changing the security property.
 
+### Payments
+
+```json
+"payment": {"provider": "sandbox", "db": "payments.sqlite"}
+```
+or a generic HTTP provider:
+```json
+"payment": {"provider": "http", "url": "https://provider.example/charges",
+            "token_env": "PAYMENT_TOKEN"}
+```
+The provider must be idempotent on `idempotency_key` and expose a lookup by that
+key. The broker looks up before charging and reconciles on timeout; recovery
+never charges twice.
+
+### ERP (SQLite or MSSQL, read-only)
+
+```json
+"erp": {"driver": "sqlite", "db": "erp.sqlite", "checks": { ... }}
+```
+For MSSQL: `"driver": "mssql"`, `"dsn": "...", "user_env": "...",
+"password_env": "..."` and `pip install gama-mandate[mssql]`. Only `SELECT`/`WITH`
+queries are accepted; SQLite opens `mode=ro`, MSSQL runs read-only and rolls back.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

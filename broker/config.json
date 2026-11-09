@@ -16,6 +16,10 @@
     "mode": "file",
     "effects_dir": "effects"
   },
+  "payment": {
+    "provider": "sandbox",
+    "db": "payments.sqlite"
+  },
   "smtp": {
     "mode": "dry_run",
     "host": "",
@@ -27,6 +31,7 @@
     "outbox": "outbox"
   },
   "erp": {
+    "driver": "sqlite",
     "db": "erp.sqlite",
     "checks": {
       "payment.send": {

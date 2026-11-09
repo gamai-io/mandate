@@ -10,7 +10,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import core, sign
-from .adapters import ErpChecker, SmtpSender, WriteAdapter
+from .adapters import ErpChecker, PaymentAdapter, SmtpSender, WriteAdapter
 from .journal import Journal
 
 BROKER_NAMESPACE = "mandate-broker"
@@ -31,7 +31,7 @@ class Broker:
                  receipt_key: str = "", broker_name: str = "gama-broker",
                  effects_dir: str = "effects", outbox: str = "outbox",
                  smtp: dict | None = None, erp: dict | None = None,
-                 write: dict | None = None,
+                 write: dict | None = None, payment: dict | None = None,
                  require_audience: bool = True, revoked_path: str = "",
                  journal_db: str | None = None, lease_s: float = 60,
                  recover_on_start: bool = True, token: str = ""):
@@ -45,6 +45,7 @@ class Broker:
         self.outbox = outbox
         self.smtp = SmtpSender(smtp) if smtp else None
         self.erp = ErpChecker(erp) if erp else None
+        self.payment = PaymentAdapter(payment) if payment else None
         self.require_audience = require_audience
         self.revoked_path = revoked_path
         self.token = token
@@ -57,10 +58,18 @@ class Broker:
         if recover_on_start:
             self.recover()
 
+    def _store(self, kind: str):
+        if kind == "payment.send" and self.payment is not None:
+            return self.payment
+        if kind == "message.send" and self.smtp is not None:
+            return None
+        return self.writer
+
     def _run(self, kind: str, intent: dict, idem_key: str) -> dict:
         if kind == "message.send" and self.smtp is not None:
             return self.smtp.send(intent)
-        return self.writer.execute(intent, idem_key)
+        store = self._store(kind)
+        return store.execute(intent, idem_key)
 
     def _sign_result(self, body: dict) -> dict:
         if not self.receipt_key or not os.path.exists(self.receipt_key):
@@ -131,8 +140,9 @@ class Broker:
                 actions.append({"nonce": nonce, "action": "abandoned"})
                 continue
             if row["state"] == "executing":
-                if self.writer.has_effect(nonce):
-                    result = self.writer.result_for(nonce) or {
+                store = self._store(str(row.get("kind") or ""))
+                if store is not None and store.has_effect(nonce):
+                    result = store.result_for(nonce) or {
                         "ok": True, "recovered": True}
                     self.journal.mark_executed(nonce, core.jcs(result),
                                                external_ref=nonce)
@@ -222,6 +232,7 @@ class Broker:
                 "signers": bool(os.path.exists(self.signers)),
                 "receipt_key": bool(self.receipt_key and os.path.exists(self.receipt_key)),
                 "smtp": bool(self.smtp), "erp": bool(self.erp),
+                "payment": bool(self.payment),
                 "writer": self.writer.mode, "auth": bool(self.token),
                 "journal": self.journal.counts()}
 
@@ -229,7 +240,7 @@ class Broker:
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.11.1"
+        server_version = "mandate-broker/0.12.0"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -340,7 +351,7 @@ def main(argv=None) -> int:
                     receipt_key=args.receipt_key, broker_name=args.broker_name,
                     effects_dir=args.effects_dir, outbox=args.outbox,
                     smtp=cfg.get("smtp"), erp=cfg.get("erp"),
-                    write=cfg.get("write"),
+                    write=cfg.get("write"), payment=cfg.get("payment"),
                     require_audience=not args.allow_any_audience,
                     revoked_path=args.revoked,
                     journal_db=args.journal_db or None,

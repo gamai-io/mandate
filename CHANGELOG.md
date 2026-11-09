@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.0 — 2026-11-09
+- **Payment adapter**: `provider=sandbox` (SQLite) or `provider=http`. Strict
+  idempotency key = grant nonce, `lookup` before charging, and reconciliation on
+  timeout. The broker's recovery uses the provider lookup, so a committed charge
+  without a receipt is finalized without charging twice; a crash before the
+  charge abandons the grant.
+- **ERP driver `mssql`** (optional `pyodbc`, `pip install gama-mandate[mssql]`):
+  only `SELECT`/`WITH` queries are accepted; SQLite stays `mode=ro`, MSSQL runs
+  read-only and rolls back.
+- 85 tests.
+
 ## 0.11.1 — 2026-11-09
 - Privacy: repository is now **private**; example names, vendor names, and local
   domains were removed from the tree and from the package metadata. No personal,

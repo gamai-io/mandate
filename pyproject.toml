@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gama-mandate"
-version = "0.11.1"
+version = "0.12.0"
 description = "Signed, verifiable business commitments for AI agents: canonical commitment, off-host Ed25519 grant, one-shot redemption, hash-chained receipts."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -18,6 +18,9 @@ classifiers = [
   "Topic :: Office/Business",
 ]
 dependencies = []
+
+[project.optional-dependencies]
+mssql = ["pyodbc>=5"]
 
 [project.urls]
 Homepage = "https://github.com/gamai-io/mandate"

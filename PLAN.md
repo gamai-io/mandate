@@ -18,6 +18,8 @@
 - [x] Signed result entry chained after the authorisation receipt
 - [x] Read-only ERP precondition (SQLite, fail-closed target + amount check)
 - [x] SMTP adapter (`dry_run` default; `live` reads password from env)
+- [x] Payment adapter with provider idempotency + lookup/reconciliation
+- [x] MSSQL/ERP read-only driver (optional `pyodbc`, SELECT/WITH only)
 - [ ] Move write credentials (SQL write, payment, WA) into the broker
 - [ ] Per-effect adapters + integration tests against a fake ERP
 
