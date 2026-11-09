@@ -34,8 +34,8 @@
   qwen25vl7b (`unsafe_execution=0` for both); LUMI batch templates.
 - Auditor bundle: intent + grant + receipt + Merkle proof + STH + witness pin in
   one signed JSON, verified offline.
-- Cross-host witness verified on a second host (vast) on 2026-11-09
-  (`valid=true, witness=true`); oracle/linux3/LUMI not used.
+- Cross-host witness verified on vast, oracle and linux3 on 2026-11-09
+  (`valid=true, witness=true` for each).
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items

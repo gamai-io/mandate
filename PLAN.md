@@ -43,9 +43,9 @@
 - [x] Model-generated IDB corpus mode (OpenAI-compatible endpoint; LUMI template)
 - [x] 20-scenario, 2-model LUMI comparison (qwen25-7b/qwen25vl7b, unsafe=0)
 - [x] Auditor bundle (envelope + receipt + Merkle proof + STH + witness pin)
-- [x] Deploy the witness on a second physical host (vast, verified 2026-11-09:
-  `valid=true, witness=true`) without oracle/linux3/LUMI
-- [ ] Pin every published release artifact's STH on the second host
+- [x] Deploy the witness on second physical hosts (vast, oracle, linux3,
+  verified 2026-11-09: `valid=true, witness=true` for all three)
+- [ ] Pin every published release artifact's STH on the witnesses
 - [x] Hardware-backed approver keys (`sk-ssh-ed25519`) via `require_hardware_key`
 - [x] OIDC trusted-publishing path in the release workflow
 - [ ] Full WebAuthn/passkeys (browser/CBOR stack)

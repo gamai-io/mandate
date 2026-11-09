@@ -62,3 +62,7 @@ A real two-host pin was performed without using oracle, linux3 or LUMI:
 
 This shows the witness host needs only public keys and the STH, and the bundle
 can be pinned and verified across machines.
+
+The same pin was repeated on **oracle** and **linux3** on 2026-11-09; both
+witness states produced `valid=true, witness=true`. Three independent hosts
+(vast, oracle, linux3) now hold the same `root_hash` and `tree_size`.
