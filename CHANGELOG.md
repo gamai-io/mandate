@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0 — 2026-11-09
+- **Effect journal** (SQLite) with a lease-based state machine:
+  `intent → executing → executed → receipted`, plus `failed` / `abandoned`.
+- **Idempotent write adapter**: `mode=file` or `mode=sqlite` (a trusted SQL
+  statement runs in the same transaction as the idempotency insert). The
+  idempotency key is the **grant nonce**.
+- The authorisation receipt is now appended **after** the effect commits,
+  fixing the old "ledger says executed but no effect happened" crash window.
+- **Crash recovery on start**: `executing` with a committed effect → finish the
+  receipt; without an effect → abandoned; `executed` without a receipt →
+  receipted. Duplicate `execute` returns the same receipt/result instead of an
+  error.
+- Config: `write`, `journal_db`, `lease_s`; `/health` reports journal counts.
+- 43 tests (crash-after-effect recovery, crash-before-effect abandon, writer
+  failure, concurrent single effect, journal payload mismatch).
+
 ## 0.7.0 — 2026-11-09
 - Canonicalization is now **RFC 8785 (JCS)**: UTF-16 code-unit key ordering,
   ECMAScript number serialization, minimal string escaping, and strict rejection

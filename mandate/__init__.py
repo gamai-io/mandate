@@ -10,6 +10,7 @@ from .core import (  # noqa: F401
     SelfApproval,
     append_receipt,
     build_grant_core,
+    build_receipt,
     check,
     intent_commitment,
     jcs,
@@ -23,10 +24,11 @@ from .core import (  # noqa: F401
     render,
     render_hash,
     sha256,
+    verify_authorization,
     verify_chain,
     verify_grant,
     verify_receipt,
     verify_result_entry,
 )
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"

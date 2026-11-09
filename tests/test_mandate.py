@@ -11,6 +11,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from unittest import mock
 
 from mandate import broker, core
 
@@ -343,8 +344,9 @@ class MandateTests(unittest.TestCase):
         self.assertTrue(body["ok"])
         self.assertEqual(body["effect"], "payment.send")
         status2, body2 = self._post(port, intent, grant)
-        self.assertEqual(status2, 409, body2)
-        self.assertEqual(body2["error"], "GrantReplayed")
+        self.assertEqual(status2, 200, body2)
+        self.assertTrue(body2.get("duplicate"))
+        self.assertEqual(body2["receipt"]["hash"], body["receipt"]["hash"])
 
     def test_broker_rejects_tampered_amount(self):
         intent = intent_factory()
@@ -455,6 +457,119 @@ class MandateTests(unittest.TestCase):
         forged = json.loads(json.dumps(entry))
         forged["body"]["status"] = "ok-forged"
         self.assertFalse(core.verify_result_entry(forged, broker_signers))
+
+    def _sql_broker(self, db_path, lease_s=60):
+        return broker.Broker(
+            os.path.join(ROOT, "policy.json"), self.signers, self.ledger,
+            os.path.join(self.dir, "used.sqlite"),
+            journal_db=os.path.join(self.dir, "journal.sqlite"),
+            effects_dir=os.path.join(self.dir, "effects"),
+            write={"mode": "sqlite", "db": db_path,
+                   "statement": "INSERT INTO payments(nonce, vendor, amount)"
+                                " VALUES(:nonce, :target, :amount)"},
+            lease_s=lease_s, recover_on_start=False)
+
+    def _target_db(self):
+        path = os.path.join(self.dir, "target.sqlite")
+        con = sqlite3.connect(path)
+        con.execute("CREATE TABLE IF NOT EXISTS payments("
+                    "nonce TEXT PRIMARY KEY, vendor TEXT, amount REAL)")
+        con.commit()
+        con.close()
+        return path
+
+    def test_recovery_after_effect_before_receipt(self):
+        db = self._target_db()
+        intent = intent_factory()
+        grant = self._grant(intent)
+        b = self._sql_broker(db, lease_s=0)
+        with mock.patch.object(b.journal, "mark_executed",
+                               side_effect=RuntimeError("crash")):
+            with self.assertRaises(RuntimeError):
+                b.execute(intent, grant)
+        con = sqlite3.connect(db)
+        self.assertEqual(con.execute(
+            "SELECT COUNT(*) FROM payments").fetchone()[0], 1)
+        con.close()
+        b2 = self._sql_broker(db, lease_s=0)
+        actions = b2.recover()
+        self.assertTrue(any(a["action"] == "receipted" for a in actions))
+        row = b2.journal.get(grant["grant"]["nonce"])
+        self.assertEqual(row["state"], "receipted")
+        duplicate = b2.execute(intent, grant)
+        self.assertTrue(duplicate.get("duplicate"))
+        con = sqlite3.connect(db)
+        self.assertEqual(con.execute(
+            "SELECT COUNT(*) FROM payments").fetchone()[0], 1)
+        con.close()
+
+    def test_crash_before_effect_is_abandoned(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        b = self._sql_broker(self._target_db(), lease_s=0)
+        nonce = grant["grant"]["nonce"]
+        intent_norm = core.normalize_intent(intent)
+        b.journal.begin(nonce, core.sha256(core.jcs(intent_norm)),
+                        "payment.send", core.jcs(intent_norm),
+                        core.jcs(grant["grant"]), time.time() + 900)
+        self.assertTrue(b.journal.claim(nonce, "worker-a"))
+        actions = b.recover()
+        self.assertTrue(any(a["action"] == "abandoned" for a in actions))
+        self.assertEqual(b.journal.get(nonce)["state"], "abandoned")
+
+    def test_writer_failure_marks_failed(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        b = self._sql_broker(self._target_db())
+        with mock.patch.object(b.writer, "execute",
+                               side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                b.execute(intent, grant)
+        self.assertEqual(b.journal.get(grant["grant"]["nonce"])["state"], "failed")
+
+    def test_precondition_failure_creates_no_journal(self):
+        intent = intent_factory()
+        intent["effect"]["target"] = "Beta d.o.o."
+        grant = self._grant(intent)
+        b = self._sql_broker(self._target_db())
+        b.erp = broker.ErpChecker(self._make_erp())
+        with self.assertRaises(broker.PreconditionFailed):
+            b.execute(intent, grant)
+        self.assertIsNone(b.journal.get(grant["grant"]["nonce"]))
+
+    def test_concurrent_execute_single_effect(self):
+        db = self._target_db()
+        intent = intent_factory()
+        grant = self._grant(intent)
+        b = self._sql_broker(db, lease_s=30)
+        results, errors = [], []
+
+        def worker():
+            try:
+                results.append(b.execute(intent, grant))
+            except core.MandateError as exc:
+                errors.append(type(exc).__name__)
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        con = sqlite3.connect(db)
+        self.assertEqual(con.execute(
+            "SELECT COUNT(*) FROM payments").fetchone()[0], 1)
+        con.close()
+        hashes = {r["receipt"]["hash"] for r in results if r.get("receipt")}
+        self.assertLessEqual(len(hashes), 1)
+        self.assertTrue(results)
+
+    def test_journal_payload_mismatch(self):
+        from mandate.journal import Journal
+        journal = Journal(os.path.join(self.dir, "j.sqlite"))
+        first = journal.begin("n-1", "hash-a", "payment.send", "{}", "{}", 0)
+        self.assertEqual(first["status"], "new")
+        second = journal.begin("n-1", "hash-b", "payment.send", "{}", "{}", 0)
+        self.assertEqual(second["status"], "payload_mismatch")
 
     def test_cli_end_to_end(self):
         env = dict(os.environ)

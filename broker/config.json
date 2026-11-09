@@ -10,6 +10,12 @@
   "broker_name": "gama-broker",
   "effects_dir": "effects",
   "outbox": "outbox",
+  "journal_db": "broker/journal.sqlite",
+  "lease_s": 60,
+  "write": {
+    "mode": "file",
+    "effects_dir": "effects"
+  },
   "smtp": {
     "mode": "dry_run",
     "host": "",

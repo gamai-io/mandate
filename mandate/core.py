@@ -343,6 +343,67 @@ def verify_grant(grant_obj: dict, signers_path: str,
                        now=now)
 
 
+def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
+                         namespace: str = "mandate",
+                         allow_self: bool = False, now: float | None = None,
+                         policy: dict | None = None,
+                         audience: str | None = None,
+                         require_audience: bool = False,
+                         revoked_path: str | None = None) -> dict:
+    intent = normalize_intent(intent)
+    policy_obj = policy if isinstance(policy, dict) else load_policy()
+    decision = check(intent, policy_obj)
+    if decision["decision"] == "deny":
+        raise PolicyDenied("policy denied: %s" % decision.get("reason"))
+    moment = time.time() if now is None else float(now)
+    grant_core = (grant_obj or {}).get("grant") or {}
+    signature = str((grant_obj or {}).get("sig") or "")
+    commitment = intent_commitment(intent)
+    if grant_core.get("commitment") != commitment:
+        raise CommitmentMismatch("grant commitment does not match intent")
+    if grant_core.get("render_hash") != render_hash(intent):
+        raise CommitmentMismatch("grant render hash does not match intent")
+    bound_agent = str(grant_core.get("agent") or "")
+    if bound_agent and bound_agent != str(intent["actor"].get("agent") or ""):
+        raise CommitmentMismatch("grant is bound to a different agent")
+    if audience is not None:
+        bound_audience = str(grant_core.get("audience") or "")
+        if require_audience and not bound_audience:
+            raise GrantInvalid("grant is not bound to a broker audience")
+        if bound_audience and bound_audience != str(audience):
+            raise GrantInvalid("grant audience does not match this broker")
+    if not sign.verify(jcs(grant_core), str(grant_core.get("approver") or ""),
+                       signature, signers_path, namespace,
+                       revoked_path=revoked_path, now=moment):
+        raise GrantInvalid("grant signature invalid")
+    if float((grant_core.get("scope") or {}).get("not_after") or 0) <= moment:
+        raise GrantExpired("grant expired")
+    approver = str(grant_core.get("approver") or "")
+    if not allow_self and approver == str(intent["actor"].get("agent") or ""):
+        raise SelfApproval("agent cannot approve its own effect")
+    return {"intent": intent, "grant": grant_core,
+            "commitment": commitment, "render_hash": render_hash(intent),
+            "moment": moment}
+
+
+def build_receipt(intent: dict, grant_core: dict, commitment: str,
+                  result_hash: str, decision: str = "executed",
+                  ts: float | None = None) -> dict:
+    return {
+        "v": VERSION,
+        "type": "receipt",
+        "proposal_id": proposal_id(intent),
+        "commitment": commitment,
+        "render_hash": render_hash(intent),
+        "approver": str(grant_core.get("approver") or ""),
+        "grant_nonce": str(grant_core.get("nonce") or ""),
+        "decision": decision,
+        "result_hash": result_hash,
+        "ts": int(time.time() if ts is None else ts),
+        "render": render(intent),
+    }
+
+
 def redeem(intent: dict, grant_obj: dict, signers_path: str,
            ledger_path: str, namespace: str = "mandate",
            allow_self: bool = False, now: float | None = None,
@@ -350,51 +411,14 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            audience: str | None = None,
            require_audience: bool = False,
            revoked_path: str | None = None) -> dict:
-    intent = normalize_intent(intent)
-    policy_obj = policy if isinstance(policy, dict) else load_policy()
-    decision = check(intent, policy_obj)
-    if decision["decision"] == "deny":
-        raise PolicyDenied("policy denied: %s" % decision.get("reason"))
-    moment = time.time() if now is None else float(now)
-    core = (grant_obj or {}).get("grant") or {}
-    signature = str((grant_obj or {}).get("sig") or "")
-    commitment = intent_commitment(intent)
-    if core.get("commitment") != commitment:
-        raise CommitmentMismatch("grant commitment does not match intent")
-    if core.get("render_hash") != render_hash(intent):
-        raise CommitmentMismatch("grant render hash does not match intent")
-    bound_agent = str(core.get("agent") or "")
-    if bound_agent and bound_agent != str(intent["actor"].get("agent") or ""):
-        raise CommitmentMismatch("grant is bound to a different agent")
-    if audience is not None:
-        bound_audience = str(core.get("audience") or "")
-        if require_audience and not bound_audience:
-            raise GrantInvalid("grant is not bound to a broker audience")
-        if bound_audience and bound_audience != str(audience):
-            raise GrantInvalid("grant audience does not match this broker")
-    if not sign.verify(jcs(core), str(core.get("approver") or ""), signature,
-                       signers_path, namespace, revoked_path=revoked_path,
-                       now=moment):
-        raise GrantInvalid("grant signature invalid")
-    if float((core.get("scope") or {}).get("not_after") or 0) <= moment:
-        raise GrantExpired("grant expired")
-    approver = str(core.get("approver") or "")
-    if not allow_self and approver == str(intent["actor"].get("agent") or ""):
-        raise SelfApproval("agent cannot approve its own effect")
-    nonce = str(core.get("nonce") or "")
-    receipt = {
-        "v": VERSION,
-        "type": "receipt",
-        "proposal_id": proposal_id(intent),
-        "commitment": commitment,
-        "render_hash": render_hash(intent),
-        "approver": approver,
-        "grant_nonce": nonce,
-        "decision": "executed",
-        "result_hash": sha256(jcs(intent)),
-        "ts": int(moment),
-        "render": render(intent),
-    }
+    verified = verify_authorization(
+        intent, grant_obj, signers_path, namespace, allow_self, now, policy,
+        audience, require_audience, revoked_path)
+    intent = verified["intent"]
+    grant_core = verified["grant"]
+    nonce = str(grant_core.get("nonce") or "")
+    receipt = build_receipt(intent, grant_core, verified["commitment"],
+                            sha256(jcs(intent)), ts=verified["moment"])
     if claim is not None:
         if not claim(nonce):
             raise GrantReplayed("grant already used")

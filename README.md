@@ -117,6 +117,22 @@ mandate revoke --pub key.pub --reason "laptop lost"
 mandate --signers trust/allowed_signers signers   # inspect scopes + fingerprints
 ```
 
+### Idempotent writes and recovery
+
+The broker keeps a SQLite **effect journal** (`journal_db`). The flow is
+`intent → executing → executed → receipted`; the authorisation receipt is
+written only **after** the effect commits. On startup the broker recovers:
+a committed effect without a receipt gets one; a claimed grant with no effect is
+abandoned; a duplicate `execute` returns the original receipt and result.
+
+`write.mode=sqlite` runs a trusted configured statement together with an
+idempotency insert in **one transaction**, keyed by the grant nonce:
+
+```json
+"write": {"mode": "sqlite", "db": "erp.sqlite",
+          "statement": "INSERT INTO payments(nonce,vendor,amount) VALUES(:nonce,:target,:amount)"}
+```
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

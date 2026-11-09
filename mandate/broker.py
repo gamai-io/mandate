@@ -3,14 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sqlite3
 import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import core, sign
-from .adapters import ErpChecker, SmtpSender
+from .adapters import ErpChecker, SmtpSender, WriteAdapter
+from .journal import Journal
 
 BROKER_NAMESPACE = "mandate-broker"
 
@@ -19,33 +19,20 @@ class PreconditionFailed(core.MandateError):
     pass
 
 
-class NonceStore:
-    def __init__(self, path: str):
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        self._lock = threading.Lock()
-        self._con = sqlite3.connect(path, check_same_thread=False)
-        self._con.execute("PRAGMA journal_mode=WAL")
-        self._con.execute(
-            "CREATE TABLE IF NOT EXISTS used(nonce TEXT PRIMARY KEY, ts REAL)")
-        self._con.commit()
-
-    def consume(self, nonce: str) -> bool:
-        with self._lock:
-            try:
-                self._con.execute("INSERT INTO used(nonce, ts) VALUES(?, ?)",
-                                  (str(nonce), time.time()))
-                self._con.commit()
-                return True
-            except sqlite3.IntegrityError:
-                return False
+class ReplayBusy(core.MandateError):
+    pass
 
 
 class Broker:
-    def __init__(self, policy: str, signers: str, ledger: str, nonce_db: str,
+    def __init__(self, policy: str, signers: str, ledger: str,
+                 nonce_db: str = "broker/used.sqlite",
                  receipt_key: str = "", broker_name: str = "gama-broker",
                  effects_dir: str = "effects", outbox: str = "outbox",
                  smtp: dict | None = None, erp: dict | None = None,
-                 require_audience: bool = True, revoked_path: str = ""):
+                 write: dict | None = None,
+                 require_audience: bool = True, revoked_path: str = "",
+                 journal_db: str | None = None, lease_s: float = 60,
+                 recover_on_start: bool = True):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -58,25 +45,19 @@ class Broker:
         self.erp = ErpChecker(erp) if erp else None
         self.require_audience = require_audience
         self.revoked_path = revoked_path
-        self.nonces = NonceStore(nonce_db)
+        write_cfg = dict(write or {})
+        write_cfg.setdefault("effects_dir", effects_dir)
+        self.writer = WriteAdapter(write_cfg)
+        self.journal = Journal(journal_db or (nonce_db + ".journal"),
+                               lease_s=lease_s)
+        self._finalize_lock = threading.Lock()
+        if recover_on_start:
+            self.recover()
 
-    def _run(self, kind: str, intent: dict) -> dict:
+    def _run(self, kind: str, intent: dict, idem_key: str) -> dict:
         if kind == "message.send" and self.smtp is not None:
             return self.smtp.send(intent)
-        stamp = int(time.time() * 1000)
-        record = {"effect": intent["effect"], "nonce": intent["nonce"],
-                  "actor": intent.get("actor"), "requested_by": intent.get("requested_by"),
-                  "ts": int(time.time())}
-        if kind == "message.send":
-            target_dir = self.outbox
-        else:
-            target_dir = self.effects_dir
-        os.makedirs(target_dir, exist_ok=True)
-        path = os.path.join(target_dir, "%s-%s-%s.json" % (
-            kind.replace(".", "_"), intent["nonce"], stamp))
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(core.jcs(record) + "\n")
-        return {"ok": True, "sandbox": True, "effect": kind, "record": path}
+        return self.writer.execute(intent, idem_key)
 
     def _sign_result(self, body: dict) -> dict:
         if not self.receipt_key or not os.path.exists(self.receipt_key):
@@ -86,10 +67,98 @@ class Broker:
             BROKER_NAMESPACE)
         return body
 
+    def _result_entry(self, receipt: dict, result: dict,
+                      result_hash: str) -> dict:
+        kind = str(((receipt.get("body") or {}).get("render") or {})
+                   .get("fields", {}).get("kind") or "")
+        body = {
+            "v": core.VERSION,
+            "type": "result",
+            "receipt_hash": receipt["hash"],
+            "grant_nonce": receipt["body"]["grant_nonce"],
+            "effect": kind,
+            "status": "ok" if result.get("ok", True) else "error",
+            "result_hash": result_hash,
+            "broker": self.broker_name,
+            "ts": int(time.time()),
+        }
+        return core.append_receipt(self.ledger, self._sign_result(body))
+
+    def _finalize(self, nonce: str, intent: dict, grant_core: dict,
+                  commitment: str, result: dict, result_hash: str):
+        with self._finalize_lock:
+            row = self.journal.get(nonce) or {}
+            if row.get("receipt_entry"):
+                return (json.loads(row["receipt_entry"]),
+                        json.loads(row["result_entry"])
+                        if row.get("result_entry") else None)
+            receipt = core.append_receipt(
+                self.ledger,
+                core.build_receipt(intent, grant_core, commitment, result_hash))
+            entry = self._result_entry(receipt, result, result_hash)
+            self.journal.mark_receipted(nonce, core.jcs(receipt),
+                                        core.jcs(entry))
+            return receipt, entry
+
+    def _duplicate(self, nonce: str) -> dict:
+        row = self.journal.get(nonce) or {}
+        if row.get("state") == "executed" and not row.get("receipt_entry"):
+            try:
+                intent = json.loads(row["payload"])
+                grant_core = json.loads(row["grant_core"])
+                result = json.loads(row["result_json"] or "{}")
+                self._finalize(nonce, intent, grant_core,
+                               core.intent_commitment(intent), result,
+                               core.sha256(core.jcs(result)))
+            except (TypeError, ValueError):
+                self.recover()
+            row = self.journal.get(nonce) or {}
+        receipt = json.loads(row["receipt_entry"]) if row.get("receipt_entry") else None
+        entry = json.loads(row["result_entry"]) if row.get("result_entry") else None
+        result = json.loads(row["result_json"]) if row.get("result_json") else None
+        return {"ok": True, "duplicate": True, "effect": row.get("kind"),
+                "receipt": receipt, "result": result, "result_entry": entry}
+
+    def recover(self) -> list[dict]:
+        actions = []
+        for row in self.journal.recoverable():
+            nonce = str(row["idem_key"])
+            if row["state"] == "intent":
+                self.journal.mark_abandoned(nonce, "grant expired before execution")
+                actions.append({"nonce": nonce, "action": "abandoned"})
+                continue
+            if row["state"] == "executing":
+                if self.writer.has_effect(nonce):
+                    result = self.writer.result_for(nonce) or {
+                        "ok": True, "recovered": True}
+                    self.journal.mark_executed(nonce, core.jcs(result),
+                                               external_ref=nonce)
+                    row = self.journal.get(nonce) or {}
+                    actions.append({"nonce": nonce, "action": "effect_found"})
+                else:
+                    self.journal.mark_abandoned(nonce, "lease expired before effect")
+                    actions.append({"nonce": nonce, "action": "abandoned"})
+                    continue
+            if row.get("state") == "executed" and not row.get("receipt_entry"):
+                try:
+                    intent = json.loads(row["payload"])
+                    grant_core = json.loads(row["grant_core"])
+                    result = json.loads(row["result_json"] or "{}")
+                except (TypeError, ValueError):
+                    self.journal.mark_failed(nonce, "journal payload corrupt")
+                    actions.append({"nonce": nonce, "action": "corrupt"})
+                    continue
+                result_hash = core.sha256(core.jcs(result))
+                self._finalize(nonce, intent, grant_core,
+                               core.intent_commitment(intent), result,
+                               result_hash)
+                actions.append({"nonce": nonce, "action": "receipted"})
+        return actions
+
     def execute(self, intent: dict, grant_obj: dict) -> dict:
         intent = core.normalize_intent(intent)
-        decision = core.check(intent, self.policy)
         kind = str(intent["effect"]["kind"])
+        decision = core.check(intent, self.policy)
         if decision["decision"] == "deny":
             raise core.PolicyDenied("policy denied: %s" % decision.get("reason"))
         if not grant_obj:
@@ -103,30 +172,45 @@ class Broker:
             if not derived.get("ok"):
                 raise PreconditionFailed(
                     "erp derivation failed: %s" % derived.get("reason"))
-        receipt = core.redeem(intent, grant_obj, self.signers, self.ledger,
-                              claim=self.nonces.consume,
-                              audience=self.broker_name,
-                              require_audience=self.require_audience,
-                              revoked_path=self.revoked_path or None)
+        verified = core.verify_authorization(
+            intent, grant_obj, self.signers, policy=self.policy,
+            audience=self.broker_name, require_audience=self.require_audience,
+            revoked_path=self.revoked_path or None)
+        intent = verified["intent"]
+        grant_core = verified["grant"]
+        nonce = str(grant_core.get("nonce") or "")
+        intent_hash = core.sha256(core.jcs(intent))
+        begin = self.journal.begin(
+            nonce, intent_hash, kind, core.jcs(intent), core.jcs(grant_core),
+            (grant_core.get("scope") or {}).get("not_after"))
+        status = begin["status"]
+        if status == "payload_mismatch":
+            raise core.GrantInvalid("same nonce used for a different intent")
+        if status == "terminal":
+            raise core.GrantInvalid("grant already failed or abandoned")
+        if status == "busy":
+            raise ReplayBusy("execution in progress")
+        if status == "done":
+            return self._duplicate(nonce)
+        if not self.journal.claim(nonce, self.broker_name):
+            row = self.journal.get(nonce) or {}
+            if row.get("state") in ("executed", "receipted"):
+                return self._duplicate(nonce)
+            raise ReplayBusy("execution in progress")
         try:
-            result = self._run(kind, intent)
-            status = "ok"
+            result = self._run(kind, intent, nonce)
         except Exception as exc:
-            result = {"ok": False, "error": str(exc)[:200]}
-            status = "error"
-        body = {
-            "v": core.VERSION,
-            "type": "result",
-            "receipt_hash": receipt["hash"],
-            "grant_nonce": receipt["body"]["grant_nonce"],
-            "effect": kind,
-            "status": status,
-            "result_hash": core.sha256(core.jcs(result)),
-            "broker": self.broker_name,
-            "ts": int(time.time()),
-        }
-        entry = core.append_receipt(self.ledger, self._sign_result(body))
-        return {"ok": status == "ok", "effect": kind, "receipt": receipt,
+            self.journal.mark_failed(nonce, str(exc))
+            raise
+        result_json = core.jcs(result)
+        result_hash = core.sha256(result_json)
+        self.journal.mark_executed(
+            nonce, result_json,
+            external_ref=result.get("path") or result.get("idem_key"))
+        receipt, entry = self._finalize(
+            nonce, intent, grant_core, verified["commitment"], result,
+            result_hash)
+        return {"ok": True, "effect": kind, "receipt": receipt,
                 "result": result, "result_entry": entry}
 
     def status(self) -> dict:
@@ -134,13 +218,14 @@ class Broker:
                 "policy": self.policy_path, "effects": sorted(self.policy["effects"]),
                 "signers": bool(os.path.exists(self.signers)),
                 "receipt_key": bool(self.receipt_key and os.path.exists(self.receipt_key)),
-                "smtp": bool(self.smtp), "erp": bool(self.erp)}
+                "smtp": bool(self.smtp), "erp": bool(self.erp),
+                "writer": self.writer.mode, "journal": self.journal.counts()}
 
 
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.7"
+        server_version = "mandate-broker/0.8"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -203,6 +288,10 @@ def main(argv=None) -> int:
     parser.add_argument("--broker-name", default=os.environ.get("MANDATE_BROKER_NAME", "gama-broker"))
     parser.add_argument("--effects-dir", default=os.environ.get("MANDATE_EFFECTS_DIR", "effects"))
     parser.add_argument("--outbox", default=os.environ.get("MANDATE_OUTBOX", "outbox"))
+    parser.add_argument("--journal-db", default=os.environ.get("MANDATE_JOURNAL_DB", ""))
+    parser.add_argument("--lease", type=float,
+                        default=float(os.environ.get("MANDATE_LEASE_S", "60")))
+    parser.add_argument("--no-recover", action="store_true")
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
     parser.add_argument("--allow-any-audience", action="store_true")
@@ -216,9 +305,11 @@ def main(argv=None) -> int:
             cfg = json.load(fh)
         for key in ("host", "port", "policy", "signers", "ledger", "nonce_db",
                     "receipt_key", "broker_name", "effects_dir", "outbox",
-                    "revoked"):
+                    "revoked", "journal_db"):
             if key in cfg:
                 setattr(args, key, cfg[key])
+        if "lease_s" in cfg:
+            args.lease = float(cfg["lease_s"])
 
     if args.host not in ("127.0.0.1", "::1", "localhost") and not args.allow_remote:
         print("refusing to bind non-loopback host without --allow-remote", flush=True)
@@ -231,8 +322,12 @@ def main(argv=None) -> int:
                     receipt_key=args.receipt_key, broker_name=args.broker_name,
                     effects_dir=args.effects_dir, outbox=args.outbox,
                     smtp=cfg.get("smtp"), erp=cfg.get("erp"),
+                    write=cfg.get("write"),
                     require_audience=not args.allow_any_audience,
-                    revoked_path=args.revoked)
+                    revoked_path=args.revoked,
+                    journal_db=args.journal_db or None,
+                    lease_s=args.lease,
+                    recover_on_start=not args.no_recover)
     server = make_server(args.host, args.port, broker)
     host, port = server.server_address[:2]
     print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)
