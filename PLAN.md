@@ -20,6 +20,7 @@
 - [x] SMTP adapter (`dry_run` default; `live` reads password from env)
 - [x] Payment adapter with provider idempotency + lookup/reconciliation
 - [x] MSSQL/ERP read-only driver (optional `pyodbc`, SELECT/WITH only)
+- [x] pymssql/FreeTDS driver (`tds_version`) and live read-only check
 - [ ] Move write credentials (SQL write, payment, WA) into the broker
 - [ ] Per-effect adapters + integration tests against a fake ERP
 

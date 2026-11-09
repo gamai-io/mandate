@@ -241,7 +241,8 @@ never charges twice.
 For MSSQL: `"driver": "mssql"`, `"dsn": "...", "user_env": "...",
 "password_env": "..."` and `pip install gama-mandate[mssql]`. For FreeTDS without
 an ODBC driver use `"driver": "pymssql"`, `"server": "...", "database": "...",
-"user_env": "...", "password_env": "..."`. Only `SELECT`/`WITH` queries are
+"tds_version": "7.0"` (default; raise it only if the server supports it),
+`"user_env": "...", "password_env": "..."`. Only `SELECT`/`WITH` queries are
 accepted; SQLite opens `mode=ro`, MSSQL runs read-only and rolls back.
 
 ## Provenance (sycophancy firewall)
@@ -317,14 +318,15 @@ skills/     agent skill instructions
 
 ## Status
 
-**Alpha** — reference implementation v0.13.0: canonical commitment, Ed25519
+**Alpha** — reference implementation v0.16.1: canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
-hash-chained receipts with a `.head` anchor, idempotent effect journal + write
-adapter, payment adapter with provider idempotency and reconciliation,
-read-only ERP (SQLite/MSSQL) preconditions, SMTP, Merkle transparency log with
-an off-host witness, approver daemon with advisory Telegram notification,
-portable JOSE-style receipt export, MCP server (`mandate-mcp`), and a red-team
-test suite. See `PLAN.md` and `docs/THREAT_MODEL.md` for limits.
+hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
+effect journal + write adapter, payment adapter with provider idempotency and
+reconciliation, read-only ERP (SQLite/MSSQL/pymssql) checks, SMTP, Merkle
+transparency log with an off-host witness, approver daemon with advisory
+Telegram notification, hardware-backed `sk-` keys, portable JOSE-style receipt
+export, MCP server (`mandate-mcp`), `/metrics`, rate limiting, and a red-team
+test suite. See `STATUS.md` and `docs/THREAT_MODEL.md` for limits.
 
 ## Honest limitation
 

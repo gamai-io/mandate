@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.1 — 2026-11-09
+- pymssql ERP driver: configurable `tds_version` (default `7.0` for older
+  servers). A live read-only MSSQL check against `master`/`sys.tables` passed
+  through the adapter (no business data).
+- `STATUS.md` handover/state document; sdist includes it.
+- No behavior change for SQLite/pyodbc; 106 tests.
+
 ## 0.16.0 — 2026-11-09
 - **OIDC trusted publishing** path in the release workflow (dual path). Set the
   repo variable `PYPI_OIDC=true` after configuring the PyPI trusted publisher;

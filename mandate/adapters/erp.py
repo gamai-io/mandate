@@ -44,9 +44,11 @@ class ErpChecker:
                     raise RuntimeError("pymssql not installed") from exc
                 server = str(self.cfg.get("server") or self.dsn)
                 database = str(self.cfg.get("database") or "master")
+                tds = str(self.cfg.get("tds_version") or "7.0")
                 return pymssql.connect(server=server, user=user,
                                        password=password, database=database,
-                                       login_timeout=10, timeout=10)
+                                       tds_version=tds, login_timeout=10,
+                                       timeout=10)
             try:
                 import pyodbc
             except ImportError as exc:
