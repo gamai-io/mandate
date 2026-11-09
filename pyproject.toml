@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-mandate"
-version = "0.10.1"
+version = "0.10.2"
 description = "Signed, verifiable business commitments for AI agents: canonical commitment, off-host Ed25519 grant, one-shot redemption, hash-chained receipts."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -20,7 +20,10 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/gama/mandate"
+Homepage = "https://github.com/gamai-io/mandate"
+Repository = "https://github.com/gamai-io/mandate"
+Issues = "https://github.com/gamai-io/mandate/issues"
+Changelog = "https://github.com/gamai-io/mandate/blob/main/CHANGELOG.md"
 
 [project.scripts]
 mandate = "mandate.cli:main"

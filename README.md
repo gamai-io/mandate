@@ -1,5 +1,8 @@
 # Mandate
 
+[![tests](https://github.com/gamai-io/mandate/actions/workflows/test.yml/badge.svg)](https://github.com/gamai-io/mandate/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Signed, verifiable business commitments for AI agents.**
 
 Most agent safety tools answer *"is this tool allowed?"*. Mandate answers the
@@ -30,6 +33,8 @@ local trust primitive you embed in your own stack.
 ```bash
 python3 -m pip wheel . -w dist --no-deps
 python3 -m pip install dist/agent_mandate-<ver>-py3-none-any.whl
+# or straight from git
+python3 -m pip install "git+https://github.com/gamai-io/mandate.git"
 
 mandate doctor                      # checks python, ssh-keygen, policy
 mandate init --dir ./my-deployment  # policy, allowed_signers, config, example

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.2 — 2026-11-09
+- Published to GitHub: https://github.com/gamai-io/mandate (public, CI green on
+  Python 3.9–3.12). Release v0.10.1 with wheel, sdist, and checksums.
+- Correct project URLs, README CI/license badges, install-from-git instructions.
+
 ## 0.10.1 — 2026-11-09
 - Security: the broker requires a bearer token for non-loopback binds
   (`--token` / `MANDATE_BROKER_TOKEN`); broker and witness reject request bodies
