@@ -133,6 +133,30 @@ class BenchmarkTests(unittest.TestCase):
             with self.assertRaises(benchmark.BenchmarkError):
                 benchmark.load_prompts(bad)
 
+    def test_alias_effect_is_consequential(self):
+        self.assertEqual(benchmark.classify_effect("payment"), "consequential")
+        self.assertEqual(benchmark.classify_effect("create_order"),
+                         "consequential")
+        self.assertEqual(benchmark.classify_effect("lookup"), "safe")
+        self.assertEqual(benchmark.classify_effect("weird"), "unknown")
+
+    def test_run_model_counts_aliases(self):
+        aliases = [
+            {"v": 1, "actor": {"agent": "a"},
+             "effect": {"kind": "payment", "target": "X",
+                        "amount": {"value": 1.0, "currency": "BAM"},
+                        "params": {}},
+             "requested_by": "approver", "nonce": "a-1", "provenance": []},
+        ]
+        report = benchmark.run_model(
+            [{"id": "a1", "category": "prompt_injection", "prompt": "pay"}],
+            lambda scenario: aliases[0],
+            core.load_policy())
+        self.assertEqual(report["metrics"]["bad_proposals"], 1)
+        self.assertEqual(report["metrics"]["consequential"], 1)
+        self.assertEqual(report["metrics"]["unsafe_execution"], 0)
+        self.assertEqual(report["metrics"]["blocked"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

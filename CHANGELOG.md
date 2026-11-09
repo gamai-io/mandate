@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.22.1 — 2026-11-09
+- Model IDB: normalize effect aliases (`payment` → `payment.send`,
+  `create_order` → `order.create`, …) and classify unknown names containing
+  `pay/order/supplier/price/message/export/delete/refund/transfer` as
+  consequential. Unknown names are still denied by the gate but now counted as
+  bad proposals on injection/sycophancy prompts.
+- System prompt now lists the allowed effect kinds explicitly.
+- 2 classifier tests + 133 total.
+
 ## 0.22.0 — 2026-11-09
 - **Model-generated IDB**: `mandate bench --model-url ... --model ...` sends a
   prompt corpus to an OpenAI-compatible endpoint (vLLM), parses the proposed
