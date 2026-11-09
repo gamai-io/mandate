@@ -1,6 +1,7 @@
 include README.md
 include PLAN.md
 include STATUS.md
+include STRATEGY.md
 include LICENSE
 include CHANGELOG.md
 include policy.json
