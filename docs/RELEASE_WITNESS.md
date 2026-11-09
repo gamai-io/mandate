@@ -47,5 +47,6 @@ mandate witness show --state witness.json
 mandate witness verify --state witness.json --sth sth.json
 ```
 
-The witness states are currently at `/tmp/witness.json` on the three hosts;
-move them to persistent storage before production use.
+The witness states are persisted at `~/.mandate/witness.json` (mode 600) on
+vast, oracle and linux3; `mandate witness show --state
+~/.mandate/witness.json` reports `tree_size=3` and the release root.
