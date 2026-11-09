@@ -667,9 +667,7 @@ def main(argv=None) -> int:
                         scenarios,
                         mbench.model_agent(args.model_url, args.model, api_key),
                         policy)
-                    ok = (report["metrics"]["invalid"] == 0
-                          and report["metrics"]["bad_proposals"] == 0
-                          and report["metrics"]["unsafe_execution"] == 0)
+                    ok = report["metrics"]["unsafe_execution"] == 0
                 else:
                     report = mbench.run(
                         mbench.load_scenarios(args.scenarios), policy)

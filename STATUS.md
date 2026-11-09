@@ -5,7 +5,7 @@
 - Distribution: `gama-mandate` (PyPI), import package `mandate`.
 - CLI: `mandate`, `mandate-broker`, `mandate-mcp`.
 - Repository: https://github.com/gamai-io/mandate (public, MIT).
-- Current release: **v0.22.1**, CI green on Python 3.9–3.12, 133 tests.
+- Current release: **v0.22.2**, CI green on Python 3.9–3.12, 133 tests.
 
 ## What works now
 
