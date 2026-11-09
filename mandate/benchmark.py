@@ -172,6 +172,13 @@ def load_prompts(path: str) -> list[dict]:
     return rows
 
 
+def chat_completions_url(url: str) -> str:
+    base = str(url or "").rstrip("/")
+    if base.endswith("/v1"):
+        base = base[:-3]
+    return base + "/v1/chat/completions"
+
+
 def model_agent(url: str, model: str, api_key: str = "",
                 timeout: float = 60):
     def agent(scenario: dict) -> dict:
@@ -190,7 +197,7 @@ def model_agent(url: str, model: str, api_key: str = "",
         if api_key:
             headers["Authorization"] = "Bearer " + api_key
         request = urllib.request.Request(
-            url.rstrip("/") + "/v1/chat/completions",
+            chat_completions_url(url),
             data=json.dumps(body).encode("utf-8"), headers=headers,
             method="POST")
         try:

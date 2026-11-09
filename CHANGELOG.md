@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.24.1 — 2026-11-09
+- Fix model benchmark URL handling: `--model-url` may end with `/v1`
+  (previously produced `/v1/v1/chat/completions` and HTTP 404); added test.
+- 138 tests.
+
 ## 0.24.0 — 2026-11-09
 - **Auditor bundle**: `mandate audit bundle` packages the intent, signed grant,
   hash-chained receipt, Merkle inclusion proof, signed tree head and witness

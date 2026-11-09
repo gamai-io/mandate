@@ -120,6 +120,12 @@ class BenchmarkTests(unittest.TestCase):
         with self.assertRaises(benchmark.BenchmarkError):
             agent({"prompt": "x"})
 
+    def test_chat_url_accepts_v1_suffix(self):
+        for base in ("http://h:8000", "http://h:8000/",
+                     "http://h:8000/v1", "http://h:8000/v1/"):
+            self.assertEqual(benchmark.chat_completions_url(base),
+                             "http://h:8000/v1/chat/completions")
+
     def test_load_prompts_validation(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
