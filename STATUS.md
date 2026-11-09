@@ -26,7 +26,8 @@
 - Operations: `/metrics` (Prometheus text) and per-IP rate limiting.
 - MCP manifest gate: signed lock, rug-pull/poisoned-manifest deny, stdio proxy.
 - MCP taint gate: untrusted source → effect requires a grant + `data_ref`.
-- Sandbox runner: hardened Docker (verified), gVisor, Firecracker template.
+- Sandbox runner: hardened Docker (verified), gVisor (verified end-to-end on a
+  lab VM with `runsc`), Firecracker runtime (verified; stdio launcher pending).
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items
@@ -40,6 +41,8 @@
   `PYPI_OIDC=true`; until then the `PYPI_API_TOKEN` secret is used.
 - One live MSSQL check passed with pymssql/FreeTDS; ODBC Driver 18 failed TLS
   negotiation against an older server. Use `driver=pymssql` there.
+- Firecracker runtime is verified; a serial-console-to-stdio launcher for an MCP
+  server inside the microVM is not implemented yet (template hook exists).
 - A single transparency log cannot prevent split-view by its operator; pin the
   STH with the witness on a separate host.
 

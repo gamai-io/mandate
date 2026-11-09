@@ -38,6 +38,7 @@
 - [x] MCP manifest gate (signed lock, rug-pull deny, stdio proxy) — Phase 1
 - [x] Taint gate (untrusted source → consequential effect needs data_ref + grant)
 - [x] Sandbox runner for untrusted MCP servers (Docker verified; gVisor/Firecracker template)
+- [ ] Firecracker stdio launcher for an MCP server inside a microVM
 - [x] Hardware-backed approver keys (`sk-ssh-ed25519`) via `require_hardware_key`
 - [x] OIDC trusted-publishing path in the release workflow
 - [ ] Full WebAuthn/passkeys (browser/CBOR stack)
