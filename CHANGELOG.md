@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.1 — 2026-11-09
+- Privacy: repository is now **private**; example names, vendor names, and local
+  domains were removed from the tree and from the package metadata. No personal,
+  customer, or vendor data is included. Code unchanged; 78 tests.
+
 ## 0.11.0 — 2026-11-09
 - **Approver daemon** (`mandate approver serve`): runs on the approver's host,
   recomputes the commitment and render from the intent (it does not trust the

@@ -229,7 +229,7 @@ class Broker:
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.11.0"
+        server_version = "mandate-broker/0.11.1"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
