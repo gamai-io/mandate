@@ -309,6 +309,28 @@ with an OpenSSH SSHSIG in namespace `mandate-mcp` (`namespaces="mandate-mcp"` in
 `allowed_signers`). The proxy denies a changed manifest and any tool not in the
 lock; `--verify-calls` re-probes before each call.
 
+## Taint gate (Phase 2)
+
+After an untrusted source (web, email, RAG, MCP output) is read, an effect tool
+requires a Mandate grant and a `data_ref`:
+
+```json
+{"sources": ["web_fetch"], "effects": ["pay"], "require_grant": true}
+```
+
+The agent attaches the grant to the call; the proxy verifies it, requires a
+`data_ref` provenance entry when the session is tainted, consumes it (replay
+denied) and strips `_mandate` before forwarding:
+
+```json
+{"name": "pay", "arguments": {"amount": 1,
+  "_mandate": {"intent": {"effect": {"kind": "mcp.call", "target": "pay",
+     "params": {"args_sha256": "…"}}, "provenance": [{"type": "data_ref",
+     "source": "erp:vendor:1"}]}, "grant": {…}}}}
+```
+
+Run with `mandate mcp proxy --taint taint.json --mcp-ledger ledger.jsonl`.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

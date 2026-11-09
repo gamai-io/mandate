@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.0 — 2026-11-09
+- **MCP taint gate (Phase 2)**: `mandate mcp proxy --taint taint.json` marks the
+  session tainted after a source tool (`web_fetch`, email, RAG, …). An effect
+  tool then requires a Mandate grant in `arguments._mandate` for
+  `effect.kind="mcp.call"`, with matching `target` and `args_sha256`; after
+  taint it also requires a `data_ref` provenance entry. The grant is verified
+  and consumed (replay denied); `_mandate` is stripped before forwarding.
+- Policy: `mcp.call` (high risk).
+- 2 taint tests + 114 total.
+
 ## 0.17.0 — 2026-11-09
 - **MCP manifest gate (Phase 1)**: `mandate mcp lock` builds a signed lock of
   tool descriptions/schemas (SHA-256 over canonical JSON, OpenSSH SSHSIG in

@@ -48,7 +48,7 @@ class McpTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         data = json.loads(result.stdout)
         self.assertTrue(data["valid"])
-        self.assertEqual(data["tools"], ["pay", "read"])
+        self.assertEqual(data["tools"], ["pay", "read", "web_fetch"])
 
     def test_poisoned_manifest_rejected(self):
         self._lock()
@@ -102,7 +102,7 @@ class McpTests(unittest.TestCase):
         listing = self._rpc(proc, {"jsonrpc": "2.0", "id": 2,
                                    "method": "tools/list"})
         names = [tool["name"] for tool in listing["result"]["tools"]]
-        self.assertEqual(sorted(names), ["pay", "read"])
+        self.assertEqual(sorted(names), ["pay", "read", "web_fetch"])
         call = self._rpc(proc, {"jsonrpc": "2.0", "id": 3,
                                 "method": "tools/call",
                                 "params": {"name": "pay", "arguments": {}}})

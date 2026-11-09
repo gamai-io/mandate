@@ -333,9 +333,12 @@ def _cmd_mcp(args) -> int:
                    "tools": sorted((lock.get("tools") or {}).keys())}, None)
             return 0 if valid else 1
         if cmd == "proxy":
-            return mmcp.proxy(_read(args.lock), server_cmd, args.signers,
-                              verify_calls=args.verify_calls,
-                              revoked_path=args.revoked)
+            taint = _read(args.taint) if args.taint else {}
+            return mmcp.proxy(
+                _read(args.lock), server_cmd, args.signers,
+                verify_calls=args.verify_calls, revoked_path=args.revoked,
+                taint=taint, mcp_policy=core.load_policy(args.policy),
+                ledger=args.mcp_ledger, audience=args.mcp_audience)
     except (core.MandateError, OSError, ValueError) as exc:
         if cmd == "proxy":
             print("mandate mcp proxy: %s" % str(exc)[:200], file=sys.stderr)
@@ -518,6 +521,9 @@ def main(argv=None) -> int:
     p_mp.add_argument("--lock", required=True)
     p_mp.add_argument("--cmd", dest="mcp_server_cmd", required=True)
     p_mp.add_argument("--verify-calls", action="store_true")
+    p_mp.add_argument("--taint", default=None)
+    p_mp.add_argument("--mcp-ledger", default="mcp_ledger.jsonl")
+    p_mp.add_argument("--mcp-audience", default="")
 
     p_req = sub.add_parser("request")
     p_req.add_argument("--approver", required=True)

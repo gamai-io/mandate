@@ -9,6 +9,7 @@
     "supplier.change": {"risk": "high", "max_auto": 0, "require_data_ref": ["target"]},
     "price.change": {"risk": "high", "max_auto": 0, "require_data_ref": ["target", "amount"]},
     "message.send": {"risk": "medium", "max_auto": 0, "require_data_ref": ["target"]},
-    "file.export": {"risk": "medium", "max_auto": 0}
+    "file.export": {"risk": "medium", "max_auto": 0},
+    "mcp.call": {"risk": "high", "max_auto": 0}
   }
 }

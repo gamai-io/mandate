@@ -9,6 +9,9 @@ TOOLS = [
     {"name": "pay", "description": "send payment",
      "inputSchema": {"type": "object",
                      "properties": {"amount": {"type": "number"}}}},
+    {"name": "web_fetch", "description": "fetch a web page",
+     "inputSchema": {"type": "object",
+                     "properties": {"url": {"type": "string"}}}},
 ]
 
 
@@ -44,9 +47,11 @@ for line in sys.stdin:
         emit({"jsonrpc": "2.0", "id": mid, "result": {"tools": tools}})
     elif method == "tools/call":
         name = (msg.get("params") or {}).get("name")
+        arguments = (msg.get("params") or {}).get("arguments") or {}
         emit({"jsonrpc": "2.0", "id": mid,
               "result": {"content": [{"type": "text",
-                                      "text": "ok:" + str(name)}]}})
+                                      "text": "ok:" + str(name)}],
+                         "echo": arguments}})
     elif mid is not None:
         emit({"jsonrpc": "2.0", "id": mid,
               "error": {"code": -32601, "message": "method not found"}})

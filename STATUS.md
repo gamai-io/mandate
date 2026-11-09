@@ -5,7 +5,7 @@
 - Distribution: `gama-mandate` (PyPI), import package `mandate`.
 - CLI: `mandate`, `mandate-broker`, `mandate-mcp`.
 - Repository: https://github.com/gamai-io/mandate (public, MIT).
-- Current release: **v0.17.0**, CI green on Python 3.9–3.12, 112 tests.
+- Current release: **v0.18.0**, CI green on Python 3.9–3.12, 114 tests.
 
 ## What works now
 
@@ -25,6 +25,7 @@
 - Portable receipt envelope (`mandate export`) with OpenSSH SSHSIG.
 - Operations: `/metrics` (Prometheus text) and per-IP rate limiting.
 - MCP manifest gate: signed lock, rug-pull/poisoned-manifest deny, stdio proxy.
+- MCP taint gate: untrusted source → effect requires a grant + `data_ref`.
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items

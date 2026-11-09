@@ -172,17 +172,63 @@ def probe(cmd: str, timeout: float = 10, server: str = "") -> dict:
 
 def proxy(lock: dict, cmd: str, signers_path: str,
           verify_calls: bool = False, revoked_path: str | None = None,
-          in_stream=None, out_stream=None) -> int:
+          in_stream=None, out_stream=None, taint: dict | None = None,
+          mcp_policy: dict | None = None, ledger: str | None = None,
+          audience: str = "") -> int:
     if not verify_lock(lock, signers_path, revoked_path=revoked_path):
         raise McpError("MCP lock signature invalid")
     in_stream = in_stream or sys.stdin
     out_stream = out_stream or sys.stdout
+    taint = taint or {}
+    sources = {str(item) for item in (taint.get("sources") or [])}
+    effects = {str(item) for item in (taint.get("effects") or [])}
+    require_grant = bool(taint.get("require_grant", True))
+    ledger_path = ledger or "mcp_ledger.jsonl"
+    tainted = False
     args = shlex.split(str(cmd))
     proc = subprocess.Popen(args, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=None,
                             text=True, bufsize=1)
     pending: dict = {}
     lock_tools = lock.get("tools") or {}
+
+    def deny(mid, message_text: str) -> None:
+        if mid is not None:
+            out_stream.write(json.dumps({
+                "jsonrpc": "2.0", "id": mid,
+                "error": {"code": -32003, "message": message_text}}) + "\n")
+            out_stream.flush()
+
+    def authorize_effect(name: str, arguments: dict, mandate) -> str:
+        if not isinstance(mandate, dict):
+            return "mandate: grant required for effect tool '%s'" % name
+        intent = mandate.get("intent") or {}
+        grant = mandate.get("grant") or {}
+        try:
+            intent = core.normalize_intent(intent)
+        except core.MandateError:
+            return "mandate: invalid intent"
+        effect = intent.get("effect") or {}
+        if str(effect.get("kind")) != "mcp.call":
+            return "mandate: grant is not for mcp.call"
+        if str(effect.get("target")) != name:
+            return "mandate: grant target does not match tool"
+        args_sha = core.sha256(core.jcs(arguments))
+        if str((effect.get("params") or {}).get("args_sha256")) != args_sha:
+            return "mandate: grant arguments do not match"
+        if tainted and not any(
+                entry.get("type") == "data_ref"
+                and str(entry.get("source") or "").strip()
+                for entry in (intent.get("provenance") or [])):
+            return "mandate: data_ref required after untrusted content"
+        try:
+            core.redeem(intent, grant, signers_path, ledger_path,
+                        policy=mcp_policy, audience=audience or None,
+                        require_audience=bool(audience),
+                        revoked_path=revoked_path)
+        except core.MandateError as exc:
+            return "mandate: grant rejected (%s)" % type(exc).__name__
+        return ""
 
     def reader() -> None:
         for line in proc.stdout:
@@ -221,16 +267,24 @@ def proxy(lock: dict, cmd: str, signers_path: str,
             method = message.get("method")
             mid = message.get("id")
             if method == "tools/call":
-                name = str((message.get("params") or {}).get("name") or "")
+                params = message.get("params") or {}
+                name = str(params.get("name") or "")
+                arguments = params.get("arguments")
+                if not isinstance(arguments, dict):
+                    arguments = {}
+                mandate = arguments.pop("_mandate", None)
                 if name not in lock_tools:
-                    if mid is not None:
-                        out_stream.write(json.dumps({
-                            "jsonrpc": "2.0", "id": mid,
-                            "error": {"code": -32002,
-                                      "message": "mandate: tool not in lock: %s"
-                                                 % name}}) + "\n")
-                        out_stream.flush()
+                    deny(mid, "mandate: tool not in lock: %s" % name)
                     continue
+                if name in sources:
+                    tainted = True
+                if name in effects and require_grant:
+                    reason = authorize_effect(name, arguments, mandate)
+                    if reason:
+                        deny(mid, reason)
+                        continue
+                params["arguments"] = arguments
+                message["params"] = params
                 if verify_calls:
                     try:
                         manifest = probe(cmd, server=str(lock.get("server") or ""))
@@ -247,7 +301,7 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                         continue
             if mid is not None and method == "tools/list":
                 pending[mid] = method
-            proc.stdin.write(text + "\n")
+            proc.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
             proc.stdin.flush()
     finally:
         try:
