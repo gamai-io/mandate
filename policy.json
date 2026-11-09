@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "default": "deny",
+  "effects": {
+    "read.lookup": {"risk": "low"},
+    "quote.create": {"risk": "medium", "max_auto": 0},
+    "order.create": {"risk": "high", "max_auto": 0},
+    "payment.send": {"risk": "high", "max_auto": 0},
+    "supplier.change": {"risk": "high", "max_auto": 0},
+    "price.change": {"risk": "high", "max_auto": 0},
+    "message.send": {"risk": "medium", "max_auto": 0},
+    "file.export": {"risk": "medium", "max_auto": 0}
+  }
+}

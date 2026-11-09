@@ -1,0 +1,87 @@
+# Mandate
+
+**Signed, verifiable business commitments for AI agents.**
+
+Most agent safety tools answer *"is this tool allowed?"*. Mandate answers the
+question that actually matters: **"who ordered this exact payment, to this
+supplier, for this amount?"** A tool permission is not a business mandate.
+
+Every consequential effect becomes a canonical **Commitment** object. An agent
+signs the intent; a human co-signs a **Grant** with an Ed25519 key; execution
+produces a hash-chained **Receipt**. Anyone can verify the whole chain offline.
+
+> Approval workflows are ephemeral events. A Mandate is a durable, portable,
+> cryptographically bound artifact — a commit, not a log line.
+
+## Why it is not another approval gate
+
+| Approval gate | Mandate |
+|---|---|
+| Asks "may this tool run?" | Asks "is this exact effect authorised?" |
+| Identity is a self-asserted field | Approver proves possession of an off-host key |
+| Approval is a mutable DB row | Grant + receipt are signed, content-addressed |
+| Logs what happened | Lets anyone prove what was authorised |
+
+## Quickstart
+
+```bash
+export PYTHONPATH=$PWD
+
+# 1. on the approver's device (never on the agent host)
+ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
+# append the PUBLIC key to trust/allowed_signers as: approver ssh-ed25519 AAAA... mandate
+
+# 2. agent proposes
+./bin/mandate propose --intent examples/intent.json --out /tmp/proposal.json
+
+# 3. human grants (signs the commitment)
+./bin/mandate grant --proposal /tmp/proposal.json --approver approver \
+  --key ~/.ssh/mandate --out /tmp/grant.json
+
+# 4. agent redeems exactly once
+./bin/mandate redeem --intent examples/intent.json --grant /tmp/grant.json \
+  --ledger ledger.jsonl
+
+# 5. anyone verifies offline
+./bin/mandate verify --receipt ... --intent examples/intent.json --grant /tmp/grant.json
+./bin/mandate chain --ledger ledger.jsonl
+```
+
+Exit codes for `check`: `0` allow · `10` ask (grant required) · `20` deny.
+
+## Design invariants
+
+1. **Effect, not tool.** The registry keys on `payment.send`, not on
+   `gama_sql`. The same effect is the same commitment regardless of executor.
+2. **Canonical bytes.** JCS-style canonical JSON; the commitment is the hash of
+   `{v, effect, requested_by}`. Same content ⇒ same id, any language.
+3. **Off-host key.** The approver's private key never lives where the agent
+   runs. The host stores only public keys (`trust/allowed_signers`).
+4. **One-shot, nonce-bound.** A grant is redeemable once; replays fail.
+5. **Agent cannot self-approve.** Enforced in code, not by convention.
+6. **Fail closed.** Unknown effects are denied. Missing signer ⇒ invalid.
+
+## Layout
+
+```
+spec/       MANDATE-1 data model
+mandate/    stdlib-only reference implementation
+bin/        CLI
+adapters/   MCP server
+tests/      unit + bypass tests (red-team)
+docs/       THREAT_MODEL, NON_GOALS, PLAN
+skills/     agent skill instructions
+```
+
+## Status
+
+Reference implementation v0.1: canonical commitment, Ed25519 grant, one-shot
+redeem, hash-chained receipts, bypass tests. See `PLAN.md` for the roadmap
+(effect broker, transparency log, WebAuthn, ERP adapters).
+
+## Honest limitation
+
+Cryptography proves *who authorised what*. It does **not** isolate
+credentials. Until the credentials that cause the effect (SQL write, payment
+API, mail) live only in an effect broker, a compromised agent can bypass
+Mandate entirely. That broker is the next milestone — see `PLAN.md`.

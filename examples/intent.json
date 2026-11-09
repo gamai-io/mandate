@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "actor": {"agent": "opencode@contabo", "session": "demo-session"},
+  "effect": {
+    "kind": "payment.send",
+    "target": "Example Supplier",
+    "amount": {"value": 1170.0, "currency": "BAM"},
+    "params": {"ref": "faktura-77"}
+  },
+  "requested_by": "approver",
+  "nonce": "demo-nonce-1",
+  "provenance": [{"type": "data_ref", "source": "erp:vendor:1"}]
+}

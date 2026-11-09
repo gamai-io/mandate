@@ -1,0 +1,5 @@
+# Allowed signers for mandat grants (OpenSSH allowed_signers format).
+# Generate the keypair on the approver's device, never on the host:
+#   ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
+# Append the PUBLIC key as:
+#   <approver-name> ssh-ed25519 AAAAC3Nza... mandate
