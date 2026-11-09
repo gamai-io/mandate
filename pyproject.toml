@@ -9,7 +9,7 @@ description = "Signed, verifiable business commitments for AI agents: canonical 
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
-authors = [{name = "GAMA"}]
+authors = [{name = "The Mandate Authors"}]
 keywords = ["ai-agents", "trust", "approval", "commitment", "ed25519", "audit"]
 classifiers = [
   "Programming Language :: Python :: 3",
