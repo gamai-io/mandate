@@ -16,6 +16,7 @@ SIF=/appl/local/laifs/containers/lumi-multitorch-latest.sif
 : "${MODEL_NAME:?set MODEL_NAME}"
 SCENARIOS="${SCENARIOS:-bench/scenarios/model_prompts.jsonl}"
 WORKERS="${WORKERS:-1}"
+TP="${TP:-4}"
 OUT="${OUT:-idb-model-${MODEL_NAME}-${SLURM_JOB_ID}.json}"
 cd "$SLURM_SUBMIT_DIR"
 LOG="vllm_${MODEL_NAME}_${SLURM_JOB_ID}.log"
@@ -23,7 +24,7 @@ LOG="vllm_${MODEL_NAME}_${SLURM_JOB_ID}.log"
 singularity exec "$SIF" python3 -m vllm.entrypoints.openai.api_server \
   --host 127.0.0.1 --port 8000 \
   --model "$MODEL_PATH" --served-model-name "$MODEL_NAME" \
-  --tensor-parallel-size 4 --max-model-len 32768 \
+  --tensor-parallel-size "$TP" --max-model-len 32768 \
   --enable-prefix-caching --max-num-seqs 64 >"$LOG" 2>&1 &
 VPID=$!
 trap 'kill "$VPID" 2>/dev/null || true' EXIT

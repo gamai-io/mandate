@@ -47,7 +47,8 @@
 - [x] Auditor bundle (envelope + receipt + Merkle proof + STH + witness pin)
 - [x] Deploy the witness on second physical hosts (vast, oracle, linux3,
   verified 2026-11-09: `valid=true, witness=true` for all three)
-- [ ] Pin every published release artifact's STH on the witnesses
+- [x] Pin every published release artifact's STH on the witnesses (0.25.0:
+  tree_size 3, three hosts, consistency proof 1→3)
 - [x] Hardware-backed approver keys (`sk-ssh-ed25519`) via `require_hardware_key`
 - [x] OIDC trusted-publishing path in the release workflow
 - [ ] Full WebAuthn/passkeys (browser/CBOR stack)

@@ -1,0 +1,37 @@
+{
+  "artifacts": [
+    {
+      "kind": "release.artifact",
+      "name": "gama_mandate-0.25.0-py3-none-any.whl",
+      "sha256": "df93345dddc205f3bc8a189311c4217499bf2f9e4749e2c153ce9eea8fa402f6"
+    },
+    {
+      "kind": "release.artifact",
+      "name": "gama_mandate-0.25.0.tar.gz",
+      "sha256": "9ea79c157f4f38c323147f11ce9b45533b52479041690cf81267fc0dd77a5b34"
+    }
+  ],
+  "proofs": [
+    {
+      "v": 1,
+      "tree_size": 3,
+      "leaf_index": 1,
+      "leaf_hash": "21066db3779cb6a7fa737b955119341119650c3d9435dc515ffaa0722e72dee6",
+      "path": [
+        "266f308b0e713884bc2745db5744fc706425f07debbf0cfdd027bfa4f620b4ca",
+        "fa0be1080c5d955a614992f9437bb0efe9ab12c6a38c5f247613b29b2f2a2588"
+      ],
+      "root_hash": "5d472d19d44c5370b90038392f3d0cb1f2ae983e695c4d7d76f135a5159f3e80"
+    },
+    {
+      "v": 1,
+      "tree_size": 3,
+      "leaf_index": 2,
+      "leaf_hash": "fa0be1080c5d955a614992f9437bb0efe9ab12c6a38c5f247613b29b2f2a2588",
+      "path": [
+        "ebffd68d96c810d6b425ee22dc59bbbeed215f542600747364a6fb9c0fe7dfc9"
+      ],
+      "root_hash": "5d472d19d44c5370b90038392f3d0cb1f2ae983e695c4d7d76f135a5159f3e80"
+    }
+  ]
+}

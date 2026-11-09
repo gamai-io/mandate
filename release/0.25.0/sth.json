@@ -1,0 +1,11 @@
+{
+  "sth": {
+    "v": 1,
+    "log_name": "log1",
+    "log_id": "SHA256:fys3iDgGrqgU/t9Gb/t7O0K4VUpB9tZyfcdATTh7N3c",
+    "tree_size": 3,
+    "root_hash": "5d472d19d44c5370b90038392f3d0cb1f2ae983e695c4d7d76f135a5159f3e80",
+    "timestamp": 1794245686806
+  },
+  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgM9WI6g8Wu0BQcWMi1gw63fqmot\nPXumavolJS4da3+SQAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABAWzZ9tQEEKf0dsny5Mmut8x8sB3aFzcFsR6igiqxKO8aYOfkPbpiEbz\nBZ4cgevGGw6JR7w2XAdyFnQSs1qiU3Cg==\n-----END SSH SIGNATURE-----\n"
+}
