@@ -80,6 +80,50 @@ class MandateTests(unittest.TestCase):
                                                      "target": "customers"}))
         self.assertEqual(decision["decision"], "allow")
 
+    def test_missing_data_ref_denied(self):
+        intent = intent_factory(provenance=[])
+        decision = core.check(intent)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertEqual(decision["reason"], "missing_data_ref")
+        self.assertIn("target", decision["missing"])
+        grant = self._grant(intent)
+        with self.assertRaises(core.ProvenanceMissing):
+            core.redeem(intent, grant, self.signers, self.ledger)
+
+    def test_user_pref_is_not_evidence(self):
+        intent = intent_factory(provenance=[
+            {"type": "user_pref", "source": "manager preference"}])
+        self.assertEqual(core.check(intent)["decision"], "deny")
+
+    def test_partial_covers_reports_missing_field(self):
+        intent = intent_factory(provenance=[
+            {"type": "data_ref", "source": "erp:vendor:1",
+             "covers": ["target"]}])
+        decision = core.check(intent)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertEqual(decision["missing"], ["amount"])
+
+    def test_full_covers_is_accepted(self):
+        intent = intent_factory(provenance=[
+            {"type": "data_ref", "source": "erp:vendor:1",
+             "covers": ["target", "amount"]}])
+        grant = self._grant(intent)
+        receipt = core.redeem(intent, grant, self.signers, self.ledger)
+        self.assertEqual(receipt["body"]["decision"], "executed")
+
+    def test_provenance_tamper_breaks_grant(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        tampered = intent_factory(provenance=[
+            {"type": "data_ref", "source": "erp:other"}])
+        with self.assertRaises(core.CommitmentMismatch):
+            core.redeem(tampered, grant, self.signers, self.ledger)
+
+    def test_invalid_provenance_type_rejected(self):
+        with self.assertRaises(core.MandateError):
+            core.normalize_intent(intent_factory(
+                provenance=[{"type": "bogus", "source": "x"}]))
+
     def test_commitment_is_stable_and_render_is_human(self):
         a = core.propose(intent_factory())
         b = core.propose(intent_factory())

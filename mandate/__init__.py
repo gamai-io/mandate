@@ -7,6 +7,7 @@ from .core import (  # noqa: F401
     GrantReplayed,
     MandateError,
     PolicyDenied,
+    ProvenanceMissing,
     SelfApproval,
     append_receipt,
     build_grant_core,
@@ -31,4 +32,4 @@ from .core import (  # noqa: F401
     verify_result_entry,
 )
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"

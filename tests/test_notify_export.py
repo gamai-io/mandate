@@ -26,6 +26,7 @@ def intent_factory(**over):
         },
         "requested_by": "approver",
         "nonce": "n-1",
+        "provenance": [{"type": "data_ref", "source": "erp:vendor:1"}],
     }
     intent.update(over)
     return intent

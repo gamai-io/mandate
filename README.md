@@ -242,6 +242,29 @@ For MSSQL: `"driver": "mssql"`, `"dsn": "...", "user_env": "...",
 "password_env": "..."` and `pip install gama-mandate[mssql]`. Only `SELECT`/`WITH`
 queries are accepted; SQLite opens `mode=ro`, MSSQL runs read-only and rolls back.
 
+## Provenance (sycophancy firewall)
+
+A consequential intent must justify its choices with data, not with a stated
+preference. Policy declares the required fields:
+
+```json
+"payment.send": {"risk": "high", "require_data_ref": ["target", "amount"]}
+```
+
+The intent carries typed provenance:
+
+```json
+"provenance": [
+  {"type": "data_ref", "source": "erp:vendor:1", "covers": ["target", "amount"]}
+]
+```
+
+- `data_ref` without `covers` covers all required fields.
+- `user_pref` and `model_inference` **never** satisfy a required field.
+- Missing evidence is denied (`missing_data_ref` / `ProvenanceMissing`).
+- The provenance is hashed into the commitment, so it cannot be swapped after
+  the grant.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

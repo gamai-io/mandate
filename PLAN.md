@@ -32,7 +32,7 @@
 - [x] Co-sign daemon on the approver's host (TTY confirm, key never leaves host)
 - [x] Telegram notification channel in front of the approver daemon (advisory)
 - [x] Portable receipt envelope (`mandate export`, JOSE-style SSH signature)
-- [ ] Provenance enforcement: `data_ref` required for every choice parameter
+- [x] Provenance enforcement: `data_ref` required for every choice parameter
 
 ## Phase 4 — Ecosystem
 - [ ] MCP server packaged for Claude Code / opencode / Cursor

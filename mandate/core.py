@@ -49,6 +49,10 @@ class SelfApproval(MandateError):
     pass
 
 
+class ProvenanceMissing(MandateError):
+    pass
+
+
 def jcs(obj) -> str:
     return _canonicalize(obj)
 
@@ -112,9 +116,26 @@ def normalize_intent(intent: dict) -> dict:
         raise MandateError("intent.actor.agent is required")
     if not intent.get("requested_by"):
         raise MandateError("intent.requested_by is required")
+    provenance = intent.get("provenance") or []
+    if not isinstance(provenance, list):
+        raise MandateError("intent.provenance must be a list")
+    for entry in provenance:
+        if not isinstance(entry, dict):
+            raise MandateError("provenance entries must be objects")
+        kind = entry.get("type")
+        if kind not in ("user_pref", "data_ref", "model_inference"):
+            raise MandateError("provenance type must be user_pref, data_ref "
+                               "or model_inference")
+        if kind == "data_ref" and not str(entry.get("source") or "").strip():
+            raise MandateError("data_ref provenance requires a source")
+        covers = entry.get("covers")
+        if covers is not None and (
+                not isinstance(covers, list)
+                or any(not isinstance(item, str) for item in covers)):
+            raise MandateError("provenance covers must be a list of strings")
     out = dict(intent)
     out["nonce"] = str(intent.get("nonce") or uuid.uuid4().hex)
-    out.setdefault("provenance", [])
+    out["provenance"] = provenance
     return out
 
 
@@ -124,6 +145,7 @@ def intent_core(intent: dict) -> dict:
         "effect": intent["effect"],
         "requested_by": intent.get("requested_by"),
         "render_hash": render_hash(intent),
+        "provenance_hash": provenance_hash(intent),
     }
 
 
@@ -180,6 +202,26 @@ def render_hash(intent: dict) -> str:
     return sha256(jcs(render(intent)))
 
 
+def provenance_hash(intent: dict) -> str:
+    return sha256(jcs(intent.get("provenance") or []))
+
+
+def missing_provenance(intent: dict, spec: dict) -> list[str]:
+    required = spec.get("require_data_ref") or []
+    if not required:
+        return []
+    refs = [entry for entry in (intent.get("provenance") or [])
+            if entry.get("type") == "data_ref"
+            and str(entry.get("source") or "").strip()]
+    missing = []
+    for field in required:
+        covered = any((not entry.get("covers"))
+                      or field in entry.get("covers") for entry in refs)
+        if not covered:
+            missing.append(str(field))
+    return missing
+
+
 def check(intent: dict, policy: dict | None = None) -> dict:
     intent = normalize_intent(intent)
     pol = policy if isinstance(policy, dict) else load_policy()
@@ -187,6 +229,12 @@ def check(intent: dict, policy: dict | None = None) -> dict:
     spec = pol["effects"].get(kind)
     if not isinstance(spec, dict):
         return {"decision": "deny", "reason": "unknown effect", "kind": kind}
+    missing = missing_provenance(intent, spec)
+    if missing:
+        return {"decision": "deny", "reason": "missing_data_ref",
+                "missing": missing, "provenance_ok": False,
+                "risk": spec.get("risk"), "kind": kind,
+                "render": render(intent)}
     risk = str(spec.get("risk") or "high")
     value, _currency = _amount(intent)
     if risk == "low":
@@ -202,6 +250,7 @@ def check(intent: dict, policy: dict | None = None) -> dict:
         "risk": risk,
         "kind": kind,
         "amount": value,
+        "provenance_ok": True,
         "render": render(intent),
     }
 
@@ -354,6 +403,9 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
     policy_obj = policy if isinstance(policy, dict) else load_policy()
     decision = check(intent, policy_obj)
     if decision["decision"] == "deny":
+        if decision.get("missing"):
+            raise ProvenanceMissing(
+                "missing data_ref for: %s" % ", ".join(decision["missing"]))
         raise PolicyDenied("policy denied: %s" % decision.get("reason"))
     moment = time.time() if now is None else float(now)
     grant_core = (grant_obj or {}).get("grant") or {}

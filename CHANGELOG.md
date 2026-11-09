@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.14.0 — 2026-11-09
+- **Provenance enforcement (sycophancy firewall)**: policy effects declare
+  `require_data_ref` fields (`payment.send`: `["target","amount"]`, etc.). A
+  consequential intent must carry a `data_ref` provenance entry covering each
+  required field; `user_pref` and `model_inference` never satisfy it. A
+  `data_ref` without `covers` covers all required fields. Missing evidence is
+  denied (`ProvenanceMissing` / `missing_data_ref`).
+- Provenance is **hashed into the commitment**, so it cannot be swapped after the
+  grant. Provenance entries are schema-validated.
+- **Breaking:** commitment/receipt hashes change (provenance hash added).
+- 100 tests.
+
 ## 0.13.0 — 2026-11-09
 - **Advisory Telegram notification** in the approver daemon
   (`--telegram-chat`, token from `TELEGRAM_BOT_TOKEN`). The message carries only
