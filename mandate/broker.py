@@ -10,8 +10,13 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import core, sign
+from .adapters import ErpChecker, SmtpSender
 
 BROKER_NAMESPACE = "mandate-broker"
+
+
+class PreconditionFailed(core.MandateError):
+    pass
 
 
 class NonceStore:
@@ -38,7 +43,8 @@ class NonceStore:
 class Broker:
     def __init__(self, policy: str, signers: str, ledger: str, nonce_db: str,
                  receipt_key: str = "", broker_name: str = "gama-broker",
-                 effects_dir: str = "effects", outbox: str = "outbox"):
+                 effects_dir: str = "effects", outbox: str = "outbox",
+                 smtp: dict | None = None, erp: dict | None = None):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -47,9 +53,13 @@ class Broker:
         self.broker_name = broker_name
         self.effects_dir = effects_dir
         self.outbox = outbox
+        self.smtp = SmtpSender(smtp) if smtp else None
+        self.erp = ErpChecker(erp) if erp else None
         self.nonces = NonceStore(nonce_db)
 
     def _run(self, kind: str, intent: dict) -> dict:
+        if kind == "message.send" and self.smtp is not None:
+            return self.smtp.send(intent)
         stamp = int(time.time() * 1000)
         record = {"effect": intent["effect"], "nonce": intent["nonce"],
                   "actor": intent.get("actor"), "requested_by": intent.get("requested_by"),
@@ -81,6 +91,11 @@ class Broker:
             raise core.PolicyDenied("policy denied: %s" % decision.get("reason"))
         if not grant_obj:
             raise core.GrantInvalid("a signed grant is required")
+        if self.erp is not None:
+            pre = self.erp.check(intent)
+            if not pre.get("ok"):
+                raise PreconditionFailed(
+                    "erp precondition failed: %s" % pre.get("reason"))
         receipt = core.redeem(intent, grant_obj, self.signers, self.ledger,
                               claim=self.nonces.consume)
         try:
@@ -108,7 +123,8 @@ class Broker:
         return {"ok": True, "broker": self.broker_name,
                 "policy": self.policy_path, "effects": sorted(self.policy["effects"]),
                 "signers": bool(os.path.exists(self.signers)),
-                "receipt_key": bool(self.receipt_key and os.path.exists(self.receipt_key))}
+                "receipt_key": bool(self.receipt_key and os.path.exists(self.receipt_key)),
+                "smtp": bool(self.smtp), "erp": bool(self.erp)}
 
 
 def make_handler(broker: Broker):
@@ -177,8 +193,18 @@ def main(argv=None) -> int:
     parser.add_argument("--broker-name", default=os.environ.get("MANDATE_BROKER_NAME", "gama-broker"))
     parser.add_argument("--effects-dir", default=os.environ.get("MANDATE_EFFECTS_DIR", "effects"))
     parser.add_argument("--outbox", default=os.environ.get("MANDATE_OUTBOX", "outbox"))
+    parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
     args = parser.parse_args(argv)
+
+    cfg = {}
+    if args.config:
+        with open(args.config, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        for key in ("host", "port", "policy", "signers", "ledger", "nonce_db",
+                    "receipt_key", "broker_name", "effects_dir", "outbox"):
+            if key in cfg:
+                setattr(args, key, cfg[key])
 
     if args.host not in ("127.0.0.1", "::1", "localhost") and not args.allow_remote:
         print("refusing to bind non-loopback host without --allow-remote", flush=True)
@@ -186,7 +212,8 @@ def main(argv=None) -> int:
 
     broker = Broker(args.policy, args.signers, args.ledger, args.nonce_db,
                     receipt_key=args.receipt_key, broker_name=args.broker_name,
-                    effects_dir=args.effects_dir, outbox=args.outbox)
+                    effects_dir=args.effects_dir, outbox=args.outbox,
+                    smtp=cfg.get("smtp"), erp=cfg.get("erp"))
     server = make_server(args.host, args.port, broker)
     host, port = server.server_address[:2]
     print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)

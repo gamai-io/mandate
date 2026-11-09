@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -143,12 +144,24 @@ class MandateTests(unittest.TestCase):
         self.assertIn("supplier=Example", summary)
         self.assertIn("extra=Z", summary)
 
-    def _start_broker(self):
+    def _make_erp(self):
+        path = os.path.join(self.dir, "erp.sqlite")
+        con = sqlite3.connect(path)
+        con.execute("CREATE TABLE vendors(name TEXT, invoice_total REAL)")
+        con.execute("INSERT INTO vendors VALUES ('Example Supplier', 1170.0)")
+        con.commit()
+        con.close()
+        return {"db": path, "checks": {"payment.send": {
+            "query": "SELECT invoice_total FROM vendors WHERE name = :target",
+            "amount_field": "invoice_total", "tolerance_pct": 0.5}}}
+
+    def _start_broker(self, smtp=None, erp=None):
         b = broker.Broker(
             os.path.join(ROOT, "policy.json"), self.signers, self.ledger,
             os.path.join(self.dir, "used.sqlite"),
             effects_dir=os.path.join(self.dir, "effects"),
-            outbox=os.path.join(self.dir, "outbox"))
+            outbox=os.path.join(self.dir, "outbox"),
+            smtp=smtp, erp=erp)
         srv = broker.make_server("127.0.0.1", 0, b)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.addCleanup(srv.server_close)
@@ -195,6 +208,51 @@ class MandateTests(unittest.TestCase):
         status, body = self._post(port, intent, {})
         self.assertEqual(status, 409, body)
         self.assertEqual(body["error"], "PolicyDenied")
+
+    def test_erp_precondition_blocks_unknown_target(self):
+        intent = intent_factory()
+        intent["effect"]["target"] = "Beta d.o.o."
+        grant = self._grant(intent)
+        port = self._start_broker(erp=self._make_erp())
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "PreconditionFailed")
+
+    def test_erp_amount_mismatch_blocks(self):
+        intent = intent_factory()
+        intent["effect"]["amount"] = {"value": 1.0, "currency": "BAM"}
+        grant = self._grant(intent)
+        port = self._start_broker(erp=self._make_erp())
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "PreconditionFailed")
+
+    def test_precondition_failure_does_not_consume_grant(self):
+        erp = self._make_erp()
+        intent = intent_factory()
+        intent["effect"]["target"] = "Beta d.o.o."
+        grant = self._grant(intent)
+        port = self._start_broker(erp=erp)
+        status, _body = self._post(port, intent, grant)
+        self.assertEqual(status, 409)
+        con = sqlite3.connect(erp["db"])
+        con.execute("INSERT INTO vendors VALUES ('Beta d.o.o.', 1170.0)")
+        con.commit()
+        con.close()
+        status2, body2 = self._post(port, intent, grant)
+        self.assertEqual(status2, 200, body2)
+
+    def test_smtp_dry_run_message(self):
+        intent = intent_factory(effect={
+            "kind": "message.send", "target": "kupac@example.com",
+            "params": {"subject": "Ponuda", "body": "Dobar dan"}})
+        grant = self._grant(intent)
+        outbox = os.path.join(self.dir, "outbox-smtp")
+        port = self._start_broker(smtp={"mode": "dry_run", "outbox": outbox})
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 200, body)
+        self.assertTrue(body["result"]["dry_run"])
+        self.assertTrue(os.path.exists(body["result"]["path"]))
 
     def test_cli_end_to_end(self):
         env = dict(os.environ)

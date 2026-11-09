@@ -16,7 +16,9 @@
 - [x] Atomic nonce claim (SQLite UNIQUE) → no double execution under concurrency
 - [x] `render_hash`: the human signs the rendered summary, bound into the commitment
 - [x] Signed result entry chained after the authorisation receipt
-- [ ] Move real credentials (SQL write, SMTP, payment, WA) into the broker
+- [x] Read-only ERP precondition (SQLite, fail-closed target + amount check)
+- [x] SMTP adapter (`dry_run` default; `live` reads password from env)
+- [ ] Move write credentials (SQL write, payment, WA) into the broker
 - [ ] Per-effect adapters + integration tests against a fake ERP
 
 ## Phase 3 — Transparency + interop

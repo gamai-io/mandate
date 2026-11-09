@@ -67,6 +67,25 @@ The shipped handlers are a sandbox (they record the effect under `effects/` or
 `outbox/`). Wiring real credentials (SQL write, SMTP, payment) is Phase 2
 completion — see `PLAN.md`.
 
+### Adapters
+
+**ERP precondition (read-only).** Before a grant is consumed, the broker runs a
+named-parameter SQLite query against master data. No row → `counterparty_not_found`;
+amount outside `tolerance_pct` → `amount_mismatch`. The grant is **not**
+consumed when a precondition fails, so a corrected request can retry safely.
+
+**SMTP (`message.send`).** `mode=dry_run` writes an `.eml` to the outbox;
+`mode=live` sends via SMTP. The password is read from the env var named in
+`password_env` and never logged or returned.
+
+```json
+"erp": {"db": "erp.sqlite", "checks": {"payment.send": {
+  "query": "SELECT invoice_total FROM vendors WHERE name = :target",
+  "amount_field": "invoice_total", "tolerance_pct": 0.5}}},
+"smtp": {"mode": "dry_run", "host": "", "user": "",
+         "password_env": "MANDATE_SMTP_PASSWORD", "from": "noreply@example.com"}
+```
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

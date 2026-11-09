@@ -8,5 +8,29 @@
   "receipt_key": "broker/receipt_key",
   "broker_name": "gama-broker",
   "effects_dir": "effects",
-  "outbox": "outbox"
+  "outbox": "outbox",
+  "smtp": {
+    "mode": "dry_run",
+    "host": "",
+    "port": 587,
+    "user": "",
+    "password_env": "MANDATE_SMTP_PASSWORD",
+    "from": "noreply@example.com",
+    "starttls": true,
+    "outbox": "outbox"
+  },
+  "erp": {
+    "db": "erp.sqlite",
+    "checks": {
+      "payment.send": {
+        "query": "SELECT invoice_total FROM vendors WHERE name = :target",
+        "amount_field": "invoice_total",
+        "tolerance_pct": 0.5
+      },
+      "order.create": {
+        "query": "SELECT credit_limit FROM customers WHERE name = :target",
+        "tolerance_pct": 0.0
+      }
+    }
+  }
 }

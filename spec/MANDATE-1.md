@@ -75,3 +75,8 @@ and principal = `approver`.
 - `20` deny (unknown effect / policy deny)
 - `2` malformed input
 - `3` mandate error (expired, replayed, invalid signature)
+
+## Broker preconditions
+Before the nonce is claimed, the broker may run read-only checks (ERP master
+data). A failed precondition aborts with `PreconditionFailed` and leaves the
+grant unconsumed. Preconditions never mutate external state.
