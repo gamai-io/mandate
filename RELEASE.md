@@ -52,8 +52,9 @@ Create the GitHub release and attach `dist/*.whl`, `dist/*.tar.gz` and
 twine upload dist/*
 ```
 
-`agent-mandate` was available on PyPI as of 2026-11-09 (checked: 404).
-`mandate` and `agentmandate` are already taken — do not use those names.
+`gama-mandate` is the PyPI distribution name (verified available 2026-11-09).
+`agent-mandate` was rejected by PyPI as too similar to the existing
+`agentmandate`; `mandate` and `agentmandate` are taken.
 
 ## 6. Post-release
 

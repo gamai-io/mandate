@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.4 — 2026-11-09
+- `mandate version` reports the distribution name `gama-mandate`.
+- Published to PyPI: https://pypi.org/project/gama-mandate/
+
+## 0.10.3 — 2026-11-09
+- PyPI distribution name is **`gama-mandate`**. `agent-mandate` was rejected by
+  PyPI as too similar to an existing project (`agentmandate`). Import package and
+  console scripts are unchanged (`mandate`, `mandate-broker`, `mandate-mcp`).
+- Code identical to 0.10.2.
+
 ## 0.10.2 — 2026-11-09
 - Published to GitHub: https://github.com/gamai-io/mandate (public, CI green on
   Python 3.9–3.12). Release v0.10.1 with wheel, sdist, and checksums.

@@ -453,7 +453,7 @@ def main(argv=None) -> int:
 
         if args.cmd == "version":
             from . import __version__
-            _emit({"name": "agent-mandate", "version": __version__}, None)
+            _emit({"name": "gama-mandate", "version": __version__}, None)
             return 0
 
         if args.cmd == "init":

@@ -31,9 +31,8 @@ CLI + broker + MCP adapter. There is **no web UI** by design: Mandate is a
 local trust primitive you embed in your own stack.
 
 ```bash
-python3 -m pip wheel . -w dist --no-deps
-python3 -m pip install dist/agent_mandate-<ver>-py3-none-any.whl
-# or straight from git
+python3 -m pip install gama-mandate
+# or from source / git
 python3 -m pip install "git+https://github.com/gamai-io/mandate.git"
 
 mandate doctor                      # checks python, ssh-keygen, policy
