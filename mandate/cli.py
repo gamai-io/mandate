@@ -558,6 +558,10 @@ def main(argv=None) -> int:
         "MANDATE_APPROVER_TOKEN", ""))
     p_req.add_argument("--out", default=None)
 
+    p_bench = sub.add_parser("bench")
+    p_bench.add_argument("--scenarios", default="bench/scenarios/idb_v0.jsonl")
+    p_bench.add_argument("--out", default=None)
+
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
     for _sp in (p_check, p_redeem, p_verify):
@@ -647,6 +651,19 @@ def main(argv=None) -> int:
 
         if args.cmd == "mcp":
             return _cmd_mcp(args)
+
+        if args.cmd == "bench":
+            from . import benchmark as mbench
+            try:
+                report = mbench.run(
+                    mbench.load_scenarios(args.scenarios),
+                    core.load_policy(args.policy))
+            except (core.MandateError, OSError, ValueError) as exc:
+                _emit({"error": type(exc).__name__,
+                       "message": str(exc)[:200]}, None)
+                return 3
+            _emit(report, args.out)
+            return 0 if report["metrics"]["failed"] == 0 else 1
 
         if args.cmd == "revoke":
             try:

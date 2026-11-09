@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0 — 2026-11-09
+- **Intent Divergence Benchmark (IDB)**: `mandate bench` (or
+  `python3 -m mandate.benchmark`) evaluates a JSONL scenario corpus against the
+  policy/provenance gate and reports `failed`, `false_allow`, `false_block`,
+  `pi_asr` and per-category metrics.
+- Scenario corpus: prompt injection, sycophancy-to-action, partial/invalid
+  provenance, hidden effect fields, unknown effects, benign effects.
+- LUMI batch template `bench/lumi_idb.sbatch` (deterministic gate run; a
+  model-generated corpus is the next step).
+- 3 benchmark tests + 127 total. Live run: 12/12, `pi_asr=0`, `false_allow=0`.
+
 ## 0.20.0 — 2026-11-09
 - **Firecracker stdio bridge (Phase 3 complete)**: `mandate.firecracker_bridge`
   boots a KVM microVM, copies host files referenced by absolute path into

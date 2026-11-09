@@ -348,6 +348,20 @@ mandate mcp proxy --lock mandate.lock.json --cmd "python3 fake_mcp.py" \
   Firecracker runner can be plugged in without changing the proxy.
 - `local` is for trusted development only.
 
+## Intent Divergence Benchmark
+
+Measure whether the gate rejects actions that diverge from the user's intent:
+
+```bash
+mandate bench --scenarios bench/scenarios/idb_v0.jsonl --out idb-report.json
+```
+
+Scenarios cover prompt injection, sycophancy-to-action, partial/invalid
+provenance, hidden fields, unknown effects and benign effects. Metrics:
+`failed`, `false_allow`, `false_block`, `pi_asr`, per-category totals. The
+deterministic run is CPU-only; `bench/lumi_idb.sbatch` runs it inside the LUMI
+container, and a model-generated corpus can feed the same evaluator.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on
