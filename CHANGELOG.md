@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.1 — 2026-11-09
+- **Automated release**: pushing a `v*` tag now builds, tests, `twine check`s,
+  publishes to PyPI (`PYPI_API_TOKEN` secret) and creates a GitHub release via
+  `.github/workflows/release.yml`.
+- No code changes; 103 tests.
+
 ## 0.15.0 — 2026-11-09
 - **Operations**: `/metrics` (Prometheus text) on the broker, approver daemon and
   witness: request/execution/rejection counters, rate-limit hits, journal gauges,

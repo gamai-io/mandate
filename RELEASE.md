@@ -43,6 +43,12 @@ git tag -a v<ver> -m "Mandate <ver>"
 git push origin main --tags
 ```
 
+Pushing a `v*` tag triggers `.github/workflows/release.yml`: build, tests,
+`twine check`, PyPI publish (`PYPI_API_TOKEN` secret) and a GitHub release with
+the wheel, sdist and checksums. For OIDC trusted publishing instead of a stored
+token, configure the PyPI trusted publisher and set `id-token: write` in the
+publish job (no password).
+
 Create the GitHub release and attach `dist/*.whl`, `dist/*.tar.gz` and
 `dist/*.sha256` (`sha256sum dist/*`).
 
