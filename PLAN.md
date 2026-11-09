@@ -33,6 +33,7 @@
 - [x] Telegram notification channel in front of the approver daemon (advisory)
 - [x] Portable receipt envelope (`mandate export`, JOSE-style SSH signature)
 - [x] Provenance enforcement: `data_ref` required for every choice parameter
+- [x] Prometheus `/metrics` + per-IP rate limiting on broker, approver, witness
 
 ## Phase 4 — Ecosystem
 - [ ] MCP server packaged for Claude Code / opencode / Cursor

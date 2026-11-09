@@ -16,6 +16,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import core
 from . import log as mlog
+from .metrics import Registry
+from .ratelimit import RateLimiter
 
 _LOCK = threading.Lock()
 MAX_BODY = 256 * 1024
@@ -109,7 +111,10 @@ def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
 
 
 def make_handler(state_path: str, signers_path: str, token: str,
-                 revoked_path: str | None = None):
+                 revoked_path: str | None = None,
+                 registry: Registry | None = None,
+                 limiter: RateLimiter | None = None):
+    metrics = registry or Registry("mandate_witness")
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
         server_version = "mandate-witness/0.1"
@@ -133,10 +138,28 @@ def make_handler(state_path: str, signers_path: str, token: str,
                 return False
             return hmac.compare_digest(header[7:].strip(), token)
 
+        def _client_ip(self) -> str:
+            return str(self.client_address[0]) if self.client_address else "?"
+
+        def _send_text(self, code: int, text: str):
+            data = text.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self):
             path = urllib.parse.urlsplit(self.path).path.rstrip("/") or "/"
             if path == "/health":
                 self._send(200, {"ok": True, "service": "mandate-witness"})
+                return
+            if path == "/metrics":
+                if token and not self._authorized():
+                    self._send(401, {"ok": False, "error": "unauthorized"})
+                    return
+                self._send_text(200, metrics.render())
                 return
             if path == "/state":
                 if not self._authorized():
@@ -155,6 +178,12 @@ def make_handler(state_path: str, signers_path: str, token: str,
             if path != "/sth":
                 self._send(404, {"ok": False, "error": "not found"})
                 return
+            if limiter is not None:
+                allowed, _retry = limiter.allow(self._client_ip())
+                if not allowed:
+                    metrics.inc("rate_limited", action="sth")
+                    self._send_text(429, "rate limited\n")
+                    return
             if not self._authorized():
                 self._send(401, {"ok": False, "error": "unauthorized"})
                 return
@@ -169,11 +198,15 @@ def make_handler(state_path: str, signers_path: str, token: str,
                 result = accept(body.get("sth") or {}, body.get("proof"),
                                 signers_path, state_path,
                                 revoked_path=revoked_path)
+                metrics.inc("accept", result="advanced" if result.get("advanced")
+                            else "first" if result.get("first") else "unchanged")
                 self._send(200, result)
             except WitnessError as exc:
+                metrics.inc("reject", reason=type(exc).__name__)
                 self._send(409, {"ok": False, "error": type(exc).__name__,
                                  "message": str(exc)})
             except (ValueError, TypeError) as exc:
+                metrics.inc("reject", reason="bad_request")
                 self._send(400, {"ok": False, "error": "bad_request",
                                  "message": str(exc)[:200]})
 
@@ -181,10 +214,14 @@ def make_handler(state_path: str, signers_path: str, token: str,
 
 
 def make_server(host: str, port: int, state_path: str, signers_path: str,
-                token: str, revoked_path: str | None = None
+                token: str, revoked_path: str | None = None,
+                rate_per_min: float = 0, rate_burst: float = 0
                 ) -> ThreadingHTTPServer:
+    registry = Registry("mandate_witness")
+    limiter = (RateLimiter(rate_per_min, rate_burst)
+               if rate_per_min and float(rate_per_min) > 0 else None)
     server = ThreadingHTTPServer((host, int(port)),
                                  make_handler(state_path, signers_path, token,
-                                              revoked_path))
+                                              revoked_path, registry, limiter))
     server.daemon_threads = True
     return server

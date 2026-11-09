@@ -265,6 +265,16 @@ The intent carries typed provenance:
 - The provenance is hashed into the commitment, so it cannot be swapped after
   the grant.
 
+## Operations
+
+- **Metrics:** Prometheus text at `/metrics` on the broker, approver daemon and
+  witness (bearer token required if one is configured). Counters for requests,
+  executions, rejections, rate-limit hits, journal gauges and uptime.
+- **Rate limiting:** per-IP token bucket on `/execute`, `/request` and `/sth`.
+  Enable with `--rate-limit-per-min N --rate-burst M` (or
+  `MANDATE_RATE_PER_MIN` / `MANDATE_RATE_BURST`). Excess returns `429`.
+  Disabled by default (`0`).
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

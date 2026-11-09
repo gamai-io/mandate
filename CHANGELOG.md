@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.0 — 2026-11-09
+- **Operations**: `/metrics` (Prometheus text) on the broker, approver daemon and
+  witness: request/execution/rejection counters, rate-limit hits, journal gauges,
+  uptime.
+- **Per-IP rate limiting** on `/execute`, `/request` and `/sth`
+  (`--rate-limit-per-min`, `--rate-burst`, or `MANDATE_RATE_PER_MIN` /
+  `MANDATE_RATE_BURST`); excess returns `429`. Disabled by default.
+- Metrics require the bearer token when one is configured.
+- 103 tests.
+
 ## 0.14.0 — 2026-11-09
 - **Provenance enforcement (sycophancy firewall)**: policy effects declare
   `require_data_ref` fields (`payment.send`: `["target","amount"]`, etc.). A

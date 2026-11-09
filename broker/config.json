@@ -12,6 +12,8 @@
   "outbox": "outbox",
   "journal_db": "broker/journal.sqlite",
   "lease_s": 60,
+  "rate_limit_per_min": 120,
+  "rate_burst": 20,
   "write": {
     "mode": "file",
     "effects_dir": "effects"

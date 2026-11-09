@@ -208,7 +208,9 @@ def _cmd_witness(args) -> int:
                 return 2
             server = mwit.make_server(args.host, args.port, args.state,
                                       args.signers, args.token,
-                                      revoked_path=args.revoked)
+                                      revoked_path=args.revoked,
+                                      rate_per_min=args.rate_limit_per_min,
+                                      rate_burst=args.rate_burst)
             host, port = server.server_address[:2]
             print("mandate-witness listening on http://%s:%s" % (host, port),
                   flush=True)
@@ -249,7 +251,9 @@ def _cmd_approver(args) -> int:
     approver = mapprover.Approver(args.key, args.approver,
                                   audience_default=args.audience,
                                   ttl_default=args.ttl,
-                                  notifier=notifier)
+                                  notifier=notifier,
+                                  rate_per_min=args.rate_limit_per_min,
+                                  rate_burst=args.rate_burst)
     server = mapprover.make_server(args.host, args.port, approver,
                                    token=args.token)
     host, port = server.server_address[:2]
@@ -421,6 +425,10 @@ def main(argv=None) -> int:
     p_wserve.add_argument("--host", default="127.0.0.1")
     p_wserve.add_argument("--port", type=int, default=8898)
     p_wserve.add_argument("--allow-remote", action="store_true")
+    p_wserve.add_argument("--rate-limit-per-min", type=float,
+                          default=float(os.environ.get("MANDATE_RATE_PER_MIN", "0")))
+    p_wserve.add_argument("--rate-burst", type=float,
+                          default=float(os.environ.get("MANDATE_RATE_BURST", "0")))
     p_wpush = wit_sub.add_parser("push")
     p_wpush.add_argument("--url", required=True)
     p_wpush.add_argument("--sth", required=True)
@@ -442,6 +450,10 @@ def main(argv=None) -> int:
     p_as.add_argument("--telegram-chat", default=os.environ.get(
         "TELEGRAM_CHAT_ID", ""))
     p_as.add_argument("--telegram-token-env", default="TELEGRAM_BOT_TOKEN")
+    p_as.add_argument("--rate-limit-per-min", type=float,
+                      default=float(os.environ.get("MANDATE_RATE_PER_MIN", "0")))
+    p_as.add_argument("--rate-burst", type=float,
+                      default=float(os.environ.get("MANDATE_RATE_BURST", "0")))
     p_as.add_argument("--allow-remote", action="store_true")
 
     p_exp = sub.add_parser("export")

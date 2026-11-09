@@ -12,6 +12,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from . import core, sign
 from .adapters import ErpChecker, PaymentAdapter, SmtpSender, WriteAdapter
 from .journal import Journal
+from .metrics import Registry
+from .ratelimit import RateLimiter
 
 BROKER_NAMESPACE = "mandate-broker"
 MAX_BODY = 256 * 1024
@@ -34,7 +36,8 @@ class Broker:
                  write: dict | None = None, payment: dict | None = None,
                  require_audience: bool = True, revoked_path: str = "",
                  journal_db: str | None = None, lease_s: float = 60,
-                 recover_on_start: bool = True, token: str = ""):
+                 recover_on_start: bool = True, token: str = "",
+                 rate_per_min: float = 0, rate_burst: float = 0):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -49,6 +52,9 @@ class Broker:
         self.require_audience = require_audience
         self.revoked_path = revoked_path
         self.token = token
+        self.metrics = Registry("mandate_broker")
+        self.limiter = (RateLimiter(rate_per_min, rate_burst)
+                        if rate_per_min and float(rate_per_min) > 0 else None)
         write_cfg = dict(write or {})
         write_cfg.setdefault("effects_dir", effects_dir)
         self.writer = WriteAdapter(write_cfg)
@@ -240,7 +246,7 @@ class Broker:
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.14.0"
+        server_version = "mandate-broker/0.15.0"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -255,10 +261,35 @@ def make_handler(broker: Broker):
             self.end_headers()
             self.wfile.write(data)
 
+        def _client_ip(self) -> str:
+            return str(self.client_address[0]) if self.client_address else "?"
+
+        def _send_text(self, code: int, text: str):
+            data = text.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self):
             path = urllib.parse.urlsplit(self.path).path.rstrip("/") or "/"
             if path == "/health":
                 self._send(200, broker.status())
+                return
+            if path == "/metrics":
+                if broker.token:
+                    header = self.headers.get("Authorization", "")
+                    ok = (header.lower().startswith("bearer ")
+                          and hmac.compare_digest(header[7:].strip(),
+                                                  broker.token))
+                    if not ok:
+                        self._send(401, {"ok": False, "error": "unauthorized"})
+                        return
+                for state, count in broker.journal.counts().items():
+                    broker.metrics.set("journal_entries", count, state=state)
+                self._send_text(200, broker.metrics.render())
                 return
             self._send(404, {"error": "not found"})
 
@@ -267,6 +298,12 @@ def make_handler(broker: Broker):
             if path != "/execute":
                 self._send(404, {"error": "not found"})
                 return
+            if broker.limiter is not None:
+                allowed, retry = broker.limiter.allow(self._client_ip())
+                if not allowed:
+                    broker.metrics.inc("rate_limited", action="execute")
+                    self._send_text(429, "rate limited\n")
+                    return
             if broker.token:
                 header = self.headers.get("Authorization", "")
                 ok = (header.lower().startswith("bearer ")
@@ -284,11 +321,22 @@ def make_handler(broker: Broker):
                 payload = json.loads(raw.decode("utf-8"))
                 result = broker.execute(payload.get("intent") or {},
                                         payload.get("grant") or {})
+                broker.metrics.inc("requests", action="execute",
+                                   result="duplicate" if result.get("duplicate")
+                                   else "ok")
+                if result.get("duplicate"):
+                    broker.metrics.inc("executions", result="duplicate")
+                else:
+                    broker.metrics.inc("executions", result="ok")
                 self._send(200, result)
             except core.MandateError as exc:
+                broker.metrics.inc("requests", action="execute",
+                                   result=type(exc).__name__)
                 self._send(409, {"ok": False, "error": type(exc).__name__,
                                  "message": str(exc)})
             except (ValueError, TypeError) as exc:
+                broker.metrics.inc("requests", action="execute",
+                                   result="bad_request")
                 self._send(400, {"ok": False, "error": "bad_request",
                                  "message": str(exc)[:200]})
 
@@ -318,6 +366,10 @@ def main(argv=None) -> int:
     parser.add_argument("--lease", type=float,
                         default=float(os.environ.get("MANDATE_LEASE_S", "60")))
     parser.add_argument("--no-recover", action="store_true")
+    parser.add_argument("--rate-limit-per-min", type=float,
+                        default=float(os.environ.get("MANDATE_RATE_PER_MIN", "0")))
+    parser.add_argument("--rate-burst", type=float,
+                        default=float(os.environ.get("MANDATE_RATE_BURST", "0")))
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
     parser.add_argument("--token", default=os.environ.get("MANDATE_BROKER_TOKEN", ""))
@@ -337,6 +389,10 @@ def main(argv=None) -> int:
                 setattr(args, key, cfg[key])
         if "lease_s" in cfg:
             args.lease = float(cfg["lease_s"])
+        if "rate_limit_per_min" in cfg:
+            args.rate_limit_per_min = float(cfg["rate_limit_per_min"])
+        if "rate_burst" in cfg:
+            args.rate_burst = float(cfg["rate_burst"])
 
     if args.host not in ("127.0.0.1", "::1", "localhost"):
         if not args.allow_remote or not args.token:
@@ -357,7 +413,9 @@ def main(argv=None) -> int:
                     journal_db=args.journal_db or None,
                     lease_s=args.lease,
                     recover_on_start=not args.no_recover,
-                    token=args.token)
+                    token=args.token,
+                    rate_per_min=args.rate_limit_per_min,
+                    rate_burst=args.rate_burst)
     server = make_server(args.host, args.port, broker)
     host, port = server.server_address[:2]
     print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)

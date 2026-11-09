@@ -15,6 +15,8 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import core
+from .metrics import Registry
+from .ratelimit import RateLimiter
 
 MAX_BODY = 256 * 1024
 
@@ -48,13 +50,17 @@ def tty_confirm(summary: str, commitment: str, agent: str,
 class Approver:
     def __init__(self, key_path: str, approver_name: str,
                  audience_default: str = "", ttl_default: int = 900,
-                 confirm=None, notifier=None):
+                 confirm=None, notifier=None, rate_per_min: float = 0,
+                 rate_burst: float = 0):
         self.key_path = key_path
         self.approver_name = approver_name
         self.audience_default = audience_default
         self.ttl_default = int(ttl_default)
         self.confirm = confirm or tty_confirm
         self.notifier = notifier
+        self.metrics = Registry("mandate_approver")
+        self.limiter = (RateLimiter(rate_per_min, rate_burst)
+                        if rate_per_min and float(rate_per_min) > 0 else None)
         self._lock = threading.Lock()
 
     def request(self, intent: dict, audience: str | None = None,
@@ -132,10 +138,29 @@ def make_handler(approver: Approver, token: str = ""):
             return (header.lower().startswith("bearer ")
                     and hmac.compare_digest(header[7:].strip(), token))
 
+        def _client_ip(self) -> str:
+            return str(self.client_address[0]) if self.client_address else "?"
+
+        def _send_text(self, code: int, text: str):
+            data = text.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
         def do_GET(self):
             path = urllib.parse.urlsplit(self.path).path.rstrip("/") or "/"
             if path == "/health":
                 self._send(200, approver.status())
+                return
+            if path == "/metrics":
+                if token:
+                    if not self._authorized():
+                        self._send(401, {"ok": False, "error": "unauthorized"})
+                        return
+                self._send_text(200, approver.metrics.render())
                 return
             self._send(404, {"error": "not found"})
 
@@ -144,6 +169,12 @@ def make_handler(approver: Approver, token: str = ""):
             if path != "/request":
                 self._send(404, {"error": "not found"})
                 return
+            if approver.limiter is not None:
+                allowed, _retry = approver.limiter.allow(self._client_ip())
+                if not allowed:
+                    approver.metrics.inc("rate_limited", action="request")
+                    self._send_text(429, "rate limited\n")
+                    return
             if not self._authorized():
                 self._send(401, {"ok": False, "error": "unauthorized"})
                 return
@@ -158,17 +189,22 @@ def make_handler(approver: Approver, token: str = ""):
                 result = approver.request(body.get("intent") or {},
                                           audience=body.get("audience"),
                                           ttl=body.get("ttl"))
+                approver.metrics.inc("requests", result="approved")
                 self._send(200, result)
             except NoTTY as exc:
+                approver.metrics.inc("requests", result="no_tty")
                 self._send(503, {"ok": False, "error": type(exc).__name__,
                                  "message": str(exc)})
             except ApprovalRejected as exc:
+                approver.metrics.inc("requests", result="rejected")
                 self._send(403, {"ok": False, "error": type(exc).__name__,
                                  "message": str(exc)})
             except core.MandateError as exc:
+                approver.metrics.inc("requests", result=type(exc).__name__)
                 self._send(409, {"ok": False, "error": type(exc).__name__,
                                  "message": str(exc)})
             except (ValueError, TypeError) as exc:
+                approver.metrics.inc("requests", result="bad_request")
                 self._send(400, {"ok": False, "error": "bad_request",
                                  "message": str(exc)[:200]})
 
