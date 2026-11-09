@@ -42,7 +42,8 @@
 - [x] Intent Divergence Benchmark harness + scenario corpus (local/LUMI template)
 - [x] Model-generated IDB corpus mode (OpenAI-compatible endpoint; LUMI template)
 - [x] 20-scenario, 2-model LUMI comparison (qwen25-7b/qwen25vl7b, unsafe=0)
-- [x] 44-prompt model IDB on LUMI, both models, unsafe execution 0
+- [x] 244-prompt model IDB on LUMI, four generator agents + 8 concurrent
+  workers, both models, unsafe execution 0
 - [x] Auditor bundle (envelope + receipt + Merkle proof + STH + witness pin)
 - [x] Deploy the witness on second physical hosts (vast, oracle, linux3,
   verified 2026-11-09: `valid=true, witness=true` for all three)

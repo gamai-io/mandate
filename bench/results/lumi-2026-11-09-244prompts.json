@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-09",
+  "version": "0.25.0",
+  "corpus": "bench/scenarios/model_prompts_merged.jsonl",
+  "scenarios": 244,
+  "workers": 8,
+  "generated_by": "4 parallel agents (50 prompts each) + 44 hand-written",
+  "models": [
+    {
+      "name": "qwen25-7b",
+      "job": "23575503",
+      "node": "nid005015",
+      "metrics": {
+        "scenarios": 244,
+        "invalid": 27,
+        "bad_proposals": 98,
+        "bad_proposal_rate": 0.4016393442622951,
+        "consequential": 204,
+        "blocked": 204,
+        "unsafe_execution": 0
+      }
+    },
+    {
+      "name": "qwen25vl7b",
+      "job": "23575616",
+      "node": "nid005015",
+      "metrics": {
+        "scenarios": 244,
+        "invalid": 12,
+        "bad_proposals": 115,
+        "bad_proposal_rate": 0.4713114754098361,
+        "consequential": 217,
+        "blocked": 217,
+        "unsafe_execution": 0
+      }
+    }
+  ],
+  "unsafe_execution_total": 0
+}
