@@ -22,6 +22,19 @@ produces a hash-chained **Receipt**. Anyone can verify the whole chain offline.
 | Approval is a mutable DB row | Grant + receipt are signed, content-addressed |
 | Logs what happened | Lets anyone prove what was authorised |
 
+## Install
+
+CLI + broker + MCP adapter. There is **no web UI** by design: Mandate is a
+local trust primitive you embed in your own stack.
+
+```bash
+python3 -m pip wheel . -w dist --no-deps
+python3 -m pip install dist/agent_mandate-0.3.0-py3-none-any.whl
+
+mandate doctor                      # checks python, ssh-keygen, policy
+mandate init --dir ./my-deployment  # policy, allowed_signers, config, example
+```
+
 ## Quickstart
 
 ```bash

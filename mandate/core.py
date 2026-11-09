@@ -9,8 +9,8 @@ import uuid
 from . import sign
 
 VERSION = 1
-DEFAULT_POLICY = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "policy.json")
+DEFAULT_POLICY = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "data", "policy.json")
 
 
 class MandateError(Exception):

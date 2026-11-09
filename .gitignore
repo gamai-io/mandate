@@ -2,6 +2,9 @@ __pycache__/
 *.pyc
 ledger.jsonl
 *.sig
+dist/
+build/
+*.egg-info/
 broker/used.sqlite*
 broker/receipt_key
 effects/

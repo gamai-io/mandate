@@ -23,6 +23,77 @@ def _read(path: str):
     return core.load_json(path)
 
 
+def _cmd_init(args) -> int:
+    base = os.path.abspath(args.dir)
+    for sub in ("mandate", "trust", "examples"):
+        os.makedirs(os.path.join(base, sub), exist_ok=True)
+    created = []
+    policy_target = os.path.join(base, "mandate", "policy.json")
+    if not os.path.exists(policy_target):
+        with open(core.DEFAULT_POLICY, encoding="utf-8") as src, \
+                open(policy_target, "w", encoding="utf-8") as dst:
+            dst.write(src.read())
+        created.append(policy_target)
+    signers_target = os.path.join(base, "trust", "allowed_signers")
+    if not os.path.exists(signers_target):
+        with open(signers_target, "w", encoding="utf-8") as fh:
+            fh.write("# <name> ssh-ed25519 AAAAC3Nza... comment\n")
+        created.append(signers_target)
+    example = os.path.join(base, "examples", "intent.json")
+    if not os.path.exists(example):
+        demo = {
+            "v": 1,
+            "actor": {"agent": "opencode@host", "session": "demo"},
+            "effect": {"kind": "payment.send", "target": "Example Supplier",
+                       "amount": {"value": 1170.0, "currency": "BAM"},
+                       "params": {"ref": "faktura-1"}},
+            "requested_by": "owner", "nonce": "demo-1",
+            "provenance": [{"type": "data_ref", "source": "erp:vendors:1"}],
+        }
+        with open(example, "w", encoding="utf-8") as fh:
+            json.dump(demo, fh, indent=2)
+            fh.write("\n")
+        created.append(example)
+    config = {
+        "host": "127.0.0.1", "port": 8899,
+        "policy": policy_target, "signers": signers_target,
+        "ledger": os.path.join(base, "ledger.jsonl"),
+        "nonce_db": os.path.join(base, "broker", "used.sqlite"),
+        "effects_dir": os.path.join(base, "effects"),
+        "outbox": os.path.join(base, "outbox"),
+        "broker_name": "local-broker",
+        "smtp": {"mode": "dry_run", "outbox": os.path.join(base, "outbox")},
+    }
+    config_path = os.path.join(base, "mandate", "config.json")
+    if not os.path.exists(config_path):
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump(config, fh, indent=2)
+            fh.write("\n")
+        created.append(config_path)
+    _emit({"ok": True, "dir": base, "created": created}, None)
+    return 0
+
+
+def _cmd_doctor(args) -> int:
+    import shutil
+    out = {
+        "python": sys.version.split()[0],
+        "ssh_keygen": bool(shutil.which("ssh-keygen")),
+        "policy": args.policy,
+        "signers": args.signers,
+        "signers_present": os.path.exists(args.signers),
+    }
+    try:
+        policy = core.load_policy(args.policy)
+        out["policy_ok"] = True
+        out["effects"] = len(policy["effects"])
+    except (core.MandateError, OSError, ValueError) as exc:
+        out["policy_ok"] = False
+        out["policy_error"] = str(exc)[:160]
+    _emit(out, None)
+    return 0 if out["ssh_keygen"] and out.get("policy_ok") else 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="mandate")
     parser.add_argument("--policy", default=None)
@@ -66,6 +137,15 @@ def main(argv=None) -> int:
     p_exec.add_argument("--grant", required=True)
 
     sub.add_parser("policy")
+    sub.add_parser("version")
+
+    p_init = sub.add_parser("init")
+    p_init.add_argument("--dir", default=".")
+
+    p_doctor = sub.add_parser("doctor")
+    p_doctor.add_argument("--policy", default=None)
+    p_doctor.add_argument("--signers", default=os.environ.get(
+        "MANDATE_SIGNERS", "trust/allowed_signers"))
 
     for _sp in (p_check, p_prop, p_grant, p_redeem, p_verify, p_chain):
         _sp.add_argument("--policy", default=None)
@@ -120,6 +200,17 @@ def main(argv=None) -> int:
         if args.cmd == "policy":
             _emit(core.load_policy(args.policy), None)
             return 0
+
+        if args.cmd == "version":
+            from . import __version__
+            _emit({"name": "agent-mandate", "version": __version__}, None)
+            return 0
+
+        if args.cmd == "init":
+            return _cmd_init(args)
+
+        if args.cmd == "doctor":
+            return _cmd_doctor(args)
 
         if args.cmd == "execute":
             payload = json.dumps({
