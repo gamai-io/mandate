@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0 — 2026-11-09
+- **Off-host STH witness**: pins the latest signed tree head, rejects rollback
+  (smaller tree), rejects split-view (same size, different root), and requires a
+  valid consistency proof for growth. State is written atomically (0600).
+- CLI: `mandate witness accept | verify | show | serve | push`.
+- Loopback HTTP witness with a bearer token (`/sth`, `/state`, `/health`);
+  `--allow-remote` required to bind elsewhere.
+- 8 witness tests + 68 total.
+
 ## 0.9.0 — 2026-11-09
 - **Merkle transparency log** over ledger entries (RFC 6962/9162 style):
   `Leaf=SHA256(0x00||JCS(entry))`, `Node=SHA256(0x01||L||R)`, MTH, inclusion

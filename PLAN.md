@@ -24,7 +24,7 @@
 ## Phase 3 — Transparency + interop
 - [x] Merkle transparency log (RFC 6962/9162 style) with inclusion + consistency proofs
 - [x] Signed tree head via Ed25519 (`mandate-log` namespace)
-- [ ] Off-host witness/anchor for the STH (rules out split-view)
+- [x] Off-host witness/anchor for the STH (rules out split-view)
 - [ ] Export receipt as JWS / C2PA-style manifest
 - [ ] OIDC/WebAuthn co-sign (passkeys) alongside Ed25519
 - [ ] Provenance enforcement: `data_ref` required for every choice parameter

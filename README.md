@@ -153,6 +153,23 @@ A single log cannot prevent **split-view** by its operator; pin the STH on a
 second machine (witness/anchor). The STH signer needs
 `namespaces="mandate-log"` in `allowed_signers`.
 
+### Off-host witness
+
+```bash
+# on the second machine
+mandate --signers log_signers witness serve --state witness.json \
+  --token "$WITNESS_TOKEN" --port 8898
+
+# on the log host
+mandate witness push --url http://witness:8898 --sth sth.json --token "$WITNESS_TOKEN"
+mandate witness push --url http://witness:8898 --sth sth_new.json --proof cons.json --token "$WITNESS_TOKEN"
+mandate witness show --state witness.json
+```
+
+The witness pins the latest STH and rejects rollback or a same-size different
+root (split-view). Growth requires a consistency proof from the pinned root.
+`witness verify` checks without pinning; `witness accept` pins locally.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

@@ -162,6 +162,70 @@ def _cmd_log(args) -> int:
     return 2
 
 
+def _cmd_witness(args) -> int:
+    from . import witness as mwit
+    cmd = getattr(args, "witness_cmd", None)
+    try:
+        if cmd in ("accept", "verify"):
+            sth = _read(args.sth)
+            proof = _read(args.proof) if args.proof else None
+            out = mwit.accept(sth, proof, args.signers, args.state,
+                              revoked_path=args.revoked,
+                              dry_run=(cmd == "verify"))
+            _emit(out, None)
+            return 0
+        if cmd == "show":
+            state = mwit.load_state(args.state)
+            _emit({"state": state}, None)
+            return 0 if state else 1
+        if cmd == "push":
+            payload = json.dumps({
+                "sth": _read(args.sth),
+                "proof": _read(args.proof) if args.proof else None,
+            }).encode("utf-8")
+            request = urllib.request.Request(
+                args.url.rstrip("/") + "/sth", data=payload,
+                headers={"Content-Type": "application/json",
+                         "Authorization": "Bearer " + args.token},
+                method="POST")
+            try:
+                with urllib.request.urlopen(request, timeout=30) as resp:
+                    _emit(json.loads(resp.read().decode("utf-8")), None)
+                    return 0
+            except urllib.error.HTTPError as exc:
+                try:
+                    _emit(json.loads(exc.read().decode("utf-8")), None)
+                except ValueError:
+                    _emit({"error": "http", "status": exc.code}, None)
+                return 1
+        if cmd == "serve":
+            if not args.token:
+                _emit({"error": "token_required"}, None)
+                return 2
+            if args.host not in ("127.0.0.1", "::1", "localhost") and \
+                    not args.allow_remote:
+                _emit({"error": "remote_requires_allow_remote"}, None)
+                return 2
+            server = mwit.make_server(args.host, args.port, args.state,
+                                      args.signers, args.token,
+                                      revoked_path=args.revoked)
+            host, port = server.server_address[:2]
+            print("mandate-witness listening on http://%s:%s" % (host, port),
+                  flush=True)
+            try:
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.server_close()
+            return 0
+    except (core.MandateError, OSError, ValueError) as exc:
+        _emit({"error": type(exc).__name__, "message": str(exc)[:200]}, None)
+        return 3
+    _emit({"error": "unknown_witness_command"}, None)
+    return 2
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="mandate")
     parser.add_argument("--policy", default=None)
@@ -256,6 +320,32 @@ def main(argv=None) -> int:
     p_lv.add_argument("--new", required=True)
     p_lv.add_argument("--proof", required=True)
 
+    p_wit = sub.add_parser("witness")
+    wit_sub = p_wit.add_subparsers(dest="witness_cmd")
+    p_wa = wit_sub.add_parser("accept")
+    p_wa.add_argument("--state", required=True)
+    p_wa.add_argument("--sth", required=True)
+    p_wa.add_argument("--proof", default=None)
+    p_wv = wit_sub.add_parser("verify")
+    p_wv.add_argument("--state", required=True)
+    p_wv.add_argument("--sth", required=True)
+    p_wv.add_argument("--proof", default=None)
+    p_ws = wit_sub.add_parser("show")
+    p_ws.add_argument("--state", required=True)
+    p_wserve = wit_sub.add_parser("serve")
+    p_wserve.add_argument("--state", required=True)
+    p_wserve.add_argument("--token", default=os.environ.get(
+        "MANDATE_WITNESS_TOKEN", ""))
+    p_wserve.add_argument("--host", default="127.0.0.1")
+    p_wserve.add_argument("--port", type=int, default=8898)
+    p_wserve.add_argument("--allow-remote", action="store_true")
+    p_wpush = wit_sub.add_parser("push")
+    p_wpush.add_argument("--url", required=True)
+    p_wpush.add_argument("--sth", required=True)
+    p_wpush.add_argument("--proof", default=None)
+    p_wpush.add_argument("--token", default=os.environ.get(
+        "MANDATE_WITNESS_TOKEN", ""))
+
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
     for _sp in (p_check, p_redeem, p_verify):
@@ -330,6 +420,9 @@ def main(argv=None) -> int:
 
         if args.cmd == "log":
             return _cmd_log(args)
+
+        if args.cmd == "witness":
+            return _cmd_witness(args)
 
         if args.cmd == "revoke":
             try:
