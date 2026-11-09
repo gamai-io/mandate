@@ -63,6 +63,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
 
 # 5. anyone verifies offline
 ./bin/mandate verify --receipt ... --intent examples/intent.json --grant /tmp/grant.json
+./bin/mandate verify-result --entry /tmp/result.json --broker-signers trust/broker_signers
 ./bin/mandate chain --ledger ledger.jsonl
 ```
 
@@ -125,9 +126,11 @@ skills/     agent skill instructions
 
 ## Status
 
-Reference implementation v0.1: canonical commitment, Ed25519 grant, one-shot
-redeem, hash-chained receipts, bypass tests. See `PLAN.md` for the roadmap
-(effect broker, transparency log, WebAuthn, ERP adapters).
+Reference implementation v0.4: canonical commitment, Ed25519 grant bound to the
+executing agent, one-shot redeem under a file lock, hash-chained receipts with a
+`.head` anchor, effect broker with signed result entries, read-only ERP
+preconditions, SMTP adapter, MCP server (`mandate-mcp`), and a red-team test
+suite. See `PLAN.md` for the roadmap.
 
 ## Honest limitation
 

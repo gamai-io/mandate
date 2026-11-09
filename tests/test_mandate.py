@@ -53,12 +53,14 @@ class MandateTests(unittest.TestCase):
         self.td.cleanup()
 
     def _grant(self, intent, approver="approver", ttl=900, key=None,
-               render_hash=None):
+               render_hash=None, agent=None):
         proposal = core.propose(intent)
         grant_core = core.build_grant_core(
             proposal["commitment"], approver, ttl_s=ttl,
             render_hash=(proposal["render_hash"] if render_hash is None
-                         else render_hash))
+                         else render_hash),
+            agent=(agent if agent is not None
+                   else str(intent.get("actor", {}).get("agent") or "")))
         return core.make_grant(grant_core, key or self.key)
 
     def test_check_risky_requires_grant(self):
@@ -141,8 +143,95 @@ class MandateTests(unittest.TestCase):
         intent = intent_factory()
         intent["effect"]["params"] = {"ref": "x", "supplier": "Example", "extra": "Z"}
         summary = core.render(intent)["summary"]
-        self.assertIn("supplier=Example", summary)
-        self.assertIn("extra=Z", summary)
+        self.assertIn('supplier="Example"', summary)
+        self.assertIn('extra="Z"', summary)
+
+    def test_hidden_effect_field_rejected(self):
+        intent = intent_factory()
+        intent["effect"]["iban"] = "XX99"
+        with self.assertRaises(core.MandateError):
+            core.normalize_intent(intent)
+
+    def test_nan_amount_rejected(self):
+        intent = intent_factory()
+        intent["effect"]["amount"] = {"value": float("nan"), "currency": "BAM"}
+        with self.assertRaises(core.MandateError):
+            core.normalize_intent(intent)
+
+    def test_max_uses_clamped_to_one(self):
+        grant = core.build_grant_core("sha256:x", "approver", max_uses=5)
+        self.assertEqual(grant["scope"]["max_uses"], 1)
+
+    def test_actor_swap_rejected(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        swapped = intent_factory(actor={"agent": "other@test", "session": "s"})
+        with self.assertRaises(core.CommitmentMismatch):
+            core.redeem(swapped, grant, self.signers, self.ledger)
+
+    def test_unknown_effect_redeem_denied(self):
+        intent = intent_factory(effect={"kind": "rm.rf", "target": "/"})
+        grant = self._grant(intent)
+        with self.assertRaises(core.PolicyDenied):
+            core.redeem(intent, grant, self.signers, self.ledger)
+
+    def test_erp_nan_blocked(self):
+        from mandate.adapters import ErpChecker
+        erp = ErpChecker(self._make_erp())
+        result = erp.check({"effect": {
+            "kind": "payment.send", "target": "Example Supplier",
+            "amount": {"value": float("nan")}}})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "invalid_amount")
+
+    def test_concurrent_redeem_single_success(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        ok, failed = [], []
+
+        def worker():
+            try:
+                core.redeem(intent, grant, self.signers, self.ledger)
+                ok.append(1)
+            except core.MandateError:
+                failed.append(1)
+
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(len(ok), 1)
+        self.assertTrue(core.verify_chain(self.ledger))
+
+    def test_verify_chain_empty_and_truncated(self):
+        self.assertFalse(core.verify_chain(os.path.join(self.dir, "missing.jsonl")))
+        first = intent_factory(nonce="chain-1")
+        second = intent_factory(nonce="chain-2")
+        core.redeem(first, self._grant(first), self.signers, self.ledger)
+        core.redeem(second, self._grant(second), self.signers, self.ledger)
+        self.assertTrue(core.verify_chain(self.ledger))
+        lines = pathlib.Path(self.ledger).read_text(encoding="utf-8").splitlines()
+        pathlib.Path(self.ledger).write_text(lines[0] + "\n", encoding="utf-8")
+        self.assertFalse(core.verify_chain(self.ledger))
+
+    def test_proposal_mismatch_cli(self):
+        intent_path = os.path.join(self.dir, "intent.json")
+        pathlib.Path(intent_path).write_text(json.dumps(intent_factory()),
+                                             encoding="utf-8")
+        prop = os.path.join(self.dir, "proposal.json")
+        subprocess.run([sys.executable, str(ROOT / "bin" / "mandate"),
+                        "propose", "--intent", intent_path, "--out", prop],
+                       check=True, capture_output=True, env=dict(os.environ))
+        data = json.loads(pathlib.Path(prop).read_text(encoding="utf-8"))
+        data["commitment"] = "sha256:deadbeef"
+        pathlib.Path(prop).write_text(json.dumps(data), encoding="utf-8")
+        out = subprocess.run(
+            [sys.executable, str(ROOT / "bin" / "mandate"), "grant",
+             "--proposal", prop, "--approver", "approver", "--key", self.key],
+            capture_output=True, text=True, env=dict(os.environ))
+        self.assertEqual(out.returncode, 3, out.stdout + out.stderr)
+        self.assertIn("ProposalMismatch", out.stdout)
 
     def _make_erp(self):
         path = os.path.join(self.dir, "erp.sqlite")
@@ -155,10 +244,12 @@ class MandateTests(unittest.TestCase):
             "query": "SELECT invoice_total FROM vendors WHERE name = :target",
             "amount_field": "invoice_total", "tolerance_pct": 0.5}}}
 
-    def _start_broker(self, smtp=None, erp=None):
+    def _start_broker(self, smtp=None, erp=None, receipt_key="",
+                      broker_name="gama-broker"):
         b = broker.Broker(
             os.path.join(ROOT, "policy.json"), self.signers, self.ledger,
             os.path.join(self.dir, "used.sqlite"),
+            receipt_key=receipt_key, broker_name=broker_name,
             effects_dir=os.path.join(self.dir, "effects"),
             outbox=os.path.join(self.dir, "outbox"),
             smtp=smtp, erp=erp)
@@ -253,6 +344,26 @@ class MandateTests(unittest.TestCase):
         self.assertEqual(status, 200, body)
         self.assertTrue(body["result"]["dry_run"])
         self.assertTrue(os.path.exists(body["result"]["path"]))
+
+    def test_broker_result_signature_verifiable(self):
+        broker_key = os.path.join(self.dir, "broker_key")
+        subprocess.run(["ssh-keygen", "-t", "ed25519", "-N", "", "-f", broker_key],
+                       check=True, capture_output=True)
+        broker_signers = os.path.join(self.dir, "broker_signers")
+        pathlib.Path(broker_signers).write_text(
+            "gama-broker %s\n" % pathlib.Path(broker_key + ".pub").read_text(
+                encoding="utf-8").strip(), encoding="utf-8")
+        intent = intent_factory()
+        grant = self._grant(intent)
+        port = self._start_broker(receipt_key=broker_key,
+                                  broker_name="gama-broker")
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 200, body)
+        entry = body["result_entry"]
+        self.assertTrue(core.verify_result_entry(entry, broker_signers))
+        forged = json.loads(json.dumps(entry))
+        forged["body"]["status"] = "ok-forged"
+        self.assertFalse(core.verify_result_entry(forged, broker_signers))
 
     def test_cli_end_to_end(self):
         env = dict(os.environ)

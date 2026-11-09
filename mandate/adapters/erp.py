@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import sqlite3
 
@@ -26,13 +27,23 @@ class ErpChecker:
         if not isinstance(spec, dict):
             return {"ok": True, "skipped": True}
         effect = intent.get("effect") or {}
-        amount = effect.get("amount") or {}
-        binds = dict(effect.get("params") or {})
-        binds["target"] = effect.get("target")
+        amount = effect.get("amount")
+        params = effect.get("params") or {}
+        if amount is not None and not isinstance(amount, dict):
+            return {"ok": False, "reason": "invalid_amount"}
+        if not isinstance(params, dict):
+            return {"ok": False, "reason": "invalid_params"}
+        amount = amount or {}
         try:
-            binds["amount"] = float(amount.get("value"))
+            value = (float(amount.get("value"))
+                     if amount.get("value") is not None else 0.0)
         except (TypeError, ValueError):
-            binds["amount"] = 0.0
+            return {"ok": False, "reason": "invalid_amount"}
+        if not math.isfinite(value):
+            return {"ok": False, "reason": "invalid_amount"}
+        binds = {"target": effect.get("target"), "amount": value}
+        for key in (spec.get("bind_params") or []):
+            binds[str(key)] = params.get(key)
         try:
             con = self._connect()
         except sqlite3.Error as exc:
@@ -55,6 +66,8 @@ class ErpChecker:
                 got = float(amount["value"])
             except (KeyError, TypeError, ValueError):
                 return {"ok": False, "reason": "erp_amount_unreadable"}
+            if not math.isfinite(expected) or not math.isfinite(got):
+                return {"ok": False, "reason": "invalid_amount"}
             tolerance = float(spec.get("tolerance_pct") or 0.0) / 100.0
             if expected == 0:
                 if got != 0:

@@ -26,6 +26,7 @@ from .core import (  # noqa: F401
     verify_chain,
     verify_grant,
     verify_receipt,
+    verify_result_entry,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

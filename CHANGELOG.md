@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 — 2026-11-09
+Security fixes from an independent multi-agent audit (Claude + subagent + web):
+- `mandate grant` recomputes commitment/render_hash/proposal_id from the intent and rejects a mismatched proposal (approval-confusion fix).
+- `redeem` enforces policy (unknown effects denied) and binds the grant to the agent (`agent` field), closing the actor-swap self-approval bypass.
+- CLI/MCP redeem now performs the nonce check and append under one file lock; ledger append is fsync'd and anchored with `<ledger>.head`; `verify_chain` rejects empty or truncated ledgers.
+- Intent schema validation: unknown effect/amount fields and non-finite amounts are rejected; `params` must be flat scalars.
+- `render` quotes every value (no `|` injection) and includes all params.
+- ERP: NaN/non-dict amounts rejected; only `bind_params` can fill query placeholders.
+- `execute` refuses non-loopback brokers (unless `--allow-remote`) and does not follow redirects.
+- MCP adapter moved into the package and shipped as `mandate-mcp`; `verify-result` validates the signed broker result entry.
+- `doctor` fails when signers are missing; `max_uses` is honestly fixed at 1.
+
 ## 0.3.0 — 2026-11-09
 - Read-only ERP precondition (SQLite `mode=ro`, named-param query, amount tolerance).
 - SMTP adapter for `message.send` (`dry_run` default, `live` reads password from env).

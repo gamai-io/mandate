@@ -5,9 +5,15 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from . import core
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def _emit(obj, out: str | None) -> None:
@@ -91,7 +97,8 @@ def _cmd_doctor(args) -> int:
         out["policy_ok"] = False
         out["policy_error"] = str(exc)[:160]
     _emit(out, None)
-    return 0 if out["ssh_keygen"] and out.get("policy_ok") else 1
+    return 0 if (out["ssh_keygen"] and out.get("policy_ok")
+                 and out["signers_present"]) else 1
 
 
 def main(argv=None) -> int:
@@ -99,7 +106,6 @@ def main(argv=None) -> int:
     parser.add_argument("--policy", default=None)
     parser.add_argument("--signers", default=os.environ.get(
         "MANDATE_SIGNERS", "trust/allowed_signers"))
-    parser.add_argument("--json", action="store_true")
     sub = parser.add_subparsers(dest="cmd")
 
     p_check = sub.add_parser("check")
@@ -113,7 +119,6 @@ def main(argv=None) -> int:
     p_grant.add_argument("--proposal", required=True)
     p_grant.add_argument("--approver", required=True)
     p_grant.add_argument("--key", required=True)
-    p_grant.add_argument("--max-uses", type=int, default=1)
     p_grant.add_argument("--ttl", type=int, default=900)
     p_grant.add_argument("--out", default=None)
 
@@ -131,10 +136,15 @@ def main(argv=None) -> int:
     p_chain = sub.add_parser("chain")
     p_chain.add_argument("--ledger", default="ledger.jsonl")
 
+    p_vr = sub.add_parser("verify-result")
+    p_vr.add_argument("--entry", required=True)
+    p_vr.add_argument("--broker-signers", dest="broker_signers", required=True)
+
     p_exec = sub.add_parser("execute")
     p_exec.add_argument("--broker", required=True)
     p_exec.add_argument("--intent", required=True)
     p_exec.add_argument("--grant", required=True)
+    p_exec.add_argument("--allow-remote", action="store_true")
 
     sub.add_parser("policy")
     sub.add_parser("version")
@@ -147,7 +157,7 @@ def main(argv=None) -> int:
     p_doctor.add_argument("--signers", default=os.environ.get(
         "MANDATE_SIGNERS", "trust/allowed_signers"))
 
-    for _sp in (p_check, p_prop, p_grant, p_redeem, p_verify, p_chain):
+    for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
     for _sp in (p_check, p_redeem, p_verify):
         _sp.add_argument("--signers", default=os.environ.get(
@@ -170,17 +180,27 @@ def main(argv=None) -> int:
 
         if args.cmd == "grant":
             proposal = _read(args.proposal)
+            intent = core.normalize_intent(proposal.get("intent") or {})
+            commitment = core.intent_commitment(intent)
+            rhash = core.render_hash(intent)
+            if (commitment != proposal.get("commitment")
+                    or rhash != proposal.get("render_hash")
+                    or core.proposal_id(intent) != proposal.get("proposal_id")):
+                _emit({"error": "ProposalMismatch",
+                       "message": "proposal does not match its intent"}, None)
+                return 3
             grant_core = core.build_grant_core(
-                proposal["commitment"], args.approver,
-                max_uses=args.max_uses, ttl_s=args.ttl,
-                render_hash=proposal.get("render_hash", ""))
+                commitment, args.approver, ttl_s=args.ttl,
+                render_hash=rhash,
+                agent=str(intent["actor"]["agent"]))
             _emit(core.make_grant(grant_core, args.key), args.out)
             return 0
 
         if args.cmd == "redeem":
             receipt = core.redeem(
                 _read(args.intent), _read(args.grant), args.signers,
-                args.ledger, allow_self=args.allow_self)
+                args.ledger, allow_self=args.allow_self,
+                policy=core.load_policy(args.policy))
             _emit(receipt, None)
             return 0
 
@@ -195,6 +215,11 @@ def main(argv=None) -> int:
             entries = core.read_ledger(args.ledger)
             ok = core.verify_chain(args.ledger)
             _emit({"valid": ok, "entries": len(entries)}, None)
+            return 0 if ok else 1
+
+        if args.cmd == "verify-result":
+            ok = core.verify_result_entry(_read(args.entry), args.broker_signers)
+            _emit({"valid": ok}, None)
             return 0 if ok else 1
 
         if args.cmd == "policy":
@@ -213,6 +238,15 @@ def main(argv=None) -> int:
             return _cmd_doctor(args)
 
         if args.cmd == "execute":
+            parsed = urllib.parse.urlsplit(args.broker)
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme not in ("http", "https"):
+                _emit({"error": "BadBrokerUrl"}, None)
+                return 2
+            if host not in ("127.0.0.1", "::1", "localhost") and not args.allow_remote:
+                _emit({"error": "RemoteBrokerRefused",
+                       "message": "non-loopback broker requires --allow-remote"}, None)
+                return 2
             payload = json.dumps({
                 "intent": _read(args.intent),
                 "grant": _read(args.grant),
@@ -220,8 +254,9 @@ def main(argv=None) -> int:
             request = urllib.request.Request(
                 args.broker.rstrip("/") + "/execute", data=payload,
                 headers={"Content-Type": "application/json"}, method="POST")
+            opener = urllib.request.build_opener(_NoRedirect)
             try:
-                with urllib.request.urlopen(request, timeout=30) as resp:
+                with opener.open(request, timeout=30) as resp:
                     _emit(json.loads(resp.read().decode("utf-8")), None)
                     return 0
             except urllib.error.HTTPError as exc:

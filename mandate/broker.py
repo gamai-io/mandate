@@ -78,9 +78,9 @@ class Broker:
     def _sign_result(self, body: dict) -> dict:
         if not self.receipt_key or not os.path.exists(self.receipt_key):
             return body
-        unsigned = {k: v for k, v in body.items() if k != "broker_sig"}
-        body["broker_sig"] = sign.sign(core.jcs(unsigned), self.receipt_key,
-                                       BROKER_NAMESPACE)
+        body["broker_sig"] = sign.sign(
+            core.jcs(core.result_signing_payload(body)), self.receipt_key,
+            BROKER_NAMESPACE)
         return body
 
     def execute(self, intent: dict, grant_obj: dict) -> dict:
@@ -130,7 +130,7 @@ class Broker:
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.2"
+        server_version = "mandate-broker/0.4"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -209,6 +209,9 @@ def main(argv=None) -> int:
     if args.host not in ("127.0.0.1", "::1", "localhost") and not args.allow_remote:
         print("refusing to bind non-loopback host without --allow-remote", flush=True)
         return 2
+
+    if args.policy == "policy.json" and not os.path.exists(args.policy):
+        args.policy = core.DEFAULT_POLICY
 
     broker = Broker(args.policy, args.signers, args.ledger, args.nonce_db,
                     receipt_key=args.receipt_key, broker_name=args.broker_name,
