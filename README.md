@@ -174,6 +174,28 @@ The witness pins the latest STH and rejects rollback or a same-size different
 root (split-view). Growth requires a consistency proof from the pinned root.
 `witness verify` checks without pinning; `witness accept` pins locally.
 
+## Co-sign on the approver's host
+
+The agent never holds the private key. The approver runs a small daemon on
+their own machine; it recomputes the commitment/render from the intent (it does
+not trust the agent's proposal), prints the summary, and signs only after `y`:
+
+```bash
+# approver's host
+mandate approver serve --key ~/.ssh/mandate --approver approver \
+  --audience local-broker --port 8897
+
+# agent host
+mandate request --approver http://approver-host:8897 --intent intent.json \
+  --audience local-broker --out grant.json
+mandate execute --broker http://127.0.0.1:8899 --intent intent.json --grant grant.json
+```
+
+Loopback by default; a non-loopback daemon requires `--token` /
+`MANDATE_APPROVER_TOKEN`. Without a TTY the daemon refuses to auto-approve
+(`503`). A Telegram notification channel can be added in front of the same
+signer without changing the security property.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

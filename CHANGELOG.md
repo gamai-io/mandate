@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0 — 2026-11-09
+- **Approver daemon** (`mandate approver serve`): runs on the approver's host,
+  recomputes the commitment and render from the intent (it does not trust the
+  agent's proposal), shows the summary on its terminal, and signs a grant only
+  after the human types `y`. The private key never leaves the approver host.
+- **`mandate request --approver URL --intent ...`** client: gets the signed
+  grant back (or a rejection). Loopback by default, bearer token for remote,
+  256 KiB body cap.
+- 7 approver tests + 78 total.
+
 ## 0.10.4 — 2026-11-09
 - `mandate version` reports the distribution name `gama-mandate`.
 - Published to PyPI: https://pypi.org/project/gama-mandate/

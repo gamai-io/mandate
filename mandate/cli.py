@@ -226,6 +226,67 @@ def _cmd_witness(args) -> int:
     return 2
 
 
+def _cmd_approver(args) -> int:
+    from . import approver as mapprover
+    if getattr(args, "approver_cmd", None) != "serve":
+        _emit({"error": "unknown_approver_command"}, None)
+        return 2
+    if not os.path.exists(args.key):
+        _emit({"error": "key_not_found", "key": args.key}, None)
+        return 2
+    if args.host not in ("127.0.0.1", "::1", "localhost") and not args.token:
+        _emit({"error": "remote_requires_token"}, None)
+        return 2
+    if args.host not in ("127.0.0.1", "::1", "localhost") and \
+            not args.allow_remote:
+        _emit({"error": "remote_requires_allow_remote"}, None)
+        return 2
+    approver = mapprover.Approver(args.key, args.approver,
+                                  audience_default=args.audience,
+                                  ttl_default=args.ttl)
+    server = mapprover.make_server(args.host, args.port, approver,
+                                   token=args.token)
+    host, port = server.server_address[:2]
+    print("mandate-approver listening on http://%s:%s (approver=%s)"
+          % (host, port, args.approver), flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return 0
+
+
+def _cmd_request(args) -> int:
+    body = json.dumps({
+        "intent": _read(args.intent),
+        "audience": args.audience,
+        "ttl": args.ttl,
+    }).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if args.token:
+        headers["Authorization"] = "Bearer " + args.token
+    request = urllib.request.Request(
+        args.approver.rstrip("/") + "/request", data=body, headers=headers,
+        method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=3600) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            _emit(json.loads(exc.read().decode("utf-8")), None)
+        except ValueError:
+            _emit({"error": "http", "status": exc.code}, None)
+        return 1
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as fh:
+            json.dump(result.get("grant") or {}, fh, ensure_ascii=False, indent=2)
+            fh.write("\n")
+    _emit(result, None)
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="mandate")
     parser.add_argument("--policy", default=None)
@@ -346,6 +407,28 @@ def main(argv=None) -> int:
     p_wpush.add_argument("--token", default=os.environ.get(
         "MANDATE_WITNESS_TOKEN", ""))
 
+    p_appr = sub.add_parser("approver")
+    appr_sub = p_appr.add_subparsers(dest="approver_cmd")
+    p_as = appr_sub.add_parser("serve")
+    p_as.add_argument("--key", required=True)
+    p_as.add_argument("--approver", required=True)
+    p_as.add_argument("--audience", default="")
+    p_as.add_argument("--ttl", type=int, default=900)
+    p_as.add_argument("--host", default="127.0.0.1")
+    p_as.add_argument("--port", type=int, default=8897)
+    p_as.add_argument("--token", default=os.environ.get(
+        "MANDATE_APPROVER_TOKEN", ""))
+    p_as.add_argument("--allow-remote", action="store_true")
+
+    p_req = sub.add_parser("request")
+    p_req.add_argument("--approver", required=True)
+    p_req.add_argument("--intent", required=True)
+    p_req.add_argument("--audience", default=None)
+    p_req.add_argument("--ttl", type=int, default=None)
+    p_req.add_argument("--token", default=os.environ.get(
+        "MANDATE_APPROVER_TOKEN", ""))
+    p_req.add_argument("--out", default=None)
+
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
     for _sp in (p_check, p_redeem, p_verify):
@@ -423,6 +506,12 @@ def main(argv=None) -> int:
 
         if args.cmd == "witness":
             return _cmd_witness(args)
+
+        if args.cmd == "approver":
+            return _cmd_approver(args)
+
+        if args.cmd == "request":
+            return _cmd_request(args)
 
         if args.cmd == "revoke":
             try:

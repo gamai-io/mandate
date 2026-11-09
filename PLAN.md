@@ -27,6 +27,8 @@
 - [x] Off-host witness/anchor for the STH (rules out split-view)
 - [ ] Export receipt as JWS / C2PA-style manifest
 - [ ] OIDC/WebAuthn co-sign (passkeys) alongside Ed25519
+- [x] Co-sign daemon on the approver's host (TTY confirm, key never leaves host)
+- [ ] Telegram notification channel in front of the approver daemon
 - [ ] Provenance enforcement: `data_ref` required for every choice parameter
 
 ## Phase 4 — Ecosystem
