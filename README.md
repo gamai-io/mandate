@@ -331,6 +331,23 @@ denied) and strips `_mandate` before forwarding:
 
 Run with `mandate mcp proxy --taint taint.json --mcp-ledger ledger.jsonl`.
 
+## Sandbox untrusted MCP servers (Phase 3)
+
+Run the MCP server itself in a hardened container:
+
+```bash
+mandate mcp proxy --lock mandate.lock.json --cmd "python3 fake_mcp.py" \
+  --sandbox docker --sandbox-image python:3.12-slim \
+  --sandbox-mount "$PWD/tests/fixtures:/work:ro" --sandbox-workdir /work
+```
+
+- `docker` (runc) and `gvisor` (`--runtime runsc`): read-only root, `--network
+  none`, `--cap-drop ALL`, `no-new-privileges`, pids/memory/cpu limits, 16 MiB
+  tmpfs, explicit read-only mounts.
+- `firecracker` uses `--sandbox-cmd-template "<launcher> --"` so a VMLab
+  Firecracker runner can be plugged in without changing the proxy.
+- `local` is for trusted development only.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

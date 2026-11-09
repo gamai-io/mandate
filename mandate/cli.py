@@ -312,20 +312,40 @@ def _cmd_export(args) -> int:
     return 0 if result.get("valid") else 1
 
 
+def _add_sandbox_args(parser) -> None:
+    parser.add_argument("--sandbox",
+                        choices=("local", "docker", "gvisor", "firecracker"),
+                        default="local")
+    parser.add_argument("--sandbox-image", default="python:3.12-slim")
+    parser.add_argument("--sandbox-mount", action="append", default=[])
+    parser.add_argument("--sandbox-workdir", default="")
+    parser.add_argument("--sandbox-net", action="store_true")
+    parser.add_argument("--sandbox-cmd-template", default="")
+
+
 def _cmd_mcp(args) -> int:
     from . import mcp as mmcp
+    from . import sandbox as msandbox
     cmd = getattr(args, "mcp_cmd", None)
     server_cmd = getattr(args, "mcp_server_cmd", "")
     try:
+        runner = msandbox.build_runner(
+            getattr(args, "sandbox", "local"),
+            getattr(args, "sandbox_image", "python:3.12-slim"),
+            getattr(args, "sandbox_mount", None),
+            getattr(args, "sandbox_workdir", ""),
+            getattr(args, "sandbox_net", False),
+            getattr(args, "sandbox_cmd_template", ""))
         if cmd == "lock":
-            manifest = mmcp.probe(server_cmd, server=args.server)
+            manifest = mmcp.probe(server_cmd, server=args.server, runner=runner)
             lock = mmcp.build_lock(manifest, args.key, args.signer)
             _emit(lock, args.out)
             return 0
         if cmd == "verify":
             lock = _read(args.lock)
             manifest = mmcp.probe(server_cmd,
-                                  server=str(lock.get("server") or ""))
+                                  server=str(lock.get("server") or ""),
+                                  runner=runner)
             valid = (mmcp.verify_lock(lock, args.signers,
                                       revoked_path=args.revoked)
                      and mmcp.check_manifest(lock, manifest))
@@ -338,7 +358,8 @@ def _cmd_mcp(args) -> int:
                 _read(args.lock), server_cmd, args.signers,
                 verify_calls=args.verify_calls, revoked_path=args.revoked,
                 taint=taint, mcp_policy=core.load_policy(args.policy),
-                ledger=args.mcp_ledger, audience=args.mcp_audience)
+                ledger=args.mcp_ledger, audience=args.mcp_audience,
+                runner=runner)
     except (core.MandateError, OSError, ValueError) as exc:
         if cmd == "proxy":
             print("mandate mcp proxy: %s" % str(exc)[:200], file=sys.stderr)
@@ -514,9 +535,11 @@ def main(argv=None) -> int:
     p_ml.add_argument("--key", required=True)
     p_ml.add_argument("--signer", required=True)
     p_ml.add_argument("--out", default="mandate.lock.json")
+    _add_sandbox_args(p_ml)
     p_mv = mcp_sub.add_parser("verify")
     p_mv.add_argument("--lock", required=True)
     p_mv.add_argument("--cmd", dest="mcp_server_cmd", required=True)
+    _add_sandbox_args(p_mv)
     p_mp = mcp_sub.add_parser("proxy")
     p_mp.add_argument("--lock", required=True)
     p_mp.add_argument("--cmd", dest="mcp_server_cmd", required=True)
@@ -524,6 +547,7 @@ def main(argv=None) -> int:
     p_mp.add_argument("--taint", default=None)
     p_mp.add_argument("--mcp-ledger", default="mcp_ledger.jsonl")
     p_mp.add_argument("--mcp-audience", default="")
+    _add_sandbox_args(p_mp)
 
     p_req = sub.add_parser("request")
     p_req.add_argument("--approver", required=True)

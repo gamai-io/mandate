@@ -124,8 +124,9 @@ def _read_response(proc, want_id, timeout: float) -> dict:
     raise McpError("MCP server response timeout")
 
 
-def probe(cmd: str, timeout: float = 10, server: str = "") -> dict:
-    args = shlex.split(str(cmd))
+def probe(cmd: str, timeout: float = 10, server: str = "",
+          runner=None) -> dict:
+    args = runner.wrap(cmd) if runner is not None else shlex.split(str(cmd))
     if not args:
         raise McpError("empty MCP command")
     try:
@@ -174,7 +175,7 @@ def proxy(lock: dict, cmd: str, signers_path: str,
           verify_calls: bool = False, revoked_path: str | None = None,
           in_stream=None, out_stream=None, taint: dict | None = None,
           mcp_policy: dict | None = None, ledger: str | None = None,
-          audience: str = "") -> int:
+          audience: str = "", runner=None) -> int:
     if not verify_lock(lock, signers_path, revoked_path=revoked_path):
         raise McpError("MCP lock signature invalid")
     in_stream = in_stream or sys.stdin
@@ -185,7 +186,7 @@ def proxy(lock: dict, cmd: str, signers_path: str,
     require_grant = bool(taint.get("require_grant", True))
     ledger_path = ledger or "mcp_ledger.jsonl"
     tainted = False
-    args = shlex.split(str(cmd))
+    args = runner.wrap(cmd) if runner is not None else shlex.split(str(cmd))
     proc = subprocess.Popen(args, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=None,
                             text=True, bufsize=1)
@@ -287,7 +288,9 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                 message["params"] = params
                 if verify_calls:
                     try:
-                        manifest = probe(cmd, server=str(lock.get("server") or ""))
+                        manifest = probe(cmd,
+                                         server=str(lock.get("server") or ""),
+                                         runner=runner)
                         if not check_manifest(lock, manifest):
                             raise McpError("manifest mismatch")
                     except Exception as exc:

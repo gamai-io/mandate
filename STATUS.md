@@ -5,7 +5,7 @@
 - Distribution: `gama-mandate` (PyPI), import package `mandate`.
 - CLI: `mandate`, `mandate-broker`, `mandate-mcp`.
 - Repository: https://github.com/gamai-io/mandate (public, MIT).
-- Current release: **v0.18.0**, CI green on Python 3.9–3.12, 114 tests.
+- Current release: **v0.19.0**, CI green on Python 3.9–3.12, 121 tests.
 
 ## What works now
 
@@ -26,6 +26,7 @@
 - Operations: `/metrics` (Prometheus text) and per-IP rate limiting.
 - MCP manifest gate: signed lock, rug-pull/poisoned-manifest deny, stdio proxy.
 - MCP taint gate: untrusted source → effect requires a grant + `data_ref`.
+- Sandbox runner: hardened Docker (verified), gVisor, Firecracker template.
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items

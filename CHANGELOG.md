@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.19.0 — 2026-11-09
+- **Sandbox runner for untrusted MCP servers (Phase 3)**: `--sandbox
+  local|docker|gvisor|firecracker` on `mandate mcp lock|verify|proxy`.
+  Docker/gVisor use a hardened container: read-only root, no network, all
+  capabilities dropped, `no-new-privileges`, pids/memory/cpu limits, 16 MiB
+  tmpfs, explicit read-only mounts, no bytecode writes.
+  Firecracker is an external launcher template (`--sandbox-cmd-template`) so a
+  VMLab runner can be plugged in.
+- Integration test runs the MCP lock/verify/proxy through a real Docker
+  container (`python:3.12-slim`, network none).
+- 7 sandbox tests + 121 total.
+
 ## 0.18.0 — 2026-11-09
 - **MCP taint gate (Phase 2)**: `mandate mcp proxy --taint taint.json` marks the
   session tainted after a source tool (`web_fetch`, email, RAG, …). An effect
