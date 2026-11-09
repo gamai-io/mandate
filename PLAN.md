@@ -10,10 +10,13 @@
 - [x] Fail-closed policy (unknown effect = deny)
 - [x] Bypass tests: tamper, replay, wrong signer, expiry, self-approval
 
-## Phase 2 — Effect broker (the milestone that removes theater)
-- [ ] Credentials live only in the broker (SQL write, SMTP, payment, WA)
-- [ ] Agent calls broker over HTTP/MCP; broker requires a valid grant
-- [ ] `render_hash`: the human signs the rendered summary, not opaque args
+## Phase 2 — Effect broker (core done, v0.2)
+- [x] Broker is the only executor; agent never runs the effect itself
+- [x] HTTP `/execute` + `/health`, loopback-only by default
+- [x] Atomic nonce claim (SQLite UNIQUE) → no double execution under concurrency
+- [x] `render_hash`: the human signs the rendered summary, bound into the commitment
+- [x] Signed result entry chained after the authorisation receipt
+- [ ] Move real credentials (SQL write, SMTP, payment, WA) into the broker
 - [ ] Per-effect adapters + integration tests against a fake ERP
 
 ## Phase 3 — Transparency + interop

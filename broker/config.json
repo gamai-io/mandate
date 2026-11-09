@@ -1,0 +1,12 @@
+{
+  "host": "127.0.0.1",
+  "port": 8899,
+  "policy": "policy.json",
+  "signers": "trust/allowed_signers",
+  "ledger": "ledger.jsonl",
+  "nonce_db": "broker/used.sqlite",
+  "receipt_key": "broker/receipt_key",
+  "broker_name": "gama-broker",
+  "effects_dir": "effects",
+  "outbox": "outbox"
+}

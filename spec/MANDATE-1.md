@@ -23,9 +23,11 @@ whitespace, UTF-8 (`jcs()`). Hashes are `sha256` over those bytes.
 
 ## Commitment
 ```
-commitment = "sha256:" + sha256(jcs({v, effect, requested_by}))
+render_hash = sha256(jcs(render(intent)))
+commitment  = "sha256:" + sha256(jcs({v, effect, requested_by, render_hash}))
 ```
-The commitment covers **what** is authorised, never **who executes it**.
+The commitment covers **what** is authorised (including the exact human-readable
+render the approver sees), never **who executes it**.
 
 ## Proposal
 ```
@@ -39,6 +41,7 @@ proposal_id = "m1" + sha256(jcs(intent))[:24]
   "grant": {
     "v": 1,
     "commitment": "sha256:...",
+    "render_hash": "sha256:...",
     "approver": "approver",
     "scope": {"max_uses": 1, "not_after": 1794185400},
     "nonce": "uuid"
@@ -54,7 +57,8 @@ and principal = `approver`.
 {
   "body": {
     "v": 1, "type": "receipt", "proposal_id": "m1...",
-    "commitment": "sha256:...", "approver": "approver",
+    "commitment": "sha256:...", "render_hash": "sha256:...",
+    "approver": "approver",
     "grant_nonce": "uuid", "decision": "executed",
     "result_hash": "sha256:...", "ts": 1794184500,
     "render": {"summary": "payment.send | Example Supplier | 1170.00 BAM"},

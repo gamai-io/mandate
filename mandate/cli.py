@@ -4,6 +4,8 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
+import urllib.request
 
 from . import core
 
@@ -58,6 +60,11 @@ def main(argv=None) -> int:
     p_chain = sub.add_parser("chain")
     p_chain.add_argument("--ledger", default="ledger.jsonl")
 
+    p_exec = sub.add_parser("execute")
+    p_exec.add_argument("--broker", required=True)
+    p_exec.add_argument("--intent", required=True)
+    p_exec.add_argument("--grant", required=True)
+
     sub.add_parser("policy")
 
     for _sp in (p_check, p_prop, p_grant, p_redeem, p_verify, p_chain):
@@ -85,7 +92,8 @@ def main(argv=None) -> int:
             proposal = _read(args.proposal)
             grant_core = core.build_grant_core(
                 proposal["commitment"], args.approver,
-                max_uses=args.max_uses, ttl_s=args.ttl)
+                max_uses=args.max_uses, ttl_s=args.ttl,
+                render_hash=proposal.get("render_hash", ""))
             _emit(core.make_grant(grant_core, args.key), args.out)
             return 0
 
@@ -112,6 +120,25 @@ def main(argv=None) -> int:
         if args.cmd == "policy":
             _emit(core.load_policy(args.policy), None)
             return 0
+
+        if args.cmd == "execute":
+            payload = json.dumps({
+                "intent": _read(args.intent),
+                "grant": _read(args.grant),
+            }).encode("utf-8")
+            request = urllib.request.Request(
+                args.broker.rstrip("/") + "/execute", data=payload,
+                headers={"Content-Type": "application/json"}, method="POST")
+            try:
+                with urllib.request.urlopen(request, timeout=30) as resp:
+                    _emit(json.loads(resp.read().decode("utf-8")), None)
+                    return 0
+            except urllib.error.HTTPError as exc:
+                try:
+                    _emit(json.loads(exc.read().decode("utf-8")), None)
+                except ValueError:
+                    _emit({"error": "http", "status": exc.code}, None)
+                return 1
     except core.MandateError as exc:
         _emit({"error": type(exc).__name__, "message": str(exc)}, None)
         return 3

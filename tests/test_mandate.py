@@ -5,10 +5,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
+import urllib.error
+import urllib.request
 
-from mandate import core
+from mandate import broker, core
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -48,10 +51,13 @@ class MandateTests(unittest.TestCase):
     def tearDown(self):
         self.td.cleanup()
 
-    def _grant(self, intent, approver="approver", ttl=900, key=None):
+    def _grant(self, intent, approver="approver", ttl=900, key=None,
+               render_hash=None):
         proposal = core.propose(intent)
         grant_core = core.build_grant_core(
-            proposal["commitment"], approver, ttl_s=ttl)
+            proposal["commitment"], approver, ttl_s=ttl,
+            render_hash=(proposal["render_hash"] if render_hash is None
+                         else render_hash))
         return core.make_grant(grant_core, key or self.key)
 
     def test_check_risky_requires_grant(self):
@@ -123,6 +129,72 @@ class MandateTests(unittest.TestCase):
         grant = self._grant(intent, key=other)
         with self.assertRaises(core.GrantInvalid):
             core.redeem(intent, grant, self.signers, self.ledger)
+
+    def test_render_hash_is_bound(self):
+        intent = intent_factory()
+        grant = self._grant(intent, render_hash="deadbeef")
+        with self.assertRaises(core.CommitmentMismatch):
+            core.redeem(intent, grant, self.signers, self.ledger)
+
+    def test_render_includes_all_params(self):
+        intent = intent_factory()
+        intent["effect"]["params"] = {"ref": "x", "supplier": "Example", "extra": "Z"}
+        summary = core.render(intent)["summary"]
+        self.assertIn("supplier=Example", summary)
+        self.assertIn("extra=Z", summary)
+
+    def _start_broker(self):
+        b = broker.Broker(
+            os.path.join(ROOT, "policy.json"), self.signers, self.ledger,
+            os.path.join(self.dir, "used.sqlite"),
+            effects_dir=os.path.join(self.dir, "effects"),
+            outbox=os.path.join(self.dir, "outbox"))
+        srv = broker.make_server("127.0.0.1", 0, b)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close)
+        self.addCleanup(srv.shutdown)
+        return srv.server_address[1]
+
+    def _post(self, port, intent, grant):
+        data = json.dumps({"intent": intent, "grant": grant}).encode()
+        request = urllib.request.Request(
+            "http://127.0.0.1:%d/execute" % port, data=data,
+            headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as resp:
+                return resp.status, json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read().decode())
+
+    def test_broker_executes_once(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        port = self._start_broker()
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 200, body)
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["effect"], "payment.send")
+        status2, body2 = self._post(port, intent, grant)
+        self.assertEqual(status2, 409, body2)
+        self.assertEqual(body2["error"], "GrantReplayed")
+
+    def test_broker_rejects_tampered_amount(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        port = self._start_broker()
+        tampered = intent_factory()
+        tampered["effect"] = dict(tampered["effect"])
+        tampered["effect"]["amount"] = {"value": 1.0, "currency": "BAM"}
+        status, body = self._post(port, tampered, grant)
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "CommitmentMismatch")
+
+    def test_broker_rejects_unknown_effect(self):
+        intent = intent_factory(effect={"kind": "rm.rf", "target": "/"})
+        port = self._start_broker()
+        status, body = self._post(port, intent, {})
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "PolicyDenied")
 
     def test_cli_end_to_end(self):
         env = dict(os.environ)

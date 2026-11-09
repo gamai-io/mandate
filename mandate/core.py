@@ -86,6 +86,7 @@ def intent_core(intent: dict) -> dict:
         "v": VERSION,
         "effect": intent["effect"],
         "requested_by": intent.get("requested_by"),
+        "render_hash": render_hash(intent),
     }
 
 
@@ -116,10 +117,30 @@ def render(intent: dict) -> dict:
     if value is not None:
         parts.append(f"{value:.2f} {currency}")
     params = effect.get("params") or {}
-    for key in ("ref", "supplier", "sku", "qty", "deadline"):
-        if key in params:
-            parts.append(f"{key}={params[key]}")
-    return {"summary": " | ".join(parts)}
+    for key in sorted(params):
+        parts.append(f"{key}={params[key]}")
+    evidence = sorted({
+        str(p.get("source"))
+        for p in (intent.get("provenance") or [])
+        if isinstance(p, dict) and p.get("type") == "data_ref" and p.get("source")
+    })
+    if evidence:
+        parts.append("evidence=" + ",".join(evidence))
+    return {
+        "summary": " | ".join(parts),
+        "fields": {
+            "kind": effect.get("kind"),
+            "target": effect.get("target"),
+            "amount": ({"value": value, "currency": currency}
+                       if value is not None else None),
+            "params": params,
+            "evidence": evidence,
+        },
+    }
+
+
+def render_hash(intent: dict) -> str:
+    return sha256(jcs(render(intent)))
 
 
 def check(intent: dict, policy: dict | None = None) -> dict:
@@ -154,17 +175,20 @@ def propose(intent: dict) -> dict:
         "v": VERSION,
         "proposal_id": proposal_id(intent),
         "commitment": intent_commitment(intent),
+        "render_hash": render_hash(intent),
         "render": render(intent),
         "intent": intent,
     }
 
 
 def build_grant_core(commitment: str, approver: str, max_uses: int = 1,
-                     ttl_s: int = 900, nonce: str | None = None) -> dict:
+                     ttl_s: int = 900, nonce: str | None = None,
+                     render_hash: str = "") -> dict:
     now = int(time.time())
     return {
         "v": VERSION,
         "commitment": str(commitment),
+        "render_hash": str(render_hash or ""),
         "approver": str(approver),
         "scope": {"max_uses": max(1, int(max_uses)),
                   "not_after": now + max(1, int(ttl_s))},
@@ -227,13 +251,16 @@ def verify_grant(grant_obj: dict, signers_path: str,
 
 def redeem(intent: dict, grant_obj: dict, signers_path: str,
            ledger_path: str, namespace: str = "mandate",
-           allow_self: bool = False, now: float | None = None) -> dict:
+           allow_self: bool = False, now: float | None = None,
+           claim=None) -> dict:
     intent = normalize_intent(intent)
     core = (grant_obj or {}).get("grant") or {}
     signature = str((grant_obj or {}).get("sig") or "")
     commitment = intent_commitment(intent)
     if core.get("commitment") != commitment:
         raise CommitmentMismatch("grant commitment does not match intent")
+    if core.get("render_hash") != render_hash(intent):
+        raise CommitmentMismatch("grant render hash does not match intent")
     if not sign.verify(jcs(core), str(core.get("approver") or ""), signature,
                        signers_path, namespace):
         raise GrantInvalid("grant signature invalid")
@@ -244,13 +271,17 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     if not allow_self and approver == str(intent["actor"].get("agent") or ""):
         raise SelfApproval("agent cannot approve its own effect")
     nonce = str(core.get("nonce") or "")
-    if nonce in _used_nonces(ledger_path):
+    if claim is not None:
+        if not claim(nonce):
+            raise GrantReplayed("grant already used")
+    elif nonce in _used_nonces(ledger_path):
         raise GrantReplayed("grant already used")
     receipt = {
         "v": VERSION,
         "type": "receipt",
         "proposal_id": proposal_id(intent),
         "commitment": commitment,
+        "render_hash": render_hash(intent),
         "approver": approver,
         "grant_nonce": nonce,
         "decision": "executed",
@@ -268,7 +299,13 @@ def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
         return False
     if body.get("commitment") != intent_commitment(intent):
         return False
+    if body.get("render_hash") != render_hash(intent):
+        return False
     if not verify_grant(grant_obj, signers_path, namespace):
         return False
     core = (grant_obj or {}).get("grant") or {}
-    return body.get("grant_nonce") == core.get("nonce")
+    if body.get("grant_nonce") != core.get("nonce"):
+        return False
+    if core.get("render_hash") != render_hash(intent):
+        return False
+    return True

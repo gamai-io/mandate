@@ -42,12 +42,30 @@ ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
 ./bin/mandate redeem --intent examples/intent.json --grant /tmp/grant.json \
   --ledger ledger.jsonl
 
+# 5. or let the effect broker execute it (credentials stay in the broker)
+./bin/mandate-broker --port 8899 --signers trust/allowed_signers \
+  --ledger ledger.jsonl --nonce-db broker/used.sqlite &
+./bin/mandate execute --broker http://127.0.0.1:8899 \
+  --intent examples/intent.json --grant /tmp/grant.json
+
 # 5. anyone verifies offline
 ./bin/mandate verify --receipt ... --intent examples/intent.json --grant /tmp/grant.json
 ./bin/mandate chain --ledger ledger.jsonl
 ```
 
 Exit codes for `check`: `0` allow · `10` ask (grant required) · `20` deny.
+
+## Effect broker (Phase 2)
+
+`bin/mandate-broker` is the only component that executes effects. It verifies
+the grant, **atomically claims the nonce** (SQLite `UNIQUE`, so two concurrent
+requests cannot both succeed), runs the effect handler, and appends a signed
+result entry to the hash-chained ledger. The agent calls it over loopback; the
+agent never holds the effect credentials.
+
+The shipped handlers are a sandbox (they record the effect under `effects/` or
+`outbox/`). Wiring real credentials (SQL write, SMTP, payment) is Phase 2
+completion — see `PLAN.md`.
 
 ## Design invariants
 

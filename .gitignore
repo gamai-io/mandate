@@ -2,5 +2,9 @@ __pycache__/
 *.pyc
 ledger.jsonl
 *.sig
+broker/used.sqlite*
+broker/receipt_key
+effects/
+outbox/
 examples/*.grant.json
 examples/*.receipt.json

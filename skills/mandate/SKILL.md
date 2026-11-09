@@ -29,9 +29,15 @@ mandate check   --intent intent.json            # 0 allow / 10 ask / 20 deny
 mandate propose --intent intent.json --out proposal.json
 mandate grant   --proposal proposal.json --approver <name> --key <priv> --out grant.json   # human only
 mandate redeem  --intent intent.json --grant grant.json --ledger ledger.jsonl
+mandate execute --broker http://127.0.0.1:8899 --intent intent.json --grant grant.json     # preferred
 mandate verify  --receipt receipt.json --intent intent.json --grant grant.json
 mandate chain   --ledger ledger.jsonl
 ```
+
+## Execution rule
+Never perform the effect yourself. Call the **effect broker** with
+`mandate execute`. The broker is the only component that holds credentials and
+it will reject an invalid, expired, or reused grant.
 
 ## Intent template
 ```json

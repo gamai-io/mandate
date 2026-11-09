@@ -21,6 +21,7 @@ from .core import (  # noqa: F401
     read_ledger,
     redeem,
     render,
+    render_hash,
     sha256,
     verify_chain,
     verify_grant,
