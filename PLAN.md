@@ -30,7 +30,8 @@
 - [ ] Export receipt as JWS / C2PA-style manifest
 - [ ] OIDC/WebAuthn co-sign (passkeys) alongside Ed25519
 - [x] Co-sign daemon on the approver's host (TTY confirm, key never leaves host)
-- [ ] Telegram notification channel in front of the approver daemon
+- [x] Telegram notification channel in front of the approver daemon (advisory)
+- [x] Portable receipt envelope (`mandate export`, JOSE-style SSH signature)
 - [ ] Provenance enforcement: `data_ref` required for every choice parameter
 
 ## Phase 4 — Ecosystem

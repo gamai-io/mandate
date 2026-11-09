@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.0 — 2026-11-09
+- **Advisory Telegram notification** in the approver daemon
+  (`--telegram-chat`, token from `TELEGRAM_BOT_TOKEN`). The message carries only
+  the summary/commitment; it has no approve button or link. The decision still
+  happens on the approver host's TTY, so the security property is unchanged.
+- **Portable receipt envelope** (`mandate export` / `export-verify`): intent,
+  signed grant, hash-chained receipt, optional Merkle inclusion proof, signed
+  with an OpenSSH SSHSIG in namespace `mandate-export`. This is a custom
+  JOSE-style profile (not strict JWS/C2PA); verifiers use OpenSSH tooling.
+- 94 tests.
+
 ## 0.12.0 — 2026-11-09
 - **Payment adapter**: `provider=sandbox` (SQLite) or `provider=http`. Strict
   idempotency key = grant nonce, `lookup` before charging, and reconciliation on

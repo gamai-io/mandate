@@ -228,6 +228,7 @@ def _cmd_witness(args) -> int:
 
 def _cmd_approver(args) -> int:
     from . import approver as mapprover
+    from . import notify as mnotify
     if getattr(args, "approver_cmd", None) != "serve":
         _emit({"error": "unknown_approver_command"}, None)
         return 2
@@ -241,14 +242,19 @@ def _cmd_approver(args) -> int:
             not args.allow_remote:
         _emit({"error": "remote_requires_allow_remote"}, None)
         return 2
+    token = os.environ.get(args.telegram_token_env, "") \
+        if args.telegram_token_env else ""
+    chat = args.telegram_chat or os.environ.get("TELEGRAM_CHAT_ID", "")
+    notifier = mnotify.TelegramNotifier(token, chat) if token and chat else None
     approver = mapprover.Approver(args.key, args.approver,
                                   audience_default=args.audience,
-                                  ttl_default=args.ttl)
+                                  ttl_default=args.ttl,
+                                  notifier=notifier)
     server = mapprover.make_server(args.host, args.port, approver,
                                    token=args.token)
     host, port = server.server_address[:2]
-    print("mandate-approver listening on http://%s:%s (approver=%s)"
-          % (host, port, args.approver), flush=True)
+    print("mandate-approver listening on http://%s:%s (approver=%s, notify=%s)"
+          % (host, port, args.approver, bool(notifier)), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -285,6 +291,21 @@ def _cmd_request(args) -> int:
             fh.write("\n")
     _emit(result, None)
     return 0
+
+
+def _cmd_export(args) -> int:
+    from . import export as mexport
+    if args.cmd == "export":
+        bundle = mexport.build_bundle(
+            _read(args.receipt), _read(args.intent), _read(args.grant),
+            _read(args.proof) if args.proof else None,
+            key_path=args.key, signer=args.signer)
+        _emit(bundle, args.out)
+        return 0
+    result = mexport.verify_bundle_file(args.bundle, args.signers,
+                                        revoked_path=args.revoked)
+    _emit(result, None)
+    return 0 if result.get("valid") else 1
 
 
 def main(argv=None) -> int:
@@ -418,7 +439,22 @@ def main(argv=None) -> int:
     p_as.add_argument("--port", type=int, default=8897)
     p_as.add_argument("--token", default=os.environ.get(
         "MANDATE_APPROVER_TOKEN", ""))
+    p_as.add_argument("--telegram-chat", default=os.environ.get(
+        "TELEGRAM_CHAT_ID", ""))
+    p_as.add_argument("--telegram-token-env", default="TELEGRAM_BOT_TOKEN")
     p_as.add_argument("--allow-remote", action="store_true")
+
+    p_exp = sub.add_parser("export")
+    p_exp.add_argument("--receipt", required=True)
+    p_exp.add_argument("--intent", required=True)
+    p_exp.add_argument("--grant", required=True)
+    p_exp.add_argument("--proof", default=None)
+    p_exp.add_argument("--key", required=True)
+    p_exp.add_argument("--signer", default=None)
+    p_exp.add_argument("--out", default=None)
+
+    p_ev = sub.add_parser("export-verify")
+    p_ev.add_argument("--bundle", required=True)
 
     p_req = sub.add_parser("request")
     p_req.add_argument("--approver", required=True)
@@ -512,6 +548,9 @@ def main(argv=None) -> int:
 
         if args.cmd == "request":
             return _cmd_request(args)
+
+        if args.cmd in ("export", "export-verify"):
+            return _cmd_export(args)
 
         if args.cmd == "revoke":
             try:

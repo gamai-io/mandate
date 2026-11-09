@@ -48,12 +48,13 @@ def tty_confirm(summary: str, commitment: str, agent: str,
 class Approver:
     def __init__(self, key_path: str, approver_name: str,
                  audience_default: str = "", ttl_default: int = 900,
-                 confirm=None):
+                 confirm=None, notifier=None):
         self.key_path = key_path
         self.approver_name = approver_name
         self.audience_default = audience_default
         self.ttl_default = int(ttl_default)
         self.confirm = confirm or tty_confirm
+        self.notifier = notifier
         self._lock = threading.Lock()
 
     def request(self, intent: dict, audience: str | None = None,
@@ -66,6 +67,18 @@ class Approver:
                 audience if audience is not None else self.audience_default or "")
             ttl_s = min(max(int(ttl if ttl is not None else self.ttl_default), 30),
                         3600)
+            if self.notifier is not None:
+                text = ("MANDATE approval requested\n"
+                        "effect: %s\nagent: %s\nbroker: %s\ncommitment: %s\n\n"
+                        "Confirm on the approver host's terminal. "
+                        "This message is advisory only."
+                        % (proposal["render"]["summary"], agent or "-",
+                           bound_audience or "(unbound)",
+                           proposal["commitment"]))
+                try:
+                    self.notifier.send(text)
+                except Exception as exc:
+                    print("notify failed: %s" % str(exc)[:120], file=sys.stderr)
             approved = self.confirm(proposal["render"]["summary"],
                                     proposal["commitment"], agent,
                                     bound_audience)

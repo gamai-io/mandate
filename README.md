@@ -196,6 +196,29 @@ Loopback by default; a non-loopback daemon requires `--token` /
 (`503`). A Telegram notification channel can be added in front of the same
 signer without changing the security property.
 
+### Telegram notification (advisory)
+
+```bash
+TELEGRAM_BOT_TOKEN=... mandate approver serve --key ~/.ssh/mandate \
+  --approver approver --telegram-chat 6402195499
+```
+The message contains only the summary, agent, broker and commitment. It has no
+approve button or link; the human still confirms on the approver host's TTY.
+Notification failures are logged and never auto-approve.
+
+### Portable receipt export (JOSE-style)
+
+```bash
+mandate export --receipt receipt.json --intent intent.json --grant grant.json \
+  --proof proof.json --key ~/.ssh/mandate --signer approver --out bundle.json
+mandate --signers trust/allowed_signers export-verify --bundle bundle.json
+```
+The envelope carries the intent, the signed grant, the hash-chained receipt and
+an optional Merkle inclusion proof, signed with an OpenSSH SSHSIG in namespace
+`mandate-export`. Add `mandate-export` to the approver's `namespaces="..."` in
+`allowed_signers`. This is a custom profile, not strict JWS/C2PA; verifiers use
+OpenSSH tooling.
+
 ### Payments
 
 ```json
@@ -246,13 +269,14 @@ skills/     agent skill instructions
 
 ## Status
 
-**Alpha** — reference implementation v0.10.1: canonical commitment, Ed25519 grant
-bound to the executing agent, one-shot redeem under a file lock, hash-chained
-receipts with a `.head` anchor, idempotent effect journal + write adapter,
-effect broker with signed result entries, read-only ERP preconditions, SMTP
-adapter, Merkle transparency log with an off-host witness, MCP server
-(`mandate-mcp`), and a red-team test suite. See `PLAN.md` for the roadmap and
-`docs/THREAT_MODEL.md` for the known limits.
+**Alpha** — reference implementation v0.13.0: canonical commitment, Ed25519
+grant bound to the executing agent, one-shot redeem under a file lock,
+hash-chained receipts with a `.head` anchor, idempotent effect journal + write
+adapter, payment adapter with provider idempotency and reconciliation,
+read-only ERP (SQLite/MSSQL) preconditions, SMTP, Merkle transparency log with
+an off-host witness, approver daemon with advisory Telegram notification,
+portable JOSE-style receipt export, MCP server (`mandate-mcp`), and a red-team
+test suite. See `PLAN.md` and `docs/THREAT_MODEL.md` for limits.
 
 ## Honest limitation
 
