@@ -1,12 +1,12 @@
 """Mandate: signed, verifiable business commitments for AI agents."""
 
 from .core import (  # noqa: F401
+    CommitmentMismatch,
+    GrantExpired,
+    GrantInvalid,
+    GrantReplayed,
     MandateError,
     PolicyDenied,
-    CommitmentMismatch,
-    GrantInvalid,
-    GrantExpired,
-    GrantReplayed,
     SelfApproval,
     append_receipt,
     build_grant_core,
@@ -31,4 +31,4 @@ from .core import (  # noqa: F401
     verify_result_entry,
 )
 
-__version__ = "0.10.0"
+__version__ = "0.10.1"

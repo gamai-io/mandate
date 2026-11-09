@@ -14,9 +14,11 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import core, log as mlog
+from . import core
+from . import log as mlog
 
 _LOCK = threading.Lock()
+MAX_BODY = 256 * 1024
 
 
 class WitnessError(core.MandateError):
@@ -158,6 +160,10 @@ def make_handler(state_path: str, signers_path: str, token: str,
                 return
             try:
                 length = int(self.headers.get("Content-Length") or 0)
+                if length < 0 or length > MAX_BODY:
+                    self.close_connection = True
+                    self._send(413, {"ok": False, "error": "payload_too_large"})
+                    return
                 body = json.loads((self.rfile.read(length) if length else b"{}")
                                   .decode("utf-8"))
                 result = accept(body.get("sth") or {}, body.get("proof"),

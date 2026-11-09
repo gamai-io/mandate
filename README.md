@@ -29,7 +29,7 @@ local trust primitive you embed in your own stack.
 
 ```bash
 python3 -m pip wheel . -w dist --no-deps
-python3 -m pip install dist/agent_mandate-0.3.0-py3-none-any.whl
+python3 -m pip install dist/agent_mandate-<ver>-py3-none-any.whl
 
 mandate doctor                      # checks python, ssh-keygen, policy
 mandate init --dir ./my-deployment  # policy, allowed_signers, config, example
@@ -197,11 +197,13 @@ skills/     agent skill instructions
 
 ## Status
 
-Reference implementation v0.4: canonical commitment, Ed25519 grant bound to the
-executing agent, one-shot redeem under a file lock, hash-chained receipts with a
-`.head` anchor, effect broker with signed result entries, read-only ERP
-preconditions, SMTP adapter, MCP server (`mandate-mcp`), and a red-team test
-suite. See `PLAN.md` for the roadmap.
+**Alpha** — reference implementation v0.10.1: canonical commitment, Ed25519 grant
+bound to the executing agent, one-shot redeem under a file lock, hash-chained
+receipts with a `.head` anchor, idempotent effect journal + write adapter,
+effect broker with signed result entries, read-only ERP preconditions, SMTP
+adapter, Merkle transparency log with an off-host witness, MCP server
+(`mandate-mcp`), and a red-team test suite. See `PLAN.md` for the roadmap and
+`docs/THREAT_MODEL.md` for the known limits.
 
 ## Honest limitation
 

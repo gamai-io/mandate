@@ -136,6 +136,26 @@ class WitnessTests(unittest.TestCase):
             state = json.loads(resp.read().decode())["state"]
         self.assertEqual(state["tree_size"], 3)
 
+    def test_http_body_cap(self):
+        token = "witness-token"
+        server = mwit.make_server("127.0.0.1", 0, self.state, self.signers,
+                                  token)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        port = server.server_address[1]
+        request = urllib.request.Request(
+            "http://127.0.0.1:%d/sth" % port,
+            data=b"x" * (mwit.MAX_BODY + 1),
+            headers={"Content-Type": "application/json",
+                     "Authorization": "Bearer " + token}, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=5) as resp:
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            status = exc.code
+        self.assertEqual(status, 413)
+
 
 if __name__ == "__main__":
     unittest.main()

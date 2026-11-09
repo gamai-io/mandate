@@ -310,25 +310,28 @@ class MandateTests(unittest.TestCase):
         }
 
     def _start_broker(self, smtp=None, erp=None, receipt_key="",
-                      broker_name="gama-broker"):
+                      broker_name="gama-broker", token="", lease_s=30):
         b = broker.Broker(
             os.path.join(ROOT, "policy.json"), self.signers, self.ledger,
             os.path.join(self.dir, "used.sqlite"),
             receipt_key=receipt_key, broker_name=broker_name,
             effects_dir=os.path.join(self.dir, "effects"),
             outbox=os.path.join(self.dir, "outbox"),
-            smtp=smtp, erp=erp)
+            smtp=smtp, erp=erp, token=token, lease_s=lease_s)
         srv = broker.make_server("127.0.0.1", 0, b)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.addCleanup(srv.server_close)
         self.addCleanup(srv.shutdown)
         return srv.server_address[1]
 
-    def _post(self, port, intent, grant):
+    def _post(self, port, intent, grant, token=None):
         data = json.dumps({"intent": intent, "grant": grant}).encode()
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = "Bearer " + token
         request = urllib.request.Request(
             "http://127.0.0.1:%d/execute" % port, data=data,
-            headers={"Content-Type": "application/json"}, method="POST")
+            headers=headers, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=10) as resp:
                 return resp.status, json.loads(resp.read().decode())
@@ -570,6 +573,28 @@ class MandateTests(unittest.TestCase):
         self.assertEqual(first["status"], "new")
         second = journal.begin("n-1", "hash-b", "payment.send", "{}", "{}", 0)
         self.assertEqual(second["status"], "payload_mismatch")
+
+    def test_broker_token_required(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        port = self._start_broker(token="broker-token")
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 401, body)
+        status, body = self._post(port, intent, grant, token="broker-token")
+        self.assertEqual(status, 200, body)
+
+    def test_broker_rejects_oversized_body(self):
+        port = self._start_broker()
+        request = urllib.request.Request(
+            "http://127.0.0.1:%d/execute" % port,
+            data=b"x" * (broker.MAX_BODY + 1),
+            headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=10) as resp:
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            status = exc.code
+        self.assertEqual(status, 413)
 
     def test_cli_end_to_end(self):
         env = dict(os.environ)

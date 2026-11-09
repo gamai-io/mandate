@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import threading
@@ -13,6 +14,7 @@ from .adapters import ErpChecker, SmtpSender, WriteAdapter
 from .journal import Journal
 
 BROKER_NAMESPACE = "mandate-broker"
+MAX_BODY = 256 * 1024
 
 
 class PreconditionFailed(core.MandateError):
@@ -32,7 +34,7 @@ class Broker:
                  write: dict | None = None,
                  require_audience: bool = True, revoked_path: str = "",
                  journal_db: str | None = None, lease_s: float = 60,
-                 recover_on_start: bool = True):
+                 recover_on_start: bool = True, token: str = ""):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -45,6 +47,7 @@ class Broker:
         self.erp = ErpChecker(erp) if erp else None
         self.require_audience = require_audience
         self.revoked_path = revoked_path
+        self.token = token
         write_cfg = dict(write or {})
         write_cfg.setdefault("effects_dir", effects_dir)
         self.writer = WriteAdapter(write_cfg)
@@ -219,13 +222,14 @@ class Broker:
                 "signers": bool(os.path.exists(self.signers)),
                 "receipt_key": bool(self.receipt_key and os.path.exists(self.receipt_key)),
                 "smtp": bool(self.smtp), "erp": bool(self.erp),
-                "writer": self.writer.mode, "journal": self.journal.counts()}
+                "writer": self.writer.mode, "auth": bool(self.token),
+                "journal": self.journal.counts()}
 
 
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.10"
+        server_version = "mandate-broker/0.10.1"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -252,8 +256,19 @@ def make_handler(broker: Broker):
             if path != "/execute":
                 self._send(404, {"error": "not found"})
                 return
+            if broker.token:
+                header = self.headers.get("Authorization", "")
+                ok = (header.lower().startswith("bearer ")
+                      and hmac.compare_digest(header[7:].strip(), broker.token))
+                if not ok:
+                    self._send(401, {"ok": False, "error": "unauthorized"})
+                    return
             try:
                 length = int(self.headers.get("Content-Length") or 0)
+                if length < 0 or length > MAX_BODY:
+                    self.close_connection = True
+                    self._send(413, {"ok": False, "error": "payload_too_large"})
+                    return
                 raw = self.rfile.read(length) if length else b"{}"
                 payload = json.loads(raw.decode("utf-8"))
                 result = broker.execute(payload.get("intent") or {},
@@ -294,6 +309,7 @@ def main(argv=None) -> int:
     parser.add_argument("--no-recover", action="store_true")
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
+    parser.add_argument("--token", default=os.environ.get("MANDATE_BROKER_TOKEN", ""))
     parser.add_argument("--allow-any-audience", action="store_true")
     parser.add_argument("--revoked", default=os.environ.get(
         "MANDATE_REVOKED", "trust/revoked_signers"))
@@ -311,9 +327,11 @@ def main(argv=None) -> int:
         if "lease_s" in cfg:
             args.lease = float(cfg["lease_s"])
 
-    if args.host not in ("127.0.0.1", "::1", "localhost") and not args.allow_remote:
-        print("refusing to bind non-loopback host without --allow-remote", flush=True)
-        return 2
+    if args.host not in ("127.0.0.1", "::1", "localhost"):
+        if not args.allow_remote or not args.token:
+            print("refusing non-loopback bind without --allow-remote and a "
+                  "bearer token (--token / MANDATE_BROKER_TOKEN)", flush=True)
+            return 2
 
     if args.policy == "policy.json" and not os.path.exists(args.policy):
         args.policy = core.DEFAULT_POLICY
@@ -327,7 +345,8 @@ def main(argv=None) -> int:
                     revoked_path=args.revoked,
                     journal_db=args.journal_db or None,
                     lease_s=args.lease,
-                    recover_on_start=not args.no_recover)
+                    recover_on_start=not args.no_recover,
+                    token=args.token)
     server = make_server(args.host, args.port, broker)
     host, port = server.server_address[:2]
     print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)

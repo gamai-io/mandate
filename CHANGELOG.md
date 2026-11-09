@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.1 — 2026-11-09
+- Security: the broker requires a bearer token for non-loopback binds
+  (`--token` / `MANDATE_BROKER_TOKEN`); broker and witness reject request bodies
+  over 256 KiB (413).
+- Lint: `ruff` config, clean `ruff check .`, CI lint + build/`twine check`.
+- Packaging: `py.typed`, sdist/README install instructions, governance files
+  (`SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `AUTHORS`,
+  `RELEASE.md`).
+- PyPI name `agent-mandate` verified available (2026-11-09).
+- 71 tests.
+
 ## 0.10.0 — 2026-11-09
 - **Off-host STH witness**: pins the latest signed tree head, rejects rollback
   (smaller tree), rejects split-view (same size, different root), and requires a

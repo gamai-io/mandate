@@ -1,10 +1,16 @@
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
 ledger.jsonl
+ledger.jsonl.*
+witness.json
 *.sig
 dist/
 build/
 *.egg-info/
+*.sqlite
+*.sqlite-*
 broker/used.sqlite*
 broker/receipt_key
 effects/
