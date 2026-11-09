@@ -40,7 +40,8 @@
 - [x] Sandbox runner for untrusted MCP servers (Docker verified; gVisor/Firecracker template)
 - [x] Firecracker stdio launcher for an MCP server inside a microVM
 - [x] Intent Divergence Benchmark harness + scenario corpus (local/LUMI template)
-- [ ] Model-generated IDB corpus at scale (vLLM on LUMI)
+- [x] Model-generated IDB corpus mode (OpenAI-compatible endpoint; LUMI template)
+- [ ] Run the model-generated IDB at scale on LUMI and publish results
 - [x] Hardware-backed approver keys (`sk-ssh-ed25519`) via `require_hardware_key`
 - [x] OIDC trusted-publishing path in the release workflow
 - [ ] Full WebAuthn/passkeys (browser/CBOR stack)

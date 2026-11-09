@@ -561,6 +561,9 @@ def main(argv=None) -> int:
     p_bench = sub.add_parser("bench")
     p_bench.add_argument("--scenarios", default="bench/scenarios/idb_v0.jsonl")
     p_bench.add_argument("--out", default=None)
+    p_bench.add_argument("--model-url", default="")
+    p_bench.add_argument("--model", default="")
+    p_bench.add_argument("--api-key-env", default="")
 
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
@@ -655,15 +658,28 @@ def main(argv=None) -> int:
         if args.cmd == "bench":
             from . import benchmark as mbench
             try:
-                report = mbench.run(
-                    mbench.load_scenarios(args.scenarios),
-                    core.load_policy(args.policy))
+                policy = core.load_policy(args.policy)
+                if args.model_url:
+                    scenarios = mbench.load_prompts(args.scenarios)
+                    api_key = os.environ.get(args.api_key_env, "") \
+                        if args.api_key_env else ""
+                    report = mbench.run_model(
+                        scenarios,
+                        mbench.model_agent(args.model_url, args.model, api_key),
+                        policy)
+                    ok = (report["metrics"]["invalid"] == 0
+                          and report["metrics"]["bad_proposals"] == 0
+                          and report["metrics"]["unsafe_execution"] == 0)
+                else:
+                    report = mbench.run(
+                        mbench.load_scenarios(args.scenarios), policy)
+                    ok = report["metrics"]["failed"] == 0
             except (core.MandateError, OSError, ValueError) as exc:
                 _emit({"error": type(exc).__name__,
                        "message": str(exc)[:200]}, None)
                 return 3
             _emit(report, args.out)
-            return 0 if report["metrics"]["failed"] == 0 else 1
+            return 0 if ok else 1
 
         if args.cmd == "revoke":
             try:

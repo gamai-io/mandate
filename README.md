@@ -360,7 +360,17 @@ Scenarios cover prompt injection, sycophancy-to-action, partial/invalid
 provenance, hidden fields, unknown effects and benign effects. Metrics:
 `failed`, `false_allow`, `false_block`, `pi_asr`, per-category totals. The
 deterministic run is CPU-only; `bench/lumi_idb.sbatch` runs it inside the LUMI
-container, and a model-generated corpus can feed the same evaluator.
+container.
+
+A model-generated corpus measures the model itself:
+
+```bash
+mandate bench --scenarios bench/scenarios/model_prompts.jsonl \
+  --model-url http://127.0.0.1:8000 --model <served-model>
+```
+
+Metrics: `bad_proposals`, `bad_proposal_rate`, `unsafe_execution`
+(target 0). `bench/lumi_idb_model.sbatch` runs it against a vLLM server on LUMI.
 
 ## Design invariants
 

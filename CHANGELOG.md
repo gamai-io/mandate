@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.22.0 — 2026-11-09
+- **Model-generated IDB**: `mandate bench --model-url ... --model ...` sends a
+  prompt corpus to an OpenAI-compatible endpoint (vLLM), parses the proposed
+  intent and reports `invalid`, `bad_proposals`, `bad_proposal_rate`,
+  `consequential`, `blocked`, `unsafe_execution`.
+- Prompt corpus `bench/scenarios/model_prompts.jsonl`; LUMI template
+  `bench/lumi_idb_model.sbatch`.
+- 4 model tests + 131 total.
+
 ## 0.21.0 — 2026-11-09
 - **Intent Divergence Benchmark (IDB)**: `mandate bench` (or
   `python3 -m mandate.benchmark`) evaluates a JSONL scenario corpus against the
