@@ -5,7 +5,7 @@
 - Distribution: `gama-mandate` (PyPI), import package `mandate`.
 - CLI: `mandate`, `mandate-broker`, `mandate-mcp`.
 - Repository: https://github.com/gamai-io/mandate (public, MIT).
-- Current release: **v0.23.0**, CI green on Python 3.9–3.12, 133 tests.
+- Current release: **v0.24.0**, CI green on Python 3.9–3.12, 137 tests.
 
 ## What works now
 
@@ -32,6 +32,8 @@
 - Intent Divergence Benchmark: deterministic 12-scenario corpus (12/12,
   `pi_asr=0`) and a 20-prompt model corpus; LUMI comparison of qwen25-7b and
   qwen25vl7b (`unsafe_execution=0` for both); LUMI batch templates.
+- Auditor bundle: intent + grant + receipt + Merkle proof + STH + witness pin in
+  one signed JSON, verified offline.
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items

@@ -372,6 +372,22 @@ mandate bench --scenarios bench/scenarios/model_prompts.jsonl \
 Metrics: `bad_proposals`, `bad_proposal_rate`, `unsafe_execution`
 (target 0). `bench/lumi_idb_model.sbatch` runs it against a vLLM server on LUMI.
 
+## Auditor bundle
+
+One signed JSON proves a single action end-to-end (intent, grant, receipt,
+Merkle proof, signed tree head, witness pin):
+
+```bash
+mandate audit bundle --receipt R --intent I --grant G --proof P \
+  --sth sth.json --witness-state witness.json \
+  --key ~/.ssh/mandate --signer approver --out bundle.json
+mandate --signers trust/allowed_signers audit verify \
+  --bundle bundle.json --log-signers trust/log_signers
+```
+
+`valid` is true only if the envelope signature, receipt/grant, STH signature,
+inclusion proof and witness state all check out. Details: `docs/AUDITOR_BUNDLE.md`.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

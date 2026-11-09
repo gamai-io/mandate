@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.24.0 — 2026-11-09
+- **Auditor bundle**: `mandate audit bundle` packages the intent, signed grant,
+  hash-chained receipt, Merkle inclusion proof, signed tree head and witness
+  state into one signed JSON; `mandate audit verify --log-signers ...` checks
+  the envelope signature, receipt/grant, STH signature, inclusion against the
+  STH root/size and the witness pin. 4 tests + docs
+  (`docs/AUDITOR_BUNDLE.md`).
+- 137 tests.
+
 ## 0.23.0 — 2026-11-09
 - Model IDB prompt corpus expanded to **20** scenarios (injection, sycophancy,
   exfiltration, TOCTOU, ambiguous, benign).

@@ -565,6 +565,22 @@ def main(argv=None) -> int:
     p_bench.add_argument("--model", default="")
     p_bench.add_argument("--api-key-env", default="")
 
+    p_audit = sub.add_parser("audit")
+    audit_sub = p_audit.add_subparsers(dest="audit_cmd")
+    p_ab = audit_sub.add_parser("bundle")
+    p_ab.add_argument("--receipt", required=True)
+    p_ab.add_argument("--intent", required=True)
+    p_ab.add_argument("--grant", required=True)
+    p_ab.add_argument("--proof", default=None)
+    p_ab.add_argument("--sth", default=None)
+    p_ab.add_argument("--witness-state", dest="witness_state", default=None)
+    p_ab.add_argument("--key", required=True)
+    p_ab.add_argument("--signer", default=None)
+    p_ab.add_argument("--out", default=None)
+    p_av = audit_sub.add_parser("verify")
+    p_av.add_argument("--bundle", required=True)
+    p_av.add_argument("--log-signers", dest="log_signers", required=True)
+
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
     for _sp in (p_check, p_redeem, p_verify):
@@ -654,7 +670,6 @@ def main(argv=None) -> int:
 
         if args.cmd == "mcp":
             return _cmd_mcp(args)
-
         if args.cmd == "bench":
             from . import benchmark as mbench
             try:
@@ -678,6 +693,34 @@ def main(argv=None) -> int:
                 return 3
             _emit(report, args.out)
             return 0 if ok else 1
+
+        if args.cmd == "audit":
+            from . import audit as maudit
+            from . import export as mexport
+            try:
+                if getattr(args, "audit_cmd", None) == "bundle":
+                    bundle = mexport.build_bundle(
+                        _read(args.receipt), _read(args.intent),
+                        _read(args.grant),
+                        _read(args.proof) if args.proof else None,
+                        key_path=args.key, signer=args.signer,
+                        sth=_read(args.sth) if args.sth else None,
+                        witness_state=(_read(args.witness_state)
+                                       if args.witness_state else None))
+                    _emit(bundle, args.out)
+                    return 0
+                if getattr(args, "audit_cmd", None) == "verify":
+                    result = maudit.verify_bundle_file(
+                        args.bundle, args.signers, args.log_signers,
+                        revoked_path=args.revoked)
+                    _emit(result, None)
+                    return 0 if result.get("valid") else 1
+            except (core.MandateError, OSError, ValueError) as exc:
+                _emit({"error": type(exc).__name__,
+                       "message": str(exc)[:200]}, None)
+                return 3
+            _emit({"error": "unknown_audit_command"}, None)
+            return 2
 
         if args.cmd == "revoke":
             try:

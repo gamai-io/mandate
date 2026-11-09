@@ -42,7 +42,8 @@
 - [x] Intent Divergence Benchmark harness + scenario corpus (local/LUMI template)
 - [x] Model-generated IDB corpus mode (OpenAI-compatible endpoint; LUMI template)
 - [x] 20-scenario, 2-model LUMI comparison (qwen25-7b/qwen25vl7b, unsafe=0)
-- [ ] Scale the model corpus to 10k prompts and publish per-model results
+- [x] Auditor bundle (envelope + receipt + Merkle proof + STH + witness pin)
+- [ ] Deploy the witness on a second physical host (oracle/linux3) and pin live STHs
 - [x] Hardware-backed approver keys (`sk-ssh-ed25519`) via `require_hardware_key`
 - [x] OIDC trusted-publishing path in the release workflow
 - [ ] Full WebAuthn/passkeys (browser/CBOR stack)

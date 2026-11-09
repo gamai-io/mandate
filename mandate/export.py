@@ -29,7 +29,8 @@ def _key_id(key_path: str) -> str:
 
 def build_bundle(receipt_entry: dict, intent: dict, grant_obj: dict,
                  proof: dict | None = None, key_path: str | None = None,
-                 signer: str | None = None) -> dict:
+                 signer: str | None = None, sth: dict | None = None,
+                 witness_state: dict | None = None) -> dict:
     body = {
         "v": 1,
         "format": FORMAT,
@@ -39,6 +40,10 @@ def build_bundle(receipt_entry: dict, intent: dict, grant_obj: dict,
     }
     if proof:
         body["inclusion_proof"] = proof
+    if sth:
+        body["sth"] = sth
+    if witness_state:
+        body["witness_state"] = witness_state
     signature = {"alg": "ssh-ed25519", "namespace": EXPORT_NAMESPACE,
                  "key_id": _key_id(key_path) if key_path else "",
                  "signer": str(signer or (grant_obj or {}).get("grant", {})
