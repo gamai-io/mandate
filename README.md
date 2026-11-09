@@ -291,6 +291,24 @@ ssh-keygen -t ed25519-sk -O verify-required -f ~/.ssh/mandate
 Set `"require_hardware_key": true` on an effect to reject software Ed25519
 grants; the approver key must then be `sk-ssh-ed25519`.
 
+## MCP manifest gate (Phase 1)
+
+Pin the tools an agent may use and detect tool poisoning/rug-pull:
+
+```bash
+mandate mcp lock --cmd "python3 my_mcp_server.py" --server my-server \
+  --key ~/.ssh/publisher --signer publisher --out mandate.lock.json
+mandate --signers trust/allowed_signers mcp verify \
+  --lock mandate.lock.json --cmd "python3 my_mcp_server.py"
+mandate --signers trust/allowed_signers mcp proxy \
+  --lock mandate.lock.json --cmd "python3 my_mcp_server.py"
+```
+
+The lock hashes every tool name, description and input schema and is signed
+with an OpenSSH SSHSIG in namespace `mandate-mcp` (`namespaces="mandate-mcp"` in
+`allowed_signers`). The proxy denies a changed manifest and any tool not in the
+lock; `--verify-calls` re-probes before each call.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

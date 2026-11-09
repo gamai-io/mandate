@@ -35,6 +35,9 @@
 - [x] Portable receipt envelope (`mandate export`, JOSE-style SSH signature)
 - [x] Provenance enforcement: `data_ref` required for every choice parameter
 - [x] Prometheus `/metrics` + per-IP rate limiting on broker, approver, witness
+- [x] MCP manifest gate (signed lock, rug-pull deny, stdio proxy) — Phase 1
+- [ ] Taint gate (untrusted source → consequential effect needs data_ref + grant)
+- [ ] Sandbox runner for untrusted MCP servers (Firecracker/gVisor)
 - [x] Hardware-backed approver keys (`sk-ssh-ed25519`) via `require_hardware_key`
 - [x] OIDC trusted-publishing path in the release workflow
 - [ ] Full WebAuthn/passkeys (browser/CBOR stack)

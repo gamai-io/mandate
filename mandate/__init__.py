@@ -33,4 +33,4 @@ from .core import (  # noqa: F401
     verify_result_entry,
 )
 
-__version__ = "0.16.1"
+__version__ = "0.17.0"

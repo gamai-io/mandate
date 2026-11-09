@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 — 2026-11-09
+- **MCP manifest gate (Phase 1)**: `mandate mcp lock` builds a signed lock of
+  tool descriptions/schemas (SHA-256 over canonical JSON, OpenSSH SSHSIG in
+  namespace `mandate-mcp`); `mandate mcp verify` re-probes the server and
+  detects tool poisoning/rug-pull; `mandate mcp proxy` is a stdio MCP proxy that
+  denies a changed manifest and any tool not present in the lock (optional
+  per-call re-verification with `--verify-calls`).
+- 6 MCP tests + 112 total.
+
 ## 0.16.1 — 2026-11-09
 - pymssql ERP driver: configurable `tds_version` (default `7.0` for older
   servers). A live read-only MSSQL check against `master`/`sys.tables` passed

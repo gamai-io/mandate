@@ -312,6 +312,41 @@ def _cmd_export(args) -> int:
     return 0 if result.get("valid") else 1
 
 
+def _cmd_mcp(args) -> int:
+    from . import mcp as mmcp
+    cmd = getattr(args, "mcp_cmd", None)
+    server_cmd = getattr(args, "mcp_server_cmd", "")
+    try:
+        if cmd == "lock":
+            manifest = mmcp.probe(server_cmd, server=args.server)
+            lock = mmcp.build_lock(manifest, args.key, args.signer)
+            _emit(lock, args.out)
+            return 0
+        if cmd == "verify":
+            lock = _read(args.lock)
+            manifest = mmcp.probe(server_cmd,
+                                  server=str(lock.get("server") or ""))
+            valid = (mmcp.verify_lock(lock, args.signers,
+                                      revoked_path=args.revoked)
+                     and mmcp.check_manifest(lock, manifest))
+            _emit({"valid": valid, "server": lock.get("server"),
+                   "tools": sorted((lock.get("tools") or {}).keys())}, None)
+            return 0 if valid else 1
+        if cmd == "proxy":
+            return mmcp.proxy(_read(args.lock), server_cmd, args.signers,
+                              verify_calls=args.verify_calls,
+                              revoked_path=args.revoked)
+    except (core.MandateError, OSError, ValueError) as exc:
+        if cmd == "proxy":
+            print("mandate mcp proxy: %s" % str(exc)[:200], file=sys.stderr)
+        else:
+            _emit({"error": type(exc).__name__, "message": str(exc)[:200]},
+                  None)
+        return 3
+    _emit({"error": "unknown_mcp_command"}, None)
+    return 2
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="mandate")
     parser.add_argument("--policy", default=None)
@@ -468,6 +503,22 @@ def main(argv=None) -> int:
     p_ev = sub.add_parser("export-verify")
     p_ev.add_argument("--bundle", required=True)
 
+    p_mcp = sub.add_parser("mcp")
+    mcp_sub = p_mcp.add_subparsers(dest="mcp_cmd")
+    p_ml = mcp_sub.add_parser("lock")
+    p_ml.add_argument("--cmd", dest="mcp_server_cmd", required=True)
+    p_ml.add_argument("--server", required=True)
+    p_ml.add_argument("--key", required=True)
+    p_ml.add_argument("--signer", required=True)
+    p_ml.add_argument("--out", default="mandate.lock.json")
+    p_mv = mcp_sub.add_parser("verify")
+    p_mv.add_argument("--lock", required=True)
+    p_mv.add_argument("--cmd", dest="mcp_server_cmd", required=True)
+    p_mp = mcp_sub.add_parser("proxy")
+    p_mp.add_argument("--lock", required=True)
+    p_mp.add_argument("--cmd", dest="mcp_server_cmd", required=True)
+    p_mp.add_argument("--verify-calls", action="store_true")
+
     p_req = sub.add_parser("request")
     p_req.add_argument("--approver", required=True)
     p_req.add_argument("--intent", required=True)
@@ -563,6 +614,9 @@ def main(argv=None) -> int:
 
         if args.cmd in ("export", "export-verify"):
             return _cmd_export(args)
+
+        if args.cmd == "mcp":
+            return _cmd_mcp(args)
 
         if args.cmd == "revoke":
             try:
