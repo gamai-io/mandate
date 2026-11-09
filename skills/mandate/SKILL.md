@@ -35,6 +35,10 @@ mandate verify-result --entry result.json --broker-signers broker_signers
 mandate chain   --ledger ledger.jsonl
 ```
 
+Allowed signers must declare `namespaces="mandate"` (approvers) or
+`namespaces="mandate-broker"` (broker keys). Revoked fingerprints in
+`trust/revoked_signers` are rejected automatically.
+
 ## Execution rule
 Never perform the effect yourself. Call the **effect broker** with
 `mandate execute`. The broker is the only component that holds credentials and

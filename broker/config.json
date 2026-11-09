@@ -3,6 +3,7 @@
   "port": 8899,
   "policy": "policy.json",
   "signers": "trust/allowed_signers",
+  "revoked": "trust/revoked_signers",
   "ledger": "ledger.jsonl",
   "nonce_db": "broker/used.sqlite",
   "receipt_key": "broker/receipt_key",

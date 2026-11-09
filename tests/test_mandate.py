@@ -46,7 +46,8 @@ class MandateTests(unittest.TestCase):
             check=True, capture_output=True)
         pub = pathlib.Path(self.key + ".pub").read_text(encoding="utf-8").strip()
         self.signers = os.path.join(self.dir, "allowed_signers")
-        pathlib.Path(self.signers).write_text("approver %s\n" % pub, encoding="utf-8")
+        pathlib.Path(self.signers).write_text(
+            'approver namespaces="mandate" %s\n' % pub, encoding="utf-8")
         self.ledger = os.path.join(self.dir, "ledger.jsonl")
 
     def tearDown(self):
@@ -113,7 +114,8 @@ class MandateTests(unittest.TestCase):
         intent = intent_factory(actor={"agent": "approver", "session": "s"})
         grant = self._grant(intent, approver="approver")
         pathlib.Path(self.signers).write_text(
-            "approver %s\n" % pathlib.Path(self.key + ".pub").read_text().strip(),
+            'approver namespaces="mandate" %s\n' % pathlib.Path(
+                self.key + ".pub").read_text(encoding="utf-8").strip(),
             encoding="utf-8")
         with self.assertRaises(core.SelfApproval):
             core.redeem(intent, grant, self.signers, self.ledger)
@@ -133,6 +135,58 @@ class MandateTests(unittest.TestCase):
         grant = self._grant(intent, key=other)
         with self.assertRaises(core.GrantInvalid):
             core.redeem(intent, grant, self.signers, self.ledger)
+
+    def test_namespace_required_and_scoped(self):
+        from mandate import sign as msign
+        pub = pathlib.Path(self.key + ".pub").read_text(encoding="utf-8").strip()
+        path = os.path.join(self.dir, "no_ns")
+        pathlib.Path(path).write_text("approver %s\n" % pub, encoding="utf-8")
+        self.assertFalse(msign.authorize_signer("approver", path, "mandate"))
+        pathlib.Path(path).write_text(
+            'approver namespaces="other" %s\n' % pub, encoding="utf-8")
+        self.assertFalse(msign.authorize_signer("approver", path, "mandate"))
+
+    def test_validity_window_enforced(self):
+        from mandate import sign as msign
+        pub = pathlib.Path(self.key + ".pub").read_text(encoding="utf-8").strip()
+        path = os.path.join(self.dir, "window")
+        pathlib.Path(path).write_text(
+            'approver namespaces="mandate" valid-before="20200101" %s\n' % pub,
+            encoding="utf-8")
+        self.assertFalse(msign.authorize_signer("approver", path, "mandate"))
+        pathlib.Path(path).write_text(
+            'approver namespaces="mandate" valid-after="20990101" %s\n' % pub,
+            encoding="utf-8")
+        self.assertFalse(msign.authorize_signer("approver", path, "mandate"))
+        pathlib.Path(path).write_text(
+            'approver namespaces="mandate" %s\n' % pub, encoding="utf-8")
+        self.assertTrue(msign.authorize_signer("approver", path, "mandate"))
+
+    def test_revoked_key_rejected(self):
+        from mandate import sign as msign
+        intent = intent_factory()
+        grant = self._grant(intent)
+        fp = msign.fingerprint(
+            pathlib.Path(self.key + ".pub").read_text(encoding="utf-8").split()[1])
+        revoked = os.path.join(self.dir, "revoked")
+        pathlib.Path(revoked).write_text(fp + "\n", encoding="utf-8")
+        self.assertFalse(msign.authorize_signer(
+            "approver", self.signers, "mandate", revoked_path=revoked))
+        with self.assertRaises(core.GrantInvalid):
+            core.redeem(intent, grant, self.signers, self.ledger,
+                        revoked_path=revoked)
+
+    def test_revoke_cli(self):
+        revoked = os.path.join(self.dir, "revoked_cli")
+        out = subprocess.run(
+            [sys.executable, str(ROOT / "bin" / "mandate"), "--revoked", revoked,
+             "revoke", "--pub", self.key + ".pub", "--reason", "test"],
+            capture_output=True, text=True, env=dict(os.environ))
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+        data = json.loads(out.stdout)
+        self.assertTrue(data["added"])
+        self.assertIn(data["fingerprint"],
+                      pathlib.Path(revoked).read_text(encoding="utf-8"))
 
     def test_render_hash_is_bound(self):
         intent = intent_factory()
@@ -387,8 +441,9 @@ class MandateTests(unittest.TestCase):
                        check=True, capture_output=True)
         broker_signers = os.path.join(self.dir, "broker_signers")
         pathlib.Path(broker_signers).write_text(
-            "gama-broker %s\n" % pathlib.Path(broker_key + ".pub").read_text(
-                encoding="utf-8").strip(), encoding="utf-8")
+            'gama-broker namespaces="mandate-broker" %s\n' % pathlib.Path(
+                broker_key + ".pub").read_text(encoding="utf-8").strip(),
+            encoding="utf-8")
         intent = intent_factory()
         grant = self._grant(intent)
         port = self._start_broker(receipt_key=broker_key,

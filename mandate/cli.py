@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import core
+from . import core, sign
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -43,8 +43,13 @@ def _cmd_init(args) -> int:
     signers_target = os.path.join(base, "trust", "allowed_signers")
     if not os.path.exists(signers_target):
         with open(signers_target, "w", encoding="utf-8") as fh:
-            fh.write("# <name> ssh-ed25519 AAAAC3Nza... comment\n")
+            fh.write('# <name> namespaces="mandate" ssh-ed25519 AAAAC3Nza... comment\n')
         created.append(signers_target)
+    revoked_target = os.path.join(base, "trust", "revoked_signers")
+    if not os.path.exists(revoked_target):
+        with open(revoked_target, "w", encoding="utf-8") as fh:
+            fh.write("# SHA256:<fingerprint>  reason\n")
+        created.append(revoked_target)
     example = os.path.join(base, "examples", "intent.json")
     if not os.path.exists(example):
         demo = {
@@ -63,6 +68,7 @@ def _cmd_init(args) -> int:
     config = {
         "host": "127.0.0.1", "port": 8899,
         "policy": policy_target, "signers": signers_target,
+        "revoked": revoked_target,
         "ledger": os.path.join(base, "ledger.jsonl"),
         "nonce_db": os.path.join(base, "broker", "used.sqlite"),
         "effects_dir": os.path.join(base, "effects"),
@@ -106,6 +112,8 @@ def main(argv=None) -> int:
     parser.add_argument("--policy", default=None)
     parser.add_argument("--signers", default=os.environ.get(
         "MANDATE_SIGNERS", "trust/allowed_signers"))
+    parser.add_argument("--revoked", default=os.environ.get(
+        "MANDATE_REVOKED", "trust/revoked_signers"))
     sub = parser.add_subparsers(dest="cmd")
 
     p_check = sub.add_parser("check")
@@ -159,6 +167,12 @@ def main(argv=None) -> int:
     p_doctor.add_argument("--signers", default=os.environ.get(
         "MANDATE_SIGNERS", "trust/allowed_signers"))
 
+    p_revoke = sub.add_parser("revoke")
+    p_revoke.add_argument("--pub", required=True)
+    p_revoke.add_argument("--reason", default="")
+
+    sub.add_parser("signers")
+
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
     for _sp in (p_check, p_redeem, p_verify):
@@ -203,14 +217,15 @@ def main(argv=None) -> int:
             receipt = core.redeem(
                 _read(args.intent), _read(args.grant), args.signers,
                 args.ledger, allow_self=args.allow_self,
-                policy=core.load_policy(args.policy))
+                policy=core.load_policy(args.policy),
+                revoked_path=args.revoked)
             _emit(receipt, None)
             return 0
 
         if args.cmd == "verify":
             ok = core.verify_receipt(
                 _read(args.receipt), _read(args.intent), _read(args.grant),
-                args.signers)
+                args.signers, revoked_path=args.revoked)
             _emit({"valid": ok}, None)
             return 0 if ok else 1
 
@@ -221,9 +236,37 @@ def main(argv=None) -> int:
             return 0 if ok else 1
 
         if args.cmd == "verify-result":
-            ok = core.verify_result_entry(_read(args.entry), args.broker_signers)
+            ok = core.verify_result_entry(_read(args.entry), args.broker_signers,
+                                          revoked_path=args.revoked)
             _emit({"valid": ok}, None)
             return 0 if ok else 1
+
+        if args.cmd == "signers":
+            _emit({"signers": sign.list_signers(args.signers)}, None)
+            return 0
+
+        if args.cmd == "revoke":
+            try:
+                text = open(args.pub, encoding="utf-8").read()
+            except OSError as exc:
+                _emit({"error": "io", "message": str(exc)}, None)
+                return 2
+            tokens = text.split()
+            idx = next((i for i, tok in enumerate(tokens)
+                        if tok.startswith(("ssh-", "ecdsa-", "sk-"))), None)
+            if idx is None or idx + 1 >= len(tokens):
+                _emit({"error": "bad_pubkey"}, None)
+                return 2
+            fp = sign.fingerprint(tokens[idx + 1])
+            target = args.revoked
+            os.makedirs(os.path.dirname(os.path.abspath(target)), exist_ok=True)
+            added = fp not in sign.load_revoked(target)
+            if added:
+                with open(target, "a", encoding="utf-8") as fh:
+                    fh.write(fp + ("  # " + args.reason if args.reason else "") + "\n")
+            _emit({"ok": True, "fingerprint": fp, "added": added,
+                   "revoked_file": target}, None)
+            return 0
 
         if args.cmd == "policy":
             _emit(core.load_policy(args.policy), None)

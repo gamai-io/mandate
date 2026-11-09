@@ -332,11 +332,14 @@ def verify_chain(path: str, anchor: bool = True) -> bool:
 
 
 def verify_grant(grant_obj: dict, signers_path: str,
-                 namespace: str = "mandate") -> bool:
+                 namespace: str = "mandate",
+                 revoked_path: str | None = None,
+                 now: float | None = None) -> bool:
     core = (grant_obj or {}).get("grant") or {}
     return sign.verify(jcs(core), str(core.get("approver") or ""),
                        str((grant_obj or {}).get("sig") or ""),
-                       signers_path, namespace)
+                       signers_path, namespace, revoked_path=revoked_path,
+                       now=now)
 
 
 def redeem(intent: dict, grant_obj: dict, signers_path: str,
@@ -344,12 +347,14 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            allow_self: bool = False, now: float | None = None,
            claim=None, policy: dict | None = None,
            audience: str | None = None,
-           require_audience: bool = False) -> dict:
+           require_audience: bool = False,
+           revoked_path: str | None = None) -> dict:
     intent = normalize_intent(intent)
     policy_obj = policy if isinstance(policy, dict) else load_policy()
     decision = check(intent, policy_obj)
     if decision["decision"] == "deny":
         raise PolicyDenied("policy denied: %s" % decision.get("reason"))
+    moment = time.time() if now is None else float(now)
     core = (grant_obj or {}).get("grant") or {}
     signature = str((grant_obj or {}).get("sig") or "")
     commitment = intent_commitment(intent)
@@ -367,9 +372,9 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
         if bound_audience and bound_audience != str(audience):
             raise GrantInvalid("grant audience does not match this broker")
     if not sign.verify(jcs(core), str(core.get("approver") or ""), signature,
-                       signers_path, namespace):
+                       signers_path, namespace, revoked_path=revoked_path,
+                       now=moment):
         raise GrantInvalid("grant signature invalid")
-    moment = time.time() if now is None else float(now)
     if float((core.get("scope") or {}).get("not_after") or 0) <= moment:
         raise GrantExpired("grant expired")
     approver = str(core.get("approver") or "")
@@ -401,7 +406,8 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
 
 
 def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
-                   signers_path: str, namespace: str = "mandate") -> bool:
+                   signers_path: str, namespace: str = "mandate",
+                   revoked_path: str | None = None) -> bool:
     body = (receipt_entry or {}).get("body") or {}
     if sha256(jcs(body)) != (receipt_entry or {}).get("hash"):
         return False
@@ -409,7 +415,8 @@ def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
         return False
     if body.get("render_hash") != render_hash(intent):
         return False
-    if not verify_grant(grant_obj, signers_path, namespace):
+    if not verify_grant(grant_obj, signers_path, namespace,
+                        revoked_path=revoked_path):
         return False
     core = (grant_obj or {}).get("grant") or {}
     if body.get("grant_nonce") != core.get("nonce"):
@@ -427,11 +434,12 @@ def result_signing_payload(body: dict) -> dict:
     return {key: body.get(key) for key in RESULT_SIGNED_FIELDS}
 
 
-def verify_result_entry(entry: dict, broker_signers: str) -> bool:
+def verify_result_entry(entry: dict, broker_signers: str,
+                        revoked_path: str | None = None) -> bool:
     body = (entry or {}).get("body") or {}
     if sha256(jcs(body)) != (entry or {}).get("hash"):
         return False
     return sign.verify(jcs(result_signing_payload(body)),
                        str(body.get("broker") or ""),
                        str(body.get("broker_sig") or ""), broker_signers,
-                       "mandate-broker")
+                       "mandate-broker", revoked_path=revoked_path)

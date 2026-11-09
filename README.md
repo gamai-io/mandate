@@ -100,6 +100,23 @@ consumed when a precondition fails, so a corrected request can retry safely.
          "password_env": "MANDATE_SMTP_PASSWORD", "from": "noreply@example.com"}
 ```
 
+## Key scoping and revocation
+
+An `allowed_signers` line **must** declare its namespace scope:
+
+```
+approver namespaces="mandate" ssh-ed25519 AAAAC3Nza... mandate
+gama-broker namespaces="mandate-broker" ssh-ed25519 AAAAC3Nza... broker
+```
+
+Optional validity: `valid-after="YYYYMMDD" valid-before="YYYYMMDD"`.
+Revoke a key by fingerprint:
+
+```bash
+mandate revoke --pub key.pub --reason "laptop lost"
+mandate --signers trust/allowed_signers signers   # inspect scopes + fingerprints
+```
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

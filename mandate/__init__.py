@@ -29,4 +29,4 @@ from .core import (  # noqa: F401
     verify_result_entry,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-11-09
+- `allowed_signers` now requires an explicit `namespaces="mandate"` scope
+  (`namespaces="mandate-broker"` for broker result keys). A key without a scope
+  is rejected, so a grant key cannot sign broker receipts and vice versa.
+- Validity windows (`valid-after` / `valid-before`) are enforced in Mandate's
+  own check and by OpenSSH.
+- Key revocation: `mandate revoke --pub key.pub` writes the SHA256 fingerprint to
+  `trust/revoked_signers`; `redeem`, `verify`, and `verify-result` reject revoked
+  keys. Configurable via `--revoked` / `MANDATE_REVOKED`.
+- `mandate signers` lists parsed principals, namespaces, validity, and fingerprints.
+- 37 tests (namespace scope, validity window, revocation, revoke CLI).
+
 ## 0.5.0 — 2026-11-09
 - Grant `audience`: a grant can be bound to one broker (`mandate grant --audience <broker>`).
   The broker verifies `audience == broker_name` and rejects unbound grants by default

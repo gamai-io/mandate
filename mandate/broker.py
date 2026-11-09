@@ -45,7 +45,7 @@ class Broker:
                  receipt_key: str = "", broker_name: str = "gama-broker",
                  effects_dir: str = "effects", outbox: str = "outbox",
                  smtp: dict | None = None, erp: dict | None = None,
-                 require_audience: bool = True):
+                 require_audience: bool = True, revoked_path: str = ""):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -57,6 +57,7 @@ class Broker:
         self.smtp = SmtpSender(smtp) if smtp else None
         self.erp = ErpChecker(erp) if erp else None
         self.require_audience = require_audience
+        self.revoked_path = revoked_path
         self.nonces = NonceStore(nonce_db)
 
     def _run(self, kind: str, intent: dict) -> dict:
@@ -105,7 +106,8 @@ class Broker:
         receipt = core.redeem(intent, grant_obj, self.signers, self.ledger,
                               claim=self.nonces.consume,
                               audience=self.broker_name,
-                              require_audience=self.require_audience)
+                              require_audience=self.require_audience,
+                              revoked_path=self.revoked_path or None)
         try:
             result = self._run(kind, intent)
             status = "ok"
@@ -138,7 +140,7 @@ class Broker:
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.5"
+        server_version = "mandate-broker/0.6"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -204,6 +206,8 @@ def main(argv=None) -> int:
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
     parser.add_argument("--allow-any-audience", action="store_true")
+    parser.add_argument("--revoked", default=os.environ.get(
+        "MANDATE_REVOKED", "trust/revoked_signers"))
     args = parser.parse_args(argv)
 
     cfg = {}
@@ -211,7 +215,8 @@ def main(argv=None) -> int:
         with open(args.config, encoding="utf-8") as fh:
             cfg = json.load(fh)
         for key in ("host", "port", "policy", "signers", "ledger", "nonce_db",
-                    "receipt_key", "broker_name", "effects_dir", "outbox"):
+                    "receipt_key", "broker_name", "effects_dir", "outbox",
+                    "revoked"):
             if key in cfg:
                 setattr(args, key, cfg[key])
 
@@ -226,7 +231,8 @@ def main(argv=None) -> int:
                     receipt_key=args.receipt_key, broker_name=args.broker_name,
                     effects_dir=args.effects_dir, outbox=args.outbox,
                     smtp=cfg.get("smtp"), erp=cfg.get("erp"),
-                    require_audience=not args.allow_any_audience)
+                    require_audience=not args.allow_any_audience,
+                    revoked_path=args.revoked)
     server = make_server(args.host, args.port, broker)
     host, port = server.server_address[:2]
     print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)

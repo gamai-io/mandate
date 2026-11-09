@@ -1,5 +1,8 @@
-# Allowed signers for mandat grants (OpenSSH allowed_signers format).
+# Allowed signers for Mandate grants (OpenSSH allowed_signers format).
 # Generate the keypair on the approver's device, never on the host:
 #   ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
-# Append the PUBLIC key as:
-#   <approver-name> ssh-ed25519 AAAAC3Nza... mandate
+# Append the PUBLIC key with an explicit namespace scope:
+#   <approver-name> namespaces="mandate" ssh-ed25519 AAAAC3Nza... mandate
+# Optional validity window: valid-after="YYYYMMDD" valid-before="YYYYMMDD".
+# To revoke a key: mandat revoke --pub key.pub  (adds its SHA256 fingerprint
+# to trust/revoked_signers).
