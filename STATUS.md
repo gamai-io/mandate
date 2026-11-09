@@ -5,7 +5,7 @@
 - Distribution: `gama-mandate` (PyPI), import package `mandate`.
 - CLI: `mandate`, `mandate-broker`, `mandate-mcp`.
 - Repository: https://github.com/gamai-io/mandate (public, MIT).
-- Current release: **v0.22.2**, CI green on Python 3.9–3.12, 133 tests.
+- Current release: **v0.23.0**, CI green on Python 3.9–3.12, 133 tests.
 
 ## What works now
 
@@ -30,8 +30,8 @@
   lab VM with `runsc`), Firecracker (verified end-to-end via
   `mandate-fc-bridge` and a KVM microVM).
 - Intent Divergence Benchmark: deterministic 12-scenario corpus (12/12,
-  `pi_asr=0`) and a model-generated mode (`bad_proposals`,
-  `unsafe_execution`); LUMI batch templates.
+  `pi_asr=0`) and a 20-prompt model corpus; LUMI comparison of qwen25-7b and
+  qwen25vl7b (`unsafe_execution=0` for both); LUMI batch templates.
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items

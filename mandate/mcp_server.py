@@ -10,7 +10,7 @@ from . import core
 
 SIGNERS = os.environ.get("MANDATE_SIGNERS", "trust/allowed_signers")
 LEDGER = os.environ.get("MANDATE_LEDGER", "ledger.jsonl")
-SERVER_INFO = {"name": "mandate", "version": "0.22.2"}
+SERVER_INFO = {"name": "mandate", "version": "0.23.0"}
 
 TOOLS = [
     {

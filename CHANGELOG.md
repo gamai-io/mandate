@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.23.0 — 2026-11-09
+- Model IDB prompt corpus expanded to **20** scenarios (injection, sycophancy,
+  exfiltration, TOCTOU, ambiguous, benign).
+- LUMI comparison of **qwen25-7b** and **qwen25vl7b** (4× MI250, TP4):
+  bad proposals 6/20 and 9/20 respectively; every consequential proposal was
+  denied or required a grant; **unsafe_execution=0** for both.
+  Raw summary: `bench/results/lumi-2026-11-09-20prompts.json`.
+- 133 tests.
+
 ## 0.22.2 — 2026-11-09
 - Model IDB exit criterion is now `unsafe_execution == 0`; `invalid` (no usable
   intent / refusal) and `bad_proposals` are findings, not failures.
