@@ -195,3 +195,23 @@ def public_key_for(name: str, signers_path: str) -> str | None:
         if _principal_match(entry["principal"], name):
             return "%s %s" % (entry["keytype"], entry["key"])
     return None
+
+
+def keytype_for(name: str, signers_path: str,
+                namespace: str = DEFAULT_NAMESPACE) -> str:
+    try:
+        fh = open(signers_path, encoding="utf-8")
+    except OSError:
+        return ""
+    with fh:
+        for line in fh:
+            entry = _parse_line(line)
+            if not entry or not _principal_match(entry["principal"], name):
+                continue
+            if namespace in entry["namespaces"]:
+                return entry["keytype"]
+    return ""
+
+
+def is_hardware_key(keytype: str) -> bool:
+    return str(keytype or "").startswith("sk-")

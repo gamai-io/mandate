@@ -172,6 +172,25 @@ class BrokerPaymentTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["reason"], "invalid_query")
 
+    def test_pymssql_bind_conversion(self):
+        class Cursor:
+            def execute(self, query, params):
+                self.query = query
+                self.params = params
+
+        class Connection:
+            def cursor(self):
+                return Cursor()
+
+        erp = ErpChecker({"driver": "pymssql", "server": "host",
+                          "database": "master"})
+        cursor = erp._execute(
+            Connection(),
+            "SELECT a FROM t WHERE name=:target AND amount=:amount",
+            {"target": "A", "amount": 1})
+        self.assertIn("%s", cursor.query)
+        self.assertEqual(cursor.params, ("A", 1))
+
 
 if __name__ == "__main__":
     unittest.main()

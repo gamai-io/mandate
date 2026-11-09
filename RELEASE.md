@@ -44,10 +44,20 @@ git push origin main --tags
 ```
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`: build, tests,
-`twine check`, PyPI publish (`PYPI_API_TOKEN` secret) and a GitHub release with
-the wheel, sdist and checksums. For OIDC trusted publishing instead of a stored
-token, configure the PyPI trusted publisher and set `id-token: write` in the
-publish job (no password).
+`twine check`, PyPI publish and a GitHub release with the wheel, sdist and
+checksums.
+
+### OIDC trusted publishing (recommended)
+
+1. On PyPI, add a trusted publisher for project `gama-mandate`:
+   owner `gamai-io`, repository `mandate`, workflow `release.yml`,
+   environment `pypi`.
+2. Set the repository variable `PYPI_OIDC=true`
+   (`gh variable set PYPI_OIDC --body true --repo gamai-io/mandate`).
+3. Remove the `PYPI_API_TOKEN` secret. The workflow then publishes with
+   `id-token: write` and no stored token.
+
+Until then, the token path (`PYPI_API_TOKEN`) is used.
 
 Create the GitHub release and attach `dist/*.whl`, `dist/*.tar.gz` and
 `dist/*.sha256` (`sha256sum dist/*`).

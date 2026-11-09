@@ -16,6 +16,7 @@ class ErpChecker:
 
     def __init__(self, cfg: dict):
         cfg = cfg or {}
+        self.cfg = cfg
         self.db = str(cfg.get("db") or "")
         self.driver = str(cfg.get("driver") or "sqlite").lower()
         self.dsn = str(cfg.get("dsn") or "")
@@ -33,14 +34,24 @@ class ErpChecker:
         return text
 
     def _connect(self):
-        if self.driver == "mssql":
+        if self.driver in ("mssql", "pymssql"):
+            user = os.environ.get(self.user_env, "") if self.user_env else ""
+            password = os.environ.get(self.password_env, "") if self.password_env else ""
+            if self.driver == "pymssql":
+                try:
+                    import pymssql
+                except ImportError as exc:
+                    raise RuntimeError("pymssql not installed") from exc
+                server = str(self.cfg.get("server") or self.dsn)
+                database = str(self.cfg.get("database") or "master")
+                return pymssql.connect(server=server, user=user,
+                                       password=password, database=database,
+                                       login_timeout=10, timeout=10)
             try:
                 import pyodbc
             except ImportError as exc:
                 raise RuntimeError(
                     "pyodbc not installed; pip install gama-mandate[mssql]") from exc
-            user = os.environ.get(self.user_env, "") if self.user_env else ""
-            password = os.environ.get(self.password_env, "") if self.password_env else ""
             return pyodbc.connect(self.dsn, user=user, password=password,
                                   timeout=10, autocommit=False)
         con = sqlite3.connect("file:%s?mode=ro" % os.path.abspath(self.db),
@@ -49,6 +60,12 @@ class ErpChecker:
         return con
 
     def _execute(self, con, query: str, binds: dict):
+        if self.driver == "pymssql":
+            names = re.findall(r":([A-Za-z_][A-Za-z0-9_]*)", query)
+            positional = re.sub(r":[A-Za-z_][A-Za-z0-9_]*", "%s", query)
+            cursor = con.cursor()
+            cursor.execute(positional, tuple(binds.get(n) for n in names))
+            return cursor
         if self.driver == "mssql":
             names = re.findall(r":([A-Za-z_][A-Za-z0-9_]*)", query)
             positional = re.sub(r":[A-Za-z_][A-Za-z0-9_]*", "?", query)
@@ -73,7 +90,11 @@ class ErpChecker:
             return None, "erp_unavailable"
         try:
             try:
-                row = self._execute(con, query, binds).fetchone()
+                cursor = self._execute(con, query, binds)
+                row = cursor.fetchone()
+                if row is not None and self.driver == "pymssql":
+                    columns = [d[0] for d in cursor.description]
+                    row = dict(zip(columns, row))
             except Exception:
                 return None, "erp_query_failed"
             return row, None

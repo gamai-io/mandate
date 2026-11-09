@@ -124,6 +124,27 @@ class MandateTests(unittest.TestCase):
             core.normalize_intent(intent_factory(
                 provenance=[{"type": "bogus", "source": "x"}]))
 
+    def test_hardware_key_required_rejects_software_key(self):
+        policy = json.loads(json.dumps(core.load_policy()))
+        policy["effects"]["payment.send"]["require_hardware_key"] = True
+        intent = intent_factory()
+        grant = self._grant(intent)
+        with self.assertRaises(core.HardwareKeyRequired):
+            core.redeem(intent, grant, self.signers, self.ledger,
+                        policy=policy)
+
+    def test_keytype_parser_and_hardware_flag(self):
+        from mandate import sign as msign
+        path = os.path.join(self.dir, "hardware_signers")
+        pub = pathlib.Path(self.key + ".pub").read_text(
+            encoding="utf-8").split()[1]
+        pathlib.Path(path).write_text(
+            'approver namespaces="mandate" sk-ssh-ed25519 %s test\n' % pub,
+            encoding="utf-8")
+        self.assertEqual(msign.keytype_for("approver", path), "sk-ssh-ed25519")
+        self.assertTrue(msign.is_hardware_key("sk-ssh-ed25519"))
+        self.assertFalse(msign.is_hardware_key("ssh-ed25519"))
+
     def test_commitment_is_stable_and_render_is_human(self):
         a = core.propose(intent_factory())
         b = core.propose(intent_factory())

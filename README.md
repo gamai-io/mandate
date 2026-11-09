@@ -239,8 +239,10 @@ never charges twice.
 "erp": {"driver": "sqlite", "db": "erp.sqlite", "checks": { ... }}
 ```
 For MSSQL: `"driver": "mssql"`, `"dsn": "...", "user_env": "...",
-"password_env": "..."` and `pip install gama-mandate[mssql]`. Only `SELECT`/`WITH`
-queries are accepted; SQLite opens `mode=ro`, MSSQL runs read-only and rolls back.
+"password_env": "..."` and `pip install gama-mandate[mssql]`. For FreeTDS without
+an ODBC driver use `"driver": "pymssql"`, `"server": "...", "database": "...",
+"user_env": "...", "password_env": "..."`. Only `SELECT`/`WITH` queries are
+accepted; SQLite opens `mode=ro`, MSSQL runs read-only and rolls back.
 
 ## Provenance (sycophancy firewall)
 
@@ -274,6 +276,19 @@ The intent carries typed provenance:
   Enable with `--rate-limit-per-min N --rate-burst M` (or
   `MANDATE_RATE_PER_MIN` / `MANDATE_RATE_BURST`). Excess returns `429`.
   Disabled by default (`0`).
+
+## Hardware-backed approver keys (WebAuthn substitute)
+
+Mandate does not implement browser WebAuthn (it needs a CBOR/COSE stack and a
+browser UI). A phishing-resistant FIDO2 key works with the same verification:
+
+```bash
+ssh-keygen -t ed25519-sk -O verify-required -f ~/.ssh/mandate
+# allowed_signers: approver namespaces="mandate,mandate-export" sk-ssh-ed25519 AAAA...
+```
+
+Set `"require_hardware_key": true` on an effect to reject software Ed25519
+grants; the approver key must then be `sk-ssh-ed25519`.
 
 ## Design invariants
 

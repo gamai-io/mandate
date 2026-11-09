@@ -53,6 +53,10 @@ class ProvenanceMissing(MandateError):
     pass
 
 
+class HardwareKeyRequired(MandateError):
+    pass
+
+
 def jcs(obj) -> str:
     return _canonicalize(obj)
 
@@ -428,6 +432,14 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
                        signature, signers_path, namespace,
                        revoked_path=revoked_path, now=moment):
         raise GrantInvalid("grant signature invalid")
+    spec = (policy_obj.get("effects") or {}).get(
+        str(intent["effect"]["kind"])) or {}
+    if isinstance(spec, dict) and spec.get("require_hardware_key"):
+        keytype = sign.keytype_for(str(grant_core.get("approver") or ""),
+                                   signers_path, namespace)
+        if not sign.is_hardware_key(keytype):
+            raise HardwareKeyRequired(
+                "approver key is not a hardware key (sk-ssh-ed25519)")
     if float((grant_core.get("scope") or {}).get("not_after") or 0) <= moment:
         raise GrantExpired("grant expired")
     approver = str(grant_core.get("approver") or "")

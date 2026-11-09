@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.0 — 2026-11-09
+- **OIDC trusted publishing** path in the release workflow (dual path). Set the
+  repo variable `PYPI_OIDC=true` after configuring the PyPI trusted publisher;
+  the token secret is then unused.
+- **Hardware-backed approver keys** (WebAuthn substitute): policy
+  `require_hardware_key` rejects software Ed25519 grants; the approver key must
+  be `sk-ssh-ed25519` (FIDO2, `ssh-keygen -t ed25519-sk -O verify-required`).
+  Full WebAuthn/passkeys still requires a browser/CBOR stack.
+- ERP `driver=pymssql` (FreeTDS; no ODBC driver needed) alongside `mssql`
+  (pyodbc) and `sqlite`; `:name` binds are converted to positional parameters.
+- 106 tests.
+
 ## 0.15.1 — 2026-11-09
 - **Automated release**: pushing a `v*` tag now builds, tests, `twine check`s,
   publishes to PyPI (`PYPI_API_TOKEN` secret) and creates a GitHub release via
