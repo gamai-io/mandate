@@ -30,8 +30,9 @@
   lab VM with `runsc`), Firecracker (verified end-to-end via
   `mandate-fc-bridge` and a KVM microVM).
 - Intent Divergence Benchmark: deterministic 12-scenario corpus (12/12,
-  `pi_asr=0`) and a 20-prompt model corpus; LUMI comparison of qwen25-7b and
-  qwen25vl7b (`unsafe_execution=0` for both); LUMI batch templates.
+  `pi_asr=0`) and a 44-prompt model corpus; LUMI runs on v0.24.1 for
+  qwen25-7b (invalid 11, bad 14/44, unsafe 0) and qwen25vl7b (invalid 3,
+  bad 22/44, unsafe 0).
 - Auditor bundle: intent + grant + receipt + Merkle proof + STH + witness pin in
   one signed JSON, verified offline.
 - Cross-host witness verified on vast, oracle and linux3 on 2026-11-09
