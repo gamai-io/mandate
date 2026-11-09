@@ -35,7 +35,7 @@ Result: `{"valid": true, "tools": ["pay","read","web_fetch"]}` — the runner
 built a `runsc` container with the same hardening flags, and the MCP handshake
 and tools/list succeeded inside it.
 
-## Firecracker — lab VM, manual
+## Firecracker — lab VM, manual + Mandate bridge
 
 The lab VM has Firecracker 1.17 and a KVM microVM pool with Python 3.12 inside.
 A real microVM boot + command execution succeeded:
@@ -46,14 +46,22 @@ Python 3.12.7
 Linux ubuntu-fc-uvm 4.14.174 ... x86_64
 ```
 
-The runtime is verified. A stdio bridge that exposes an MCP server inside a
-Firecracker microVM to the proxy (`--sandbox firecracker
---sandbox-cmd-template`) is the next step; the proxy already supports an
-external launcher template.
+`mandate.firecracker_bridge` (console script `mandate-fc-bridge`) boots a
+microVM, copies host files referenced by absolute path into `/tmp` in the guest,
+starts the command with unbuffered Python and bridges JSON-RPC lines between
+stdin/stdout and the guest serial console:
+
+```bash
+mandate mcp verify --lock /tmp/fclock.json --cmd "python3 /tmp/fake_mcp.py" \
+  --sandbox firecracker \
+  --sandbox-cmd-template "python3 -m mandate.firecracker_bridge --"
+```
+
+Result: `{"valid": true, "tools": ["pay","read","web_fetch"]}` against a real
+KVM microVM; `lock` and `verify` both pass.
 
 ## Recommendation
 
 - Use `docker`/`gvisor` for MCP servers that must be reachable as stdio today.
-- Use the Firecracker template path when a serial-console-to-stdio launcher is
-  available.
+- Use `firecracker` with `mandate-fc-bridge` for a KVM microVM boundary.
 - Keep `local` only for trusted development.

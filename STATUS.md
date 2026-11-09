@@ -5,7 +5,7 @@
 - Distribution: `gama-mandate` (PyPI), import package `mandate`.
 - CLI: `mandate`, `mandate-broker`, `mandate-mcp`.
 - Repository: https://github.com/gamai-io/mandate (public, MIT).
-- Current release: **v0.19.0**, CI green on Python 3.9–3.12, 121 tests.
+- Current release: **v0.20.0**, CI green on Python 3.9–3.12, 124 tests.
 
 ## What works now
 
@@ -27,7 +27,8 @@
 - MCP manifest gate: signed lock, rug-pull/poisoned-manifest deny, stdio proxy.
 - MCP taint gate: untrusted source → effect requires a grant + `data_ref`.
 - Sandbox runner: hardened Docker (verified), gVisor (verified end-to-end on a
-  lab VM with `runsc`), Firecracker runtime (verified; stdio launcher pending).
+  lab VM with `runsc`), Firecracker (verified end-to-end via
+  `mandate-fc-bridge` and a KVM microVM).
 - Automated release on `v*` tags; OIDC trusted-publishing path.
 
 ## Known limitations / open items
@@ -41,8 +42,6 @@
   `PYPI_OIDC=true`; until then the `PYPI_API_TOKEN` secret is used.
 - One live MSSQL check passed with pymssql/FreeTDS; ODBC Driver 18 failed TLS
   negotiation against an older server. Use `driver=pymssql` there.
-- Firecracker runtime is verified; a serial-console-to-stdio launcher for an MCP
-  server inside the microVM is not implemented yet (template hook exists).
 - A single transparency log cannot prevent split-view by its operator; pin the
   STH with the witness on a separate host.
 

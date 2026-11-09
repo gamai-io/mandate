@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.0 — 2026-11-09
+- **Firecracker stdio bridge (Phase 3 complete)**: `mandate.firecracker_bridge`
+  boots a KVM microVM, copies host files referenced by absolute path into
+  `/tmp` in the guest, starts the command with unbuffered Python and bridges
+  JSON-RPC lines between stdin/stdout and the guest serial console.
+  `mandate-fc-bridge` console script.
+- Verified on the lab VM: `mandate mcp lock/verify --sandbox firecracker
+  --sandbox-cmd-template "python3 -m mandate.firecracker_bridge --"` returns a
+  valid lock against a real microVM (Python 3.12 inside).
+- 3 bridge tests + 124 total.
+
 ## 0.19.0 — 2026-11-09
 - **Sandbox runner for untrusted MCP servers (Phase 3)**: `--sandbox
   local|docker|gvisor|firecracker` on `mandate mcp lock|verify|proxy`.
