@@ -133,6 +133,26 @@ idempotency insert in **one transaction**, keyed by the grant nonce:
           "statement": "INSERT INTO payments(nonce,vendor,amount) VALUES(:nonce,:target,:amount)"}
 ```
 
+## Transparency log
+
+Every ledger entry is a leaf in an RFC 6962/9162-style Merkle tree
+(`Leaf=SHA256(0x00||JCS(entry))`, `Node=SHA256(0x01||L||R)`). A signed tree
+head (STH) fixes the root and size; inclusion and consistency proofs verify
+offline:
+
+```bash
+mandate log head  --ledger ledger.jsonl --log-name log1 --log-key ~/.ssh/mandate-log --out sth.json
+mandate --signers trust/allowed_signers log sth-verify --sth sth.json
+mandate log proof --ledger ledger.jsonl --index 3 --out proof.json
+mandate log verify-inclusion --entry entry.json --proof proof.json --sth sth.json
+mandate log consistency --ledger ledger.jsonl --first 2 --second 3 --out cons.json
+mandate log verify-consistency --old old_sth.json --new sth.json --proof cons.json
+```
+
+A single log cannot prevent **split-view** by its operator; pin the STH on a
+second machine (witness/anchor). The STH signer needs
+`namespaces="mandate-log"` in `allowed_signers`.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on

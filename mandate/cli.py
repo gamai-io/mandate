@@ -107,6 +107,61 @@ def _cmd_doctor(args) -> int:
                  and out["signers_present"]) else 1
 
 
+def _cmd_log(args) -> int:
+    from . import log as mlog
+    cmd = getattr(args, "log_cmd", None)
+    try:
+        if cmd == "head":
+            leaves = mlog.leaves_from_ledger(args.ledger)
+            log_id = args.log_id or mlog.log_id_from_key(args.log_key)
+            payload = mlog.sth_payload(args.log_name, log_id, len(leaves),
+                                       mlog.root_hex(leaves))
+            _emit(mlog.sign_sth(payload, args.log_key), args.out)
+            return 0
+        if cmd == "sth-verify":
+            ok = mlog.verify_sth(_read(args.sth), args.signers,
+                                 revoked_path=args.revoked)
+            _emit({"valid": ok}, None)
+            return 0 if ok else 1
+        if cmd == "proof":
+            leaves = mlog.leaves_from_ledger(args.ledger)
+            _emit(mlog.inclusion_proof(leaves, args.index), args.out)
+            return 0
+        if cmd == "verify-inclusion":
+            sth = _read(args.sth) if args.sth else None
+            root = size = None
+            if sth:
+                root = (sth.get("sth") or {}).get("root_hash")
+                size = (sth.get("sth") or {}).get("tree_size")
+            ok = mlog.verify_inclusion_proof(
+                _read(args.entry), _read(args.proof), root=root, size=size)
+            _emit({"valid": ok}, None)
+            return 0 if ok else 1
+        if cmd == "consistency":
+            leaves = mlog.leaves_from_ledger(args.ledger)
+            _emit(mlog.consistency_proof(leaves, args.first, args.second),
+                  args.out)
+            return 0
+        if cmd == "verify-consistency":
+            old = _read(args.old)
+            new = _read(args.new)
+            proof = _read(args.proof)
+            old_sth = old.get("sth") or {}
+            new_sth = new.get("sth") or {}
+            ok = mlog.verify_consistency_proof(
+                proof, first_root=old_sth.get("root_hash"),
+                second_root=new_sth.get("root_hash"),
+                first=old_sth.get("tree_size"),
+                second=new_sth.get("tree_size"))
+            _emit({"valid": ok}, None)
+            return 0 if ok else 1
+    except (core.MandateError, OSError, ValueError) as exc:
+        _emit({"error": type(exc).__name__, "message": str(exc)[:200]}, None)
+        return 3
+    _emit({"error": "unknown_log_command"}, None)
+    return 2
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="mandate")
     parser.add_argument("--policy", default=None)
@@ -172,6 +227,34 @@ def main(argv=None) -> int:
     p_revoke.add_argument("--reason", default="")
 
     sub.add_parser("signers")
+
+    p_log = sub.add_parser("log")
+    log_sub = p_log.add_subparsers(dest="log_cmd")
+    p_lh = log_sub.add_parser("head")
+    p_lh.add_argument("--ledger", required=True)
+    p_lh.add_argument("--log-name", required=True)
+    p_lh.add_argument("--log-key", required=True)
+    p_lh.add_argument("--log-id", default=None)
+    p_lh.add_argument("--out", default=None)
+    p_ls = log_sub.add_parser("sth-verify")
+    p_ls.add_argument("--sth", required=True)
+    p_lp = log_sub.add_parser("proof")
+    p_lp.add_argument("--ledger", required=True)
+    p_lp.add_argument("--index", type=int, required=True)
+    p_lp.add_argument("--out", default=None)
+    p_li = log_sub.add_parser("verify-inclusion")
+    p_li.add_argument("--entry", required=True)
+    p_li.add_argument("--proof", required=True)
+    p_li.add_argument("--sth", default=None)
+    p_lc = log_sub.add_parser("consistency")
+    p_lc.add_argument("--ledger", required=True)
+    p_lc.add_argument("--first", type=int, required=True)
+    p_lc.add_argument("--second", type=int, required=True)
+    p_lc.add_argument("--out", default=None)
+    p_lv = log_sub.add_parser("verify-consistency")
+    p_lv.add_argument("--old", required=True)
+    p_lv.add_argument("--new", required=True)
+    p_lv.add_argument("--proof", required=True)
 
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
@@ -244,6 +327,9 @@ def main(argv=None) -> int:
         if args.cmd == "signers":
             _emit({"signers": sign.list_signers(args.signers)}, None)
             return 0
+
+        if args.cmd == "log":
+            return _cmd_log(args)
 
         if args.cmd == "revoke":
             try:

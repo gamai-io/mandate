@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.0 — 2026-11-09
+- **Merkle transparency log** over ledger entries (RFC 6962/9162 style):
+  `Leaf=SHA256(0x00||JCS(entry))`, `Node=SHA256(0x01||L||R)`, MTH, inclusion
+  proofs, consistency proofs.
+- **Signed tree head** via `ssh-keygen -Y sign` in namespace `mandate-log`;
+  `log_id` is the log key SHA256 fingerprint.
+- CLI: `mandate log head | sth-verify | proof | verify-inclusion | consistency |
+  verify-consistency`.
+- Refuses to build a log over an invalid ledger hash chain.
+- 9 Merkle tests + 60 total. Off-host **witness/anchor** is still required to
+  rule out split-view; tracked in PLAN.md.
+
 ## 0.8.0 — 2026-11-09
 - **Effect journal** (SQLite) with a lease-based state machine:
   `intent → executing → executed → receipted`, plus `failed` / `abandoned`.
