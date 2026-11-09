@@ -9,6 +9,7 @@ import time
 import uuid
 
 from . import sign
+from .jcs import canonicalize as _canonicalize
 
 try:
     import fcntl
@@ -49,7 +50,7 @@ class SelfApproval(MandateError):
 
 
 def jcs(obj) -> str:
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return _canonicalize(obj)
 
 
 def sha256(text: str) -> str:

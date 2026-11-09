@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-11-09
+- Canonicalization is now **RFC 8785 (JCS)**: UTF-16 code-unit key ordering,
+  ECMAScript number serialization, minimal string escaping, and strict rejection
+  of non-finite numbers, lone surrogates, non-string keys, and integers outside
+  the IEEE-754 safe range. Passes the RFC 8785 reference vector.
+- **Breaking:** commitment/receipt hashes change (e.g. `1170.0` serializes as
+  `1170`). Regenerate grants and ledgers from earlier versions.
+- CI: GitHub Actions test matrix on Python 3.9–3.12.
+
 ## 0.6.0 — 2026-11-09
 - `allowed_signers` now requires an explicit `namespaces="mandate"` scope
   (`namespaces="mandate-broker"` for broker result keys). A key without a scope

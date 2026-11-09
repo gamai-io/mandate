@@ -1,8 +1,11 @@
 # MANDATE-1
 
 ## Canonicalization
-All objects are canonicalised as JSON with sorted keys, no insignificant
-whitespace, UTF-8 (`jcs()`). Hashes are `sha256` over those bytes.
+All objects are canonicalised per **RFC 8785 (JCS)**: UTF-16 code-unit key
+ordering, ECMAScript number serialization (`1170.0` → `1170`, `1e-7` → `1e-7`),
+minimal string escaping, UTF-8 output. Non-finite numbers, lone surrogates,
+non-string keys and integers outside `[-(2^53-1), 2^53-1]` are rejected.
+Hashes are `sha256` over those bytes.
 
 ## Intent
 ```json

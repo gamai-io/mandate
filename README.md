@@ -121,8 +121,9 @@ mandate --signers trust/allowed_signers signers   # inspect scopes + fingerprint
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on
    `gama_sql`. The same effect is the same commitment regardless of executor.
-2. **Canonical bytes.** JCS-style canonical JSON; the commitment is the hash of
-   `{v, effect, requested_by}`. Same content ⇒ same id, any language.
+2. **Canonical bytes.** **RFC 8785 (JCS)** canonical JSON; the commitment is the
+   hash of `{v, effect, requested_by, render_hash}`. Same content ⇒ same id, in
+   any RFC 8785 implementation.
 3. **Off-host key.** The approver's private key never lives where the agent
    runs. The host stores only public keys (`trust/allowed_signers`).
 4. **One-shot, nonce-bound.** A grant is redeemable once; replays fail.
