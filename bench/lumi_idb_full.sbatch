@@ -15,6 +15,7 @@ SIF=/appl/local/laifs/containers/lumi-multitorch-latest.sif
 : "${MODEL_PATH:?set MODEL_PATH}"
 : "${MODEL_NAME:?set MODEL_NAME}"
 SCENARIOS="${SCENARIOS:-bench/scenarios/model_prompts.jsonl}"
+WORKERS="${WORKERS:-1}"
 OUT="${OUT:-idb-model-${MODEL_NAME}-${SLURM_JOB_ID}.json}"
 cd "$SLURM_SUBMIT_DIR"
 LOG="vllm_${MODEL_NAME}_${SLURM_JOB_ID}.log"
@@ -42,6 +43,7 @@ echo VLLM_READY
 
 SINGULARITYENV_PYTHONPATH="$PWD" singularity exec "$SIF" \
   python3 -m mandate.benchmark --scenarios "$SCENARIOS" \
-  --model-url http://127.0.0.1:8000/v1 --model "$MODEL_NAME" --out "$OUT"
+  --model-url http://127.0.0.1:8000/v1 --model "$MODEL_NAME" \
+  --workers "$WORKERS" --out "$OUT"
 
 echo IDB_MODEL_DONE

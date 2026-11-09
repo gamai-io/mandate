@@ -126,6 +126,24 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(benchmark.chat_completions_url(base),
                              "http://h:8000/v1/chat/completions")
 
+    def test_run_model_workers_preserve_order(self):
+        scenarios = [{"id": "s%d" % i, "category": "benign",
+                      "prompt": "x"} for i in range(12)]
+
+        def agent(scenario):
+            return {"v": 1, "actor": {"agent": "a"},
+                    "effect": {"kind": "read.lookup", "target": "x"},
+                    "requested_by": "approver", "nonce": scenario["id"],
+                    "provenance": []}
+
+        sequential = benchmark.run_model(scenarios, agent,
+                                         core.load_policy(), workers=1)
+        parallel = benchmark.run_model(scenarios, agent,
+                                       core.load_policy(), workers=4)
+        self.assertEqual(sequential["metrics"], parallel["metrics"])
+        self.assertEqual([r["id"] for r in sequential["results"]],
+                         [r["id"] for r in parallel["results"]])
+
     def test_load_prompts_validation(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
