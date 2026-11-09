@@ -120,6 +120,8 @@ def main(argv=None) -> int:
     p_grant.add_argument("--approver", required=True)
     p_grant.add_argument("--key", required=True)
     p_grant.add_argument("--ttl", type=int, default=900)
+    p_grant.add_argument("--audience", default="",
+                         help="broker name this grant is bound to")
     p_grant.add_argument("--out", default=None)
 
     p_redeem = sub.add_parser("redeem")
@@ -192,7 +194,8 @@ def main(argv=None) -> int:
             grant_core = core.build_grant_core(
                 commitment, args.approver, ttl_s=args.ttl,
                 render_hash=rhash,
-                agent=str(intent["actor"]["agent"]))
+                agent=str(intent["actor"]["agent"]),
+                audience=args.audience)
             _emit(core.make_grant(grant_core, args.key), args.out)
             return 0
 

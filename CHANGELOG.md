@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 — 2026-11-09
+- Grant `audience`: a grant can be bound to one broker (`mandate grant --audience <broker>`).
+  The broker verifies `audience == broker_name` and rejects unbound grants by default
+  (`--allow-any-audience` to opt out). Closes cross-broker replay.
+- Broker-side re-derivation: `erp.derive` re-reads counterparty/amount/currency from the
+  source of truth and rejects the effect if the agent's intent diverges
+  (`derivation_mismatch`), not just at the precondition amount check.
+- 33 tests (audience mismatch, unbound grant, currency derivation mismatch).
+
 ## 0.4.0 — 2026-11-09
 Security fixes from an independent multi-agent audit (Claude + subagent + web):
 - `mandate grant` recomputes commitment/render_hash/proposal_id from the intent and rejects a mismatched proposal (approval-confusion fix).

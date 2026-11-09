@@ -219,13 +219,15 @@ def propose(intent: dict) -> dict:
 
 def build_grant_core(commitment: str, approver: str, max_uses: int = 1,
                      ttl_s: int = 900, nonce: str | None = None,
-                     render_hash: str = "", agent: str = "") -> dict:
+                     render_hash: str = "", agent: str = "",
+                     audience: str = "") -> dict:
     now = int(time.time())
     return {
         "v": VERSION,
         "commitment": str(commitment),
         "render_hash": str(render_hash or ""),
         "agent": str(agent or ""),
+        "audience": str(audience or ""),
         "approver": str(approver),
         "scope": {"max_uses": 1, "not_after": now + max(1, int(ttl_s))},
         "nonce": nonce or uuid.uuid4().hex,
@@ -340,7 +342,9 @@ def verify_grant(grant_obj: dict, signers_path: str,
 def redeem(intent: dict, grant_obj: dict, signers_path: str,
            ledger_path: str, namespace: str = "mandate",
            allow_self: bool = False, now: float | None = None,
-           claim=None, policy: dict | None = None) -> dict:
+           claim=None, policy: dict | None = None,
+           audience: str | None = None,
+           require_audience: bool = False) -> dict:
     intent = normalize_intent(intent)
     policy_obj = policy if isinstance(policy, dict) else load_policy()
     decision = check(intent, policy_obj)
@@ -356,6 +360,12 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     bound_agent = str(core.get("agent") or "")
     if bound_agent and bound_agent != str(intent["actor"].get("agent") or ""):
         raise CommitmentMismatch("grant is bound to a different agent")
+    if audience is not None:
+        bound_audience = str(core.get("audience") or "")
+        if require_audience and not bound_audience:
+            raise GrantInvalid("grant is not bound to a broker audience")
+        if bound_audience and bound_audience != str(audience):
+            raise GrantInvalid("grant audience does not match this broker")
     if not sign.verify(jcs(core), str(core.get("approver") or ""), signature,
                        signers_path, namespace):
         raise GrantInvalid("grant signature invalid")

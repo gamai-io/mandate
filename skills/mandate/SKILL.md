@@ -27,10 +27,11 @@ Effect kinds (from `policy.json`): `payment.send`, `order.create`,
 ```bash
 mandate check   --intent intent.json            # 0 allow / 10 ask / 20 deny
 mandate propose --intent intent.json --out proposal.json
-mandate grant   --proposal proposal.json --approver <name> --key <priv> --out grant.json   # human only
+mandate grant   --proposal proposal.json --approver <name> --key <priv> --audience <broker> --out grant.json   # human only
 mandate redeem  --intent intent.json --grant grant.json --ledger ledger.jsonl
 mandate execute --broker http://127.0.0.1:8899 --intent intent.json --grant grant.json     # preferred
 mandate verify  --receipt receipt.json --intent intent.json --grant grant.json
+mandate verify-result --entry result.json --broker-signers broker_signers
 mandate chain   --ledger ledger.jsonl
 ```
 

@@ -47,9 +47,9 @@ ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
 # 2. agent proposes
 ./bin/mandate propose --intent examples/intent.json --out /tmp/proposal.json
 
-# 3. human grants (signs the commitment)
+# 3. human grants (signs the commitment, bound to one broker + the agent)
 ./bin/mandate grant --proposal /tmp/proposal.json --approver approver \
-  --key ~/.ssh/mandate --out /tmp/grant.json
+  --key ~/.ssh/mandate --audience local-broker --out /tmp/grant.json
 
 # 4. agent redeems exactly once
 ./bin/mandate redeem --intent examples/intent.json --grant /tmp/grant.json \

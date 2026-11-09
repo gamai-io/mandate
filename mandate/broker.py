@@ -44,7 +44,8 @@ class Broker:
     def __init__(self, policy: str, signers: str, ledger: str, nonce_db: str,
                  receipt_key: str = "", broker_name: str = "gama-broker",
                  effects_dir: str = "effects", outbox: str = "outbox",
-                 smtp: dict | None = None, erp: dict | None = None):
+                 smtp: dict | None = None, erp: dict | None = None,
+                 require_audience: bool = True):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -55,6 +56,7 @@ class Broker:
         self.outbox = outbox
         self.smtp = SmtpSender(smtp) if smtp else None
         self.erp = ErpChecker(erp) if erp else None
+        self.require_audience = require_audience
         self.nonces = NonceStore(nonce_db)
 
     def _run(self, kind: str, intent: dict) -> dict:
@@ -96,8 +98,14 @@ class Broker:
             if not pre.get("ok"):
                 raise PreconditionFailed(
                     "erp precondition failed: %s" % pre.get("reason"))
+            derived = self.erp.derive_expected(intent)
+            if not derived.get("ok"):
+                raise PreconditionFailed(
+                    "erp derivation failed: %s" % derived.get("reason"))
         receipt = core.redeem(intent, grant_obj, self.signers, self.ledger,
-                              claim=self.nonces.consume)
+                              claim=self.nonces.consume,
+                              audience=self.broker_name,
+                              require_audience=self.require_audience)
         try:
             result = self._run(kind, intent)
             status = "ok"
@@ -130,7 +138,7 @@ class Broker:
 def make_handler(broker: Broker):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "mandate-broker/0.4"
+        server_version = "mandate-broker/0.5"
 
         def log_message(self, fmt, *args):
             if os.environ.get("MANDATE_BROKER_LOG") == "1":
@@ -195,6 +203,7 @@ def main(argv=None) -> int:
     parser.add_argument("--outbox", default=os.environ.get("MANDATE_OUTBOX", "outbox"))
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
+    parser.add_argument("--allow-any-audience", action="store_true")
     args = parser.parse_args(argv)
 
     cfg = {}
@@ -216,7 +225,8 @@ def main(argv=None) -> int:
     broker = Broker(args.policy, args.signers, args.ledger, args.nonce_db,
                     receipt_key=args.receipt_key, broker_name=args.broker_name,
                     effects_dir=args.effects_dir, outbox=args.outbox,
-                    smtp=cfg.get("smtp"), erp=cfg.get("erp"))
+                    smtp=cfg.get("smtp"), erp=cfg.get("erp"),
+                    require_audience=not args.allow_any_audience)
     server = make_server(args.host, args.port, broker)
     host, port = server.server_address[:2]
     print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)

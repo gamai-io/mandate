@@ -31,6 +31,13 @@
         "query": "SELECT credit_limit FROM customers WHERE name = :target",
         "tolerance_pct": 0.0
       }
+    },
+    "derive": {
+      "payment.send": {
+        "query": "SELECT name, invoice_total, currency FROM vendors WHERE name = :target",
+        "fields": {"counterparty": "name", "amount": "invoice_total", "currency": "currency"},
+        "tolerance_pct": 0.5
+      }
     }
   }
 }

@@ -53,14 +53,15 @@ class MandateTests(unittest.TestCase):
         self.td.cleanup()
 
     def _grant(self, intent, approver="approver", ttl=900, key=None,
-               render_hash=None, agent=None):
+               render_hash=None, agent=None, audience="gama-broker"):
         proposal = core.propose(intent)
         grant_core = core.build_grant_core(
             proposal["commitment"], approver, ttl_s=ttl,
             render_hash=(proposal["render_hash"] if render_hash is None
                          else render_hash),
             agent=(agent if agent is not None
-                   else str(intent.get("actor", {}).get("agent") or "")))
+                   else str(intent.get("actor", {}).get("agent") or "")),
+            audience=audience)
         return core.make_grant(grant_core, key or self.key)
 
     def test_check_risky_requires_grant(self):
@@ -236,13 +237,22 @@ class MandateTests(unittest.TestCase):
     def _make_erp(self):
         path = os.path.join(self.dir, "erp.sqlite")
         con = sqlite3.connect(path)
-        con.execute("CREATE TABLE vendors(name TEXT, invoice_total REAL)")
-        con.execute("INSERT INTO vendors VALUES ('Example Supplier', 1170.0)")
+        con.execute("CREATE TABLE vendors(name TEXT, invoice_total REAL, currency TEXT)")
+        con.execute("INSERT INTO vendors VALUES ('Example Supplier', 1170.0, 'BAM')")
         con.commit()
         con.close()
-        return {"db": path, "checks": {"payment.send": {
-            "query": "SELECT invoice_total FROM vendors WHERE name = :target",
-            "amount_field": "invoice_total", "tolerance_pct": 0.5}}}
+        return {
+            "db": path,
+            "checks": {"payment.send": {
+                "query": "SELECT invoice_total FROM vendors WHERE name = :target",
+                "amount_field": "invoice_total", "tolerance_pct": 0.5}},
+            "derive": {"payment.send": {
+                "query": "SELECT name, invoice_total, currency FROM vendors"
+                         " WHERE name = :target",
+                "fields": {"counterparty": "name", "amount": "invoice_total",
+                           "currency": "currency"},
+                "tolerance_pct": 0.5}},
+        }
 
     def _start_broker(self, smtp=None, erp=None, receipt_key="",
                       broker_name="gama-broker"):
@@ -327,11 +337,37 @@ class MandateTests(unittest.TestCase):
         status, _body = self._post(port, intent, grant)
         self.assertEqual(status, 409)
         con = sqlite3.connect(erp["db"])
-        con.execute("INSERT INTO vendors VALUES ('Beta d.o.o.', 1170.0)")
+        con.execute("INSERT INTO vendors VALUES ('Beta d.o.o.', 1170.0, 'BAM')")
         con.commit()
         con.close()
         status2, body2 = self._post(port, intent, grant)
         self.assertEqual(status2, 200, body2)
+
+    def test_audience_mismatch_rejected(self):
+        intent = intent_factory()
+        grant = self._grant(intent)
+        port = self._start_broker(broker_name="other-broker")
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "GrantInvalid")
+
+    def test_unbound_grant_rejected(self):
+        intent = intent_factory()
+        grant = self._grant(intent, audience="")
+        port = self._start_broker()
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "GrantInvalid")
+
+    def test_derive_currency_mismatch_blocked(self):
+        intent = intent_factory()
+        intent["effect"]["amount"] = {"value": 1170.0, "currency": "EUR"}
+        grant = self._grant(intent)
+        port = self._start_broker(erp=self._make_erp())
+        status, body = self._post(port, intent, grant)
+        self.assertEqual(status, 409, body)
+        self.assertEqual(body["error"], "PreconditionFailed")
+        self.assertIn("derivation", body["message"])
 
     def test_smtp_dry_run_message(self):
         intent = intent_factory(effect={
