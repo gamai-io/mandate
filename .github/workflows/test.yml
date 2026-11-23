@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # ubuntu-latest = 26.04, nema Python 3.9 u setup-python
     strategy:
       fail-fast: false
       matrix:
