@@ -94,7 +94,7 @@ class VmPause(unittest.TestCase):
 
     def test_state_is_readable(self) -> None:
         self.assertEqual(warden.vm_state(self.path), "Running")
-        self.assertIn(("GET", "/vm"), self.stub.calls)
+        self.assertTrue(any(m == "GET" and p in ("/", "/vm") for m, p in self.stub.calls), self.stub.calls)
 
     def test_missing_socket_is_reported(self) -> None:
         res = warden.vm_pause(os.path.join(self.tmp.name, "nope.sock"))

@@ -325,10 +325,14 @@ def fc_call(socket_path: str, method: str, path: str, payload: dict | None = Non
 
 
 def vm_state(socket_path: str) -> str | None:
-    res = fc_call(socket_path, "GET", "/vm")
-    if not res["ok"]:
-        return None
-    return (res["body"] or {}).get("state")
+    """Firecracker 1.17 answers GET / with {"state": "Running"|"Paused"}."""
+    res = fc_call(socket_path, "GET", "/")
+    if res["ok"] and isinstance(res["body"], dict) and res["body"].get("state"):
+        return res["body"]["state"]
+    res = fc_call(socket_path, "GET", "/vm")  # older builds
+    if res["ok"] and isinstance(res["body"], dict):
+        return res["body"].get("state")
+    return None
 
 
 def vm_pause(socket_path: str, timeout_ms: int = 3000) -> dict:
