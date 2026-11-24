@@ -70,6 +70,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 2 | [`examples/02-audit-bundle.sh`](examples/02-audit-bundle.sh) | portable audit bundle an auditor can verify offline |
 | 3 | [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md) | lock and proxy an MCP server for Claude Code / Codex / Cursor |
 | 4 | [`examples/04-full-stack.sh`](examples/04-full-stack.sh) | all five packages on one payment: guard → policy → grant → claim check → seal |
+| 5 | [`examples/05-bank-scenario.sh`](examples/05-bank-scenario.sh) | budget, kill switch and four-eyes: the controls banks started enforcing in Nov 2026 |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -82,6 +83,36 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Governance: budget, kill switch, four-eyes
+
+Banks now treat agents like employees: credentials, permissions, **limits**, and
+a kill switch whose use is on the record. Three additions cover that:
+
+```bash
+# policy.json
+"limits": {"window_seconds": 3600, "max_effects": 3,
+           "max_amount": 5000, "currency": "BAM"}
+
+mandate redeem ...            # exit 4, code=limit_effects once the budget is spent
+mandate halt --reason "runaway loop detected" --actor ops
+mandate redeem ...            # exit 4, code=halted
+mandate resume --reason "root cause fixed" --actor ops
+mandate redeem ...            # still exit 4: resume does not reset the budget
+mandate limits --ledger ledger.jsonl   # current state and last control record
+```
+
+- **Four-eyes:** `mandate grant` refuses when the approver equals the agent in
+  the intent (`exit 3`, `SeparationOfDuties`).
+- **Kill switch is evidence:** `halt`/`resume` are written into the same
+  hash-chained ledger as receipts, so "we stopped it at 14:32, because X" is
+  provable with `mandate chain` and survives the agent being deleted.
+- **Limits are policy, not code:** an operator can raise a budget deliberately
+  (and that change is a human act, with its own authorisation trail).
+
+Run [`examples/05-bank-scenario.sh`](examples/05-bank-scenario.sh) to see all of
+it in one pass: self-approval refused → three effects allowed → fourth refused →
+halt → resume keeps the budget → raised limit → audit re-check.
 
 ## Effect broker (Phase 2)
 

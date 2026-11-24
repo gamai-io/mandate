@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import core, sign
+from . import core, governance, sign
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -402,6 +402,20 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--ledger", default="ledger.jsonl")
     p_redeem.add_argument("--allow-self", action="store_true")
 
+    p_halt = sub.add_parser("halt")
+    p_halt.add_argument("--reason", required=True)
+    p_halt.add_argument("--actor", default="owner")
+    p_halt.add_argument("--ledger", default="ledger.jsonl")
+
+    p_resume = sub.add_parser("resume")
+    p_resume.add_argument("--reason", required=True)
+    p_resume.add_argument("--actor", default="owner")
+    p_resume.add_argument("--ledger", default="ledger.jsonl")
+
+    p_limits = sub.add_parser("limits")
+    p_limits.add_argument("--ledger", default="ledger.jsonl")
+    p_limits.add_argument("--policy", default=None)
+
     p_verify = sub.add_parser("verify")
     p_verify.add_argument("--receipt", required=True)
     p_verify.add_argument("--intent", required=True)
@@ -613,6 +627,12 @@ def main(argv=None) -> int:
                 _emit({"error": "ProposalMismatch",
                        "message": "proposal does not match its intent"}, None)
                 return 3
+            sod = governance.check_separation_of_duties(intent, args.approver)
+            if not sod["allow"]:
+                _emit({"error": "SeparationOfDuties", "message":
+                       "approver must differ from the agent that proposed the effect",
+                       "detail": sod["detail"]}, None)
+                return 3
             grant_core = core.build_grant_core(
                 commitment, args.approver, ttl_s=args.ttl,
                 render_hash=rhash,
@@ -622,12 +642,33 @@ def main(argv=None) -> int:
             return 0
 
         if args.cmd == "redeem":
+            gov = governance.check(args.ledger, governance.load_limits(args.policy))
+            if not gov["allow"]:
+                _emit({"error": "Governance", "code": gov["code"],
+                       "message": "the effect is not allowed right now",
+                       "detail": gov["detail"]}, None)
+                return 4
             receipt = core.redeem(
                 _read(args.intent), _read(args.grant), args.signers,
                 args.ledger, allow_self=args.allow_self,
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked)
             _emit(receipt, None)
+            return 0
+
+        if args.cmd == "halt":
+            entry = governance.halt(args.ledger, args.reason, args.actor)
+            _emit({"halted": True, "reason": args.reason, "head": entry["hash"]}, None)
+            return 0
+
+        if args.cmd == "resume":
+            entry = governance.resume(args.ledger, args.reason, args.actor)
+            _emit({"resumed": True, "reason": args.reason, "head": entry["hash"]}, None)
+            return 0
+
+        if args.cmd == "limits":
+            _emit(governance.summary(args.ledger,
+                                     governance.load_limits(args.policy)), None)
             return 0
 
         if args.cmd == "verify":
