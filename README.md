@@ -69,6 +69,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 1 | [`examples/01-invoice-approval.sh`](examples/01-invoice-approval.sh) | full payment approval + replay rejection |
 | 2 | [`examples/02-audit-bundle.sh`](examples/02-audit-bundle.sh) | portable audit bundle an auditor can verify offline |
 | 3 | [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md) | lock and proxy an MCP server for Claude Code / Codex / Cursor |
+| 4 | [`examples/04-full-stack.sh`](examples/04-full-stack.sh) | all five packages on one payment: guard → policy → grant → claim check → seal |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
