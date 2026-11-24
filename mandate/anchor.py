@@ -18,7 +18,6 @@ and the time, and say so explicitly instead of implying more.
 """
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import os
@@ -123,7 +122,7 @@ def ledger_head(path: str) -> str:
     head = path + ".head"
     if os.path.exists(head):
         return open(head).read().strip()
-    entries = [json.loads(l) for l in open(path) if l.strip()]
+    entries = [json.loads(line) for line in open(path) if line.strip()]
     return str(entries[-1]["hash"]) if entries else ""
 
 
