@@ -112,10 +112,23 @@ mandate warden --quarantine --uid 65534 --undo --ledger L.jsonl
   works where the iptables `owner` module is missing. The agent must run under its
   own uid for this to mean anything.
 
+**MicroVM pause** is implemented against the Firecracker API and tested against a
+stub, but it needs `/dev/kvm`:
+
+```bash
+mandate warden --method vm-pause --vm-socket /tmp/fc.sock --ledger L.jsonl
+# without KVM: exit 4, {"error": "NoKvm", "message": "/dev/kvm is not available on this host"}
+```
+
+Verified 2026-11-24: the lab node `gama-lab-fra` (Vultr FRA, 8 vCPU / 31 GB,
+20 containers) has **no** `/dev/kvm` and no `kvm` module, so Firecracker and VM
+pause cannot run there. MicroVM work needs a KVM-capable host (nested virt or
+bare metal); the client code is host-agnostic and ready for it.
+
 Honest limits: a cgroup freeze keeps memory and can be thawed by anyone with
 write access to that cgroup; quarantine is per-uid, not per-process; neither is a
-hypervisor boundary. VM pause and safe-state definitions remain open (see the
-control matrix, row 5).
+hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
+Firecracker; "safe state" remains the bank's definition, not ours (row 5).
 
 ## Short-lived identity and delegation
 

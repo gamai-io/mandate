@@ -449,7 +449,9 @@ def main(argv=None) -> int:
     p_warden = sub.add_parser("warden")
     p_warden.add_argument("--pid", type=int, default=None)
     p_warden.add_argument("--pgid", type=int, default=None)
-    p_warden.add_argument("--method", choices=("freeze", "kill"), default="freeze")
+    p_warden.add_argument("--method", choices=("freeze", "kill", "vm-pause", "vm-resume"),
+                          default="freeze")
+    p_warden.add_argument("--vm-socket", dest="vm_socket", default=None)
     p_warden.add_argument("--timeout-ms", dest="timeout_ms", type=int, default=3000)
     p_warden.add_argument("--reason", default="")
     p_warden.add_argument("--actor", default="ops")
@@ -832,6 +834,30 @@ def main(argv=None) -> int:
                     core.append_receipt(args.ledger, body)
                 _emit(res, None)
                 return 0 if res.get("ok") else 5
+
+            if args.method in ("vm-pause", "vm-resume"):
+                if not args.vm_socket:
+                    _emit({"error": "Usage", "message": "--method vm-pause needs --vm-socket"}, None)
+                    return 2
+                if not warden.kvm_available():
+                    _emit({"error": "NoKvm", "message":
+                           "/dev/kvm is not available on this host: Firecracker cannot run here",
+                           "hint": "use a KVM-capable host (nested virt / bare metal)"}, None)
+                    return 4
+                res = (warden.vm_pause(args.vm_socket) if args.method == "vm-pause"
+                       else warden.vm_resume(args.vm_socket))
+                evidence = {"action": "halt" if args.method == "vm-pause" else "resume",
+                            "cgroup": None, "target": args.vm_socket,
+                            "reason": args.reason, "actor": args.actor, **res}
+                if args.key:
+                    evidence.update(warden.sign_evidence(evidence, args.key,
+                                                         args.signer or args.actor))
+                if args.ledger:
+                    entry = core.append_receipt(args.ledger,
+                                                {"v": 1, "type": "control", **evidence})
+                    evidence["ledger_head"] = entry["hash"]
+                _emit(evidence, None)
+                return 0 if res.get("verified") else 5
 
             if args.attach or args.cgroup:
                 path = args.cgroup

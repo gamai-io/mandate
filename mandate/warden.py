@@ -304,3 +304,57 @@ def verify_evidence(evidence: dict, signers_path: str) -> dict:
                      evidence.get("signature") or "", signers_path,
                      sign.DEFAULT_NAMESPACE)
     return {"valid": bool(ok), "signer": evidence.get("signer")}
+
+
+# --- Firecracker microVM pause (needs a KVM host; code is host-agnostic) ------
+
+
+def fc_call(socket_path: str, method: str, path: str, payload: dict | None = None,
+            timeout: int = 10) -> dict:
+    """Minimal Firecracker API client over its unix socket (via curl)."""
+    cmd = ["curl", "-s", "-X", method, "--unix-socket", socket_path,
+           f"http://localhost{path}"]
+    if payload is not None:
+        cmd += ["-H", "Content-Type: application/json", "-d", json.dumps(payload)]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    try:
+        body = json.loads(out.stdout) if out.stdout.strip() else {}
+    except ValueError:
+        body = {"raw": out.stdout[:200]}
+    return {"ok": out.returncode == 0, "status": out.returncode, "body": body}
+
+
+def vm_state(socket_path: str) -> str | None:
+    res = fc_call(socket_path, "GET", "/vm")
+    if not res["ok"]:
+        return None
+    return (res["body"] or {}).get("state")
+
+
+def vm_pause(socket_path: str, timeout_ms: int = 3000) -> dict:
+    t0 = _now_ms()
+    before = vm_state(socket_path)
+    res = fc_call(socket_path, "PATCH", "/vm", {"state": "Paused"})
+    deadline = t0 + timeout_ms
+    state = vm_state(socket_path)
+    while _now_ms() < deadline and state != "Paused":
+        time.sleep(0.01)
+        state = vm_state(socket_path)
+    return {"method": "vm-pause", "socket": socket_path, "state_before": before,
+            "state_after": state, "verified": state == "Paused",
+            "time_to_halt_ms": round(_now_ms() - t0, 1), "api": res["body"]}
+
+
+def vm_resume(socket_path: str, timeout_ms: int = 3000) -> dict:
+    res = fc_call(socket_path, "PATCH", "/vm", {"state": "Resumed"})
+    deadline = _now_ms() + timeout_ms
+    state = vm_state(socket_path)
+    while _now_ms() < deadline and state != "Running":
+        time.sleep(0.01)
+        state = vm_state(socket_path)
+    return {"method": "vm-resume", "socket": socket_path, "state_after": state,
+            "verified": state == "Running", "api": res["body"]}
+
+
+def kvm_available(path: str = "/dev/kvm") -> bool:
+    return os.path.exists(path) and os.access(path, os.R_OK | os.W_OK)
