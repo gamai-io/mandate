@@ -27,51 +27,60 @@ produces a hash-chained **Receipt**. Anyone can verify the whole chain offline.
 
 ## Install
 
-CLI + broker + MCP adapter. There is **no web UI** by design: Mandate is a
-local trust primitive you embed in your own stack.
-
 ```bash
-python3 -m pip install gama-mandate
-# or from source / git
-python3 -m pip install "git+https://github.com/gamai-io/mandate.git"
-
-mandate doctor                      # checks python, ssh-keygen, policy
-mandate init --dir ./my-deployment  # policy, allowed_signers, config, example
+python3 -m pip install gama-mandate     # CLI + broker + MCP adapter
+mandate doctor                          # checks python, ssh-keygen, policy
 ```
 
-## Quickstart
+From source: `python3 -m pip install "git+https://github.com/gamai-io/mandate.git"`.
+Python >= 3.9. No web UI and no server to run: Mandate is a local trust primitive.
+
+## Quickstart (60 seconds)
+
+Run it in an empty directory. Nothing below needs a network, database or cluster.
 
 ```bash
-export PYTHONPATH=$PWD
+mandate init --dir .                    # policy.json, allowed_signers, config, example intent
 
-# 1. on the approver's device (never on the agent host)
-ssh-keygen -t ed25519 -f ~/.ssh/mandate -C mandate
-# append the PUBLIC key to trust/allowed_signers as: approver ssh-ed25519 AAAA... mandate
+ssh-keygen -q -t ed25519 -f ./approver_key -C mandate -N ""
+printf 'approver namespaces="mandate" %s\n' "$(cat approver_key.pub)" >> trust/allowed_signers
 
-# 2. agent proposes
-./bin/mandate propose --intent examples/intent.json --out /tmp/proposal.json
-
-# 3. human grants (signs the commitment, bound to one broker + the agent)
-./bin/mandate grant --proposal /tmp/proposal.json --approver approver \
-  --key ~/.ssh/mandate --audience local-broker --out /tmp/grant.json
-
-# 4. agent redeems exactly once
-./bin/mandate redeem --intent examples/intent.json --grant /tmp/grant.json \
-  --ledger ledger.jsonl
-
-# 5. or let the effect broker execute it (credentials stay in the broker)
-./bin/mandate-broker --port 8899 --signers trust/allowed_signers \
-  --ledger ledger.jsonl --nonce-db broker/used.sqlite &
-./bin/mandate execute --broker http://127.0.0.1:8899 \
-  --intent examples/intent.json --grant /tmp/grant.json
-
-# 5. anyone verifies offline
-./bin/mandate verify --receipt ... --intent examples/intent.json --grant /tmp/grant.json
-./bin/mandate verify-result --entry /tmp/result.json --broker-signers trust/broker_signers
-./bin/mandate chain --ledger ledger.jsonl
+mandate propose --intent examples/intent.json --out proposal.json
+mandate grant  --proposal proposal.json --approver approver \
+               --key ./approver_key --audience local-broker --out grant.json
+mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl > receipt.json
+mandate verify --receipt receipt.json --intent examples/intent.json --grant grant.json
 ```
 
-Exit codes for `check`: `0` allow · `10` ask (grant required) · `20` deny.
+Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
+`GrantReplayed` — the grant is one-shot, by construction.
+
+| step | what it proves |
+|---|---|
+| `propose` | the effect is a canonical commitment (`commitment`), not a free-text request |
+| `grant` | a human signed *that exact* commitment with an Ed25519 key that never touches the agent host |
+| `redeem` | the grant was used once; the receipt is appended to a hash-chained ledger |
+| `verify` | anyone can check receipt + intent + grant offline, without trusting the broker |
+
+## Three runnable examples
+
+| # | file | shows |
+|---|---|---|
+| 1 | [`examples/01-invoice-approval.sh`](examples/01-invoice-approval.sh) | full payment approval + replay rejection |
+| 2 | [`examples/02-audit-bundle.sh`](examples/02-audit-bundle.sh) | portable audit bundle an auditor can verify offline |
+| 3 | [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md) | lock and proxy an MCP server for Claude Code / Codex / Cursor |
+
+```bash
+./examples/01-invoice-approval.sh ./demo1
+```
+
+Each script is self-contained: init, keys, propose, grant, redeem, verify.
+
+## Use it from an agent
+
+`mandate mcp proxy` sits between the agent and any MCP server. The tool list the
+agent sees is unchanged; what changes is that mutating calls need a grant and
+every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
 
 ## Effect broker (Phase 2)
 

@@ -33,4 +33,8 @@ from .core import (  # noqa: F401
     verify_result_entry,
 )
 
-__version__ = "0.25.0"
+try:  # single source of truth: installed distribution metadata
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("gama-mandate")
+except Exception:  # running from a source tree without an installed dist
+    __version__ = "0.25.3"
