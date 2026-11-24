@@ -73,8 +73,10 @@ class CgroupFreezer(unittest.TestCase):
         warden.freeze_cgroup(self.path)
         before = value(self.counter)
         warden.thaw_cgroup(self.path)
-        time.sleep(0.25)
-        self.assertGreater(value(self.counter), before)
+        deadline = time.time() + 3
+        while value(self.counter) <= before and time.time() < deadline:
+            time.sleep(0.02)
+        self.assertGreater(value(self.counter), before, "thawed cgroup did not resume")
 
     def test_cgroup_kill(self) -> None:
         warden.kill_cgroup(self.path)

@@ -180,13 +180,14 @@ class Broker:
         try:
             from .governance import check as governance_check
             from .governance import load_limits
-            gov = governance_check(self.ledger_path, load_limits(getattr(self, "policy_path", None)))
+            ledger = getattr(self, "ledger", None) or getattr(self, "ledger_path", None)
+            gov = governance_check(ledger, load_limits(getattr(self, "policy_path", None)))
             if not gov["allow"]:
                 raise core.PolicyDenied("governance: %s" % gov["code"])
         except core.MandateError:
             raise
-        except Exception:
-            pass  # governance is best-effort for very old deployments
+        except Exception as exc:      # fail closed: if limits cannot be checked, do not run
+            raise core.PolicyDenied("governance unavailable: %s" % str(exc)[:120])
         kind = str(intent["effect"]["kind"])
         decision = core.check(intent, self.policy)
         if decision["decision"] == "deny":

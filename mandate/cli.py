@@ -481,6 +481,7 @@ def main(argv=None) -> int:
     p_svid.add_argument("--scope", action="append", default=None)
     p_svid.add_argument("--ttl", type=int, default=300)
     p_svid.add_argument("--out", default=None)
+    p_svid.add_argument("--allow-wildcard", dest="allow_wildcard", action="store_true")
     p_svid.add_argument("--signers", default=None)
 
     p_egress = sub.add_parser("egress")
@@ -763,6 +764,12 @@ def main(argv=None) -> int:
             return 0
 
         if args.cmd == "redeem":
+            _pol = core.load_policy(args.policy) or {}
+            if _pol.get("require_svid") and not args.svid:
+                _emit({"error": "SvidRequired", "code": "missing_svid",
+                       "message": "policy requires an agent token: pass --svid"},
+                      None)
+                return 6
             if args.svid:
                 intent_obj = _read(args.intent)
                 tokens = [svid.load(p) for p in args.svid]
@@ -871,8 +878,13 @@ def main(argv=None) -> int:
                 if not (args.sub and args.key):
                     _emit({"error": "Usage", "message": "svid issue --sub NAME --key KEY [--scope ...]"}, None)
                     return 2
-                token = svid.issue(args.sub, args.key, args.issuer or args.sub,
-                                   args.audience, args.scope or [], args.ttl)
+                try:
+                    token = svid.issue(args.sub, args.key, args.issuer or args.sub,
+                                       args.audience, args.scope or [], args.ttl,
+                                       allow_wildcard=args.allow_wildcard)
+                except ValueError as exc:
+                    _emit({"error": "SvidInvalid", "message": str(exc)}, None)
+                    return 2
                 if args.out:
                     svid.save(token, args.out)
                 _emit({"jti": token["payload"]["jti"], "sub": args.sub,

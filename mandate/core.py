@@ -360,14 +360,18 @@ def append_receipt(path: str, body: dict) -> dict:
         return _append_locked(path, body)
 
 
-def _nonce_db_path() -> str:
-    return os.environ.get("MANDATE_NONCE_DB") or os.path.expanduser(
-        "~/.mandate/nonces.sqlite")
+def _nonce_db_path(ledger_path: str | None = None) -> str:
+    if os.environ.get("MANDATE_NONCE_DB"):
+        return os.environ["MANDATE_NONCE_DB"]
+    if ledger_path:
+        return os.path.join(os.path.dirname(os.path.abspath(ledger_path)),
+                            ".mandate-nonces.sqlite")
+    return os.path.expanduser("~/.mandate/nonces.sqlite")
 
 
-def claim_nonce_db(nonce: str) -> bool:
+def claim_nonce_db(nonce: str, ledger_path: str | None = None) -> bool:
     """Atomically claim a grant nonce across ledgers. False = already used."""
-    path = _nonce_db_path()
+    path = _nonce_db_path(ledger_path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     import sqlite3
     con = sqlite3.connect(path, timeout=10)
@@ -541,12 +545,14 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     if claim is not None:
         if not claim(nonce):
             raise GrantReplayed("grant already used")
+        if not claim_nonce_db(nonce):     # a custom callback must not skip the cross-ledger check
+            raise GrantReplayed("grant already used (nonce seen in another ledger)")
         return append_receipt(ledger_path, receipt)
     os.makedirs(os.path.dirname(os.path.abspath(ledger_path)), exist_ok=True)
     with _ledger_lock(ledger_path):
         if nonce in _used_nonces(ledger_path):
             raise GrantReplayed("grant already used")
-        if not claim_nonce_db(nonce):
+        if not claim_nonce_db(nonce, ledger_path):
             raise GrantReplayed("grant already used (nonce seen in another ledger)")
         return _append_locked(ledger_path, receipt)
 

@@ -39,11 +39,14 @@ def _new_jti() -> str:
 
 def issue(sub: str, key_path: str, issuer: str, audience: str,
           scopes: list[str], ttl: int = 300, parent: dict | None = None,
-          now: float | None = None) -> dict:
+          now: float | None = None, allow_wildcard: bool = False) -> dict:
     if not sub or not issuer:
         raise ValueError("sub and issuer are required")
     if ttl <= 0 or ttl > TTL_MAX:
         raise ValueError(f"ttl must be 1..{TTL_MAX} seconds")
+    if "*" in (scopes or []) and not allow_wildcard:
+        raise ValueError("wildcard scope requires allow_wildcard=True; "
+                         "an agent must not grant itself every effect kind")
     now = time.time() if now is None else now
     payload = {
         "v": 1,

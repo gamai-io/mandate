@@ -30,6 +30,31 @@ DEFAULT_TSA = "https://freetsa.org/tsr"
 SHA256_OID = bytes.fromhex("0609608648016503040201")  # DER OID 2.16.840.1.101.3.4.2.1
 
 
+def imprint_from_openssl_text(text: str) -> str | None:
+    """Read the message imprint from `openssl ts -reply -text` output.
+
+    That is the TSA's own parse of the structure, not a byte scan: the value we
+    compare with the ledger head comes from the parsed TSTInfo.
+    """
+    import re as _re
+    lines = text.splitlines()
+    collecting = False
+    chunks = []
+    for line in lines:
+        if line.strip().startswith("Message data:"):
+            collecting = True
+            continue
+        if collecting:
+            m = _re.match(r"\s*([0-9a-fA-F]{4}) - ((?:[0-9a-fA-F]{2}[ -]?)+)", line)
+            if not m:
+                break
+            chunks.append("".join(m.group(2).replace(" ", "").replace("-", "").split()))
+    if not chunks:
+        return None
+    digest = "".join(chunks)
+    return digest.lower()[:64] or None
+
+
 def cms_structure_ok(raw: bytes) -> tuple[bool, str]:
     """Parse the token with openssl (deep ASN.1), not just match an OID.
 
@@ -48,7 +73,7 @@ def cms_structure_ok(raw: bytes) -> tuple[bool, str]:
                              capture_output=True, text=True, timeout=30)
     text = out.stdout + out.stderr
     ok = out.returncode == 0 and "TST info" in text and "Status: Granted" in text
-    return ok, text.strip()[-300:]
+    return ok, text.strip()
 
 
 def _der_len(n: int) -> bytes:
@@ -271,9 +296,17 @@ def verify_anchor(ledger_path: str, token_path: str, ca_path: str | None = None)
               "imprint_ok": bool(imprint_ok), "valid": False}
     structure_ok, detail = cms_structure_ok(raw)
     result["cms_parsed"] = structure_ok
+    parsed_imprint = imprint_from_openssl_text(str(detail))
+    if parsed_imprint:
+        result["imprint_parsed"] = parsed_imprint
+        info["imprint_sha256"] = parsed_imprint
+        imprint_ok = parsed_imprint == digest and info.get("status") == 0
+        result["imprint_matches_head"] = parsed_imprint == digest
+        result["imprint_ok"] = bool(imprint_ok)
+        result.update({k: v for k, v in info.items() if k.startswith("imprint")})
     if not (info.get("has_cms_signed_data") and structure_ok):
         result["code"] = "no_cms_token"
-        result["note"] = "not a parseable CMS timestamp token: " + str(detail)[:160]
+        result["note"] = "not a parseable CMS timestamp token: " + str(detail)[-160:]
         return result
     if not ca_path:
         result["code"] = "cms_unverified"
