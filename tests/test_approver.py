@@ -96,7 +96,7 @@ class ApproverTests(unittest.TestCase):
             core.redeem(swapped, grant, self.signers, self.ledger)
 
     def test_http_request_and_auth(self):
-        token = "approver-token"
+        token = "dummy-approver-token"
         approver = self._approver()
         server = mapprover.make_server("127.0.0.1", 0, approver, token=token)
         threading.Thread(target=server.serve_forever, daemon=True).start()

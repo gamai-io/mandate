@@ -495,7 +495,7 @@ class MandateTests(unittest.TestCase):
 
     def test_smtp_dry_run_message(self):
         intent = intent_factory(effect={
-            "kind": "message.send", "target": "kupac@example.com",
+            "kind": "message.send", "target": "customer@example.com",
             "params": {"subject": "Ponuda", "body": "Dobar dan"}})
         grant = self._grant(intent)
         outbox = os.path.join(self.dir, "outbox-smtp")
@@ -642,10 +642,10 @@ class MandateTests(unittest.TestCase):
     def test_broker_token_required(self):
         intent = intent_factory()
         grant = self._grant(intent)
-        port = self._start_broker(token="broker-token")
+        port = self._start_broker(token="dummy-broker-token")
         status, body = self._post(port, intent, grant)
         self.assertEqual(status, 401, body)
-        status, body = self._post(port, intent, grant, token="broker-token")
+        status, body = self._post(port, intent, grant, token="dummy-broker-token")
         self.assertEqual(status, 200, body)
 
     def test_broker_rejects_oversized_body(self):

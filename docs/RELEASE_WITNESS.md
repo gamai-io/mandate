@@ -1,8 +1,8 @@
 # Release witness
 
 Every release artifact is appended as a leaf to the Mandate transparency log;
-the resulting STH is pinned by three independent witnesses (vast, oracle,
-linux3). The witnesses only accept growth with a valid consistency proof, so a
+the resulting STH is pinned by three independent witnesses (vast, host D,
+host C). The witnesses only accept growth with a valid consistency proof, so a
 rollback or split view of the release history is rejected.
 
 ## Build the release STH
@@ -48,5 +48,5 @@ mandate witness verify --state witness.json --sth sth.json
 ```
 
 The witness states are persisted at `~/.mandate/witness.json` (mode 600) on
-vast, oracle and linux3; `mandate witness show --state
+vast, host D and host C; `mandate witness show --state
 ~/.mandate/witness.json` reports `tree_size=3` and the release root.

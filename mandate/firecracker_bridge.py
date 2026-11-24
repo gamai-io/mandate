@@ -19,8 +19,7 @@ import sys
 import threading
 import time
 
-DEFAULT_MVM_DIRS = ("/root/gama-vmlab-lab", "/root/gama_mvm",
-                    "/opt/gama-vmlab-lab")
+DEFAULT_MVM_DIRS = ()  # set GAMA_MVM_DIR; no host paths are baked in
 
 
 def mvm_dir() -> str:

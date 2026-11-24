@@ -1,14 +1,13 @@
 include README.md
-include PLAN.md
-include STATUS.md
-include STRATEGY.md
 include LICENSE
 include CHANGELOG.md
 include policy.json
 recursive-include spec *.md
 recursive-include docs *.md
-recursive-include bench *
 recursive-include skills *.md
 recursive-include examples *.json
 recursive-include trust *
 recursive-include mandate/data *.json
+prune bench
+prune .github
+global-exclude *.pyc __pycache__ *.sbatch *.env .env* *.log

@@ -98,7 +98,7 @@ class WitnessTests(unittest.TestCase):
         self.assertIsNone(mwit.load_state(self.state))
 
     def test_http_witness(self):
-        token = "witness-token"
+        token = "dummy-witness-token"
         server = mwit.make_server("127.0.0.1", 0, self.state, self.signers,
                                   token)
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -137,7 +137,7 @@ class WitnessTests(unittest.TestCase):
         self.assertEqual(state["tree_size"], 3)
 
     def test_http_body_cap(self):
-        token = "witness-token"
+        token = "dummy-witness-token"
         server = mwit.make_server("127.0.0.1", 0, self.state, self.signers,
                                   token)
         threading.Thread(target=server.serve_forever, daemon=True).start()

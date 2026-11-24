@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gama-mandate"
-version = "0.25.0"
+version = "0.25.1"
 description = "Signed, verifiable business commitments for AI agents: canonical commitment, off-host Ed25519 grant, one-shot redemption, hash-chained receipts."
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
-authors = [{name = "The Mandate Authors"}]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Renato Šuster", email = "renato@gamatrade.ba"}]
 keywords = ["ai-agents", "trust", "approval", "commitment", "ed25519", "audit"]
 classifiers = [
   "Programming Language :: Python :: 3",

@@ -48,13 +48,13 @@ No network, database or host access is required at verification time.
 
 ## Verified on a second host (2026-11-09)
 
-A real two-host pin was performed without using oracle, linux3 or LUMI:
+A real two-host pin was performed on two independent machines (host A, host B):
 
-- contabo produced the keys, intent, grant, receipt and signed STH
-  (`tree_size=1`, `root_hash=266f308b...`);
+- host A produced the keys, intent, grant, receipt and signed STH
+  (`tree_size=1`, example `root_hash=266f308b...`);
 - only the public `signers` file and `sth.json` were transferred to a second
-  host (vast, `ebe88a874e2e`);
-- on vast, `mandate --signers signers witness accept --state witness.json --sth
+  host (host B);
+- on host B, `mandate --signers signers witness accept --state witness.json --sth
   sth.json` returned `ok=true, first=true` (first pin);
 - the witness state was copied back and
   `mandate --signers signers audit verify --bundle bundle.json --log-signers
@@ -63,6 +63,6 @@ A real two-host pin was performed without using oracle, linux3 or LUMI:
 This shows the witness host needs only public keys and the STH, and the bundle
 can be pinned and verified across machines.
 
-The same pin was repeated on **oracle** and **linux3** on 2026-11-09; both
+The same pin was repeated on two further hosts on 2026-11-09; both
 witness states produced `valid=true, witness=true`. Three independent hosts
-(vast, oracle, linux3) now hold the same `root_hash` and `tree_size`.
+(vast, host D, host C) now hold the same `root_hash` and `tree_size`.

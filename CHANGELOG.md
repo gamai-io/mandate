@@ -85,7 +85,7 @@
   capabilities dropped, `no-new-privileges`, pids/memory/cpu limits, 16 MiB
   tmpfs, explicit read-only mounts, no bytecode writes.
   Firecracker is an external launcher template (`--sandbox-cmd-template`) so a
-  VMLab runner can be plugged in.
+  lab VM runner can be plugged in.
 - Integration test runs the MCP lock/verify/proxy through a real Docker
   container (`python:3.12-slim`, network none).
 - 7 sandbox tests + 121 total.

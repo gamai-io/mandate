@@ -3,7 +3,7 @@
 local      - no isolation (development)
 docker     - hardened Docker (runc): read-only root, no network, caps dropped
 gvisor     - same but --runtime runsc
-firecracker- wrap the command with an external launcher (e.g. a VMLab runner)
+firecracker- wrap the command with an external launcher (e.g. a lab VM runner)
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "actor": {"agent": "opencode@contabo", "session": "demo-session"},
+  "actor": {"agent": "agent@example", "session": "demo-session"},
   "effect": {
     "kind": "payment.send",
     "target": "Example Supplier",

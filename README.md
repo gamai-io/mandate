@@ -344,7 +344,7 @@ mandate mcp proxy --lock mandate.lock.json --cmd "python3 fake_mcp.py" \
 - `docker` (runc) and `gvisor` (`--runtime runsc`): read-only root, `--network
   none`, `--cap-drop ALL`, `no-new-privileges`, pids/memory/cpu limits, 16 MiB
   tmpfs, explicit read-only mounts.
-- `firecracker` uses `--sandbox-cmd-template "<launcher> --"` so a VMLab
+- `firecracker` uses `--sandbox-cmd-template "<launcher> --"` so a lab VM
   Firecracker runner can be plugged in without changing the proxy.
 - `local` is for trusted development only.
 
