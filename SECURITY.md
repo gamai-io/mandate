@@ -87,3 +87,19 @@ test in `tests/test_redteam_fixes.py`:
   Timestamps between anchors are still self-asserted.
 - **The audit pack index can be signed** (`pack --key/--signer`); unsigned packs are
   still generated so old flows keep working.
+
+## Wording we do not use (reviewer feedback, 2026-11-25)
+
+- **"Containment" and "kill switch" are qualified.** What we provide is a *verified
+  stop of a process group, cgroup or microVM that we control*, with the stop itself
+  on the record. `SIGSTOP` is reversible by anyone who can signal the process;
+  nftables rules can be removed by root; a child that leaves the process group is
+  caught only by the cgroup/microVM path. We do not claim an agent cannot escape.
+- **"Tamper-evident" means "evident relative to the last anchor".** Receipts are
+  unsigned by default; the RFC 3161 stamp covers the ledger head, so events between
+  two anchors are only as good as the ledger's own chain.
+- **"One-shot" is one-shot per nonce store.** The SQLite store is local to one
+  deployment directory (`MANDATE_NONCE_DB` to override); two hosts with separate
+  stores can both redeem the same grant. Use a shared store before multi-host.
+- **Token revocation requires configuration**: `trust/revoked_signers` is honoured
+  only when the path is passed to `redeem`/`svid verify`.
