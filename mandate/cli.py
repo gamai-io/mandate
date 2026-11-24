@@ -439,6 +439,19 @@ def main(argv=None) -> int:
     p_chg.add_argument("--reason", default="")
     p_chg.add_argument("--signers", default=None)
 
+    p_backup = sub.add_parser("backup")
+    p_backup.add_argument("--ledger", default="ledger.jsonl")
+    p_backup.add_argument("--out", default="backup")
+    p_backup.add_argument("--anchors", default="anchors")
+
+    p_restore = sub.add_parser("restore")
+    p_restore.add_argument("--in", dest="archive", required=True)
+    p_restore.add_argument("--out", default="restored")
+
+    p_sbom = sub.add_parser("sbom")
+    p_sbom.add_argument("--out", default="sbom.json")
+    p_sbom.add_argument("--version", default="")
+
     p_pack = sub.add_parser("pack")
     p_pack.add_argument("--ledger", default="ledger.jsonl")
     p_pack.add_argument("--out", default="audit-pack")
@@ -446,6 +459,9 @@ def main(argv=None) -> int:
     p_pack.add_argument("--owner", action="append", default=None)
     p_pack.add_argument("--controls", default=None)
     p_pack.add_argument("--signers", default=None)
+    p_pack.add_argument("--anchors", default="anchors")
+    p_pack.add_argument("--key", default=None)
+    p_pack.add_argument("--signer", default=None)
 
     p_detect = sub.add_parser("detect")
     p_detect.add_argument("--ledger", default="ledger.jsonl")
@@ -503,7 +519,7 @@ def main(argv=None) -> int:
 
     p_anchor = sub.add_parser("anchor")
     p_anchor.add_argument("--ledger", default="ledger.jsonl")
-    p_anchor.add_argument("--tsa", default=anchor.DEFAULT_TSA)
+    p_anchor.add_argument("--tsa", action="append", default=None)
     p_anchor.add_argument("--out", default="anchors")
     p_anchor.add_argument("--ca", default=None)
 
@@ -806,11 +822,29 @@ def main(argv=None) -> int:
             _emit(res, None)
             return 0
 
+        if args.cmd == "backup":
+            res = audit_report.backup(args.ledger, args.out, args.anchors)
+            _emit({k: res[k] for k in ("archive", "manifest", "ledger_head")}, None)
+            return 0
+
+        if args.cmd == "restore":
+            res = audit_report.restore(args.archive, args.out)
+            _emit(res, None)
+            return 0 if res["ok"] else 1
+
+        if args.cmd == "sbom":
+            res = audit_report.sbom(args.version or __import__("mandate").__version__, args.out)
+            _emit(res, None)
+            return 0
+
         if args.cmd == "pack":
             tokens = [svid.load(t) for t in (args.svid or [])]
             owners = dict(pair.split("=", 1) for pair in (args.owner or []) if "=" in pair)
             res = audit_report.pack(args.ledger, args.out, tokens, owners, args.controls,
-                                    getattr(args, "signers", None))
+                                    getattr(args, "signers", None),
+                                    getattr(args, "anchors", None),
+                                    getattr(args, "key", None),
+                                    getattr(args, "signer", None))
             _emit({"path": res["path"], "files": sorted(res["files"]),
                    "agents": res["agents"], "changes": res["changes"],
                    "ledger_head": res["ledger_head"]}, None)
@@ -1011,7 +1045,8 @@ def main(argv=None) -> int:
             return 0 if res.get("verified", True) else 5
 
         if args.cmd == "anchor":
-            res = anchor.anchor(args.ledger, args.tsa, args.out, args.ca)
+            servers = args.tsa or [anchor.DEFAULT_TSA]
+            res = anchor.anchor(args.ledger, servers[0], args.out, args.ca, tsas=servers)
             _emit(res, None)
             return 0 if res.get("imprint_matches_head") else 4
 

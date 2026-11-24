@@ -75,6 +75,15 @@ test in `tests/test_redteam_fixes.py`:
   signature present, and `--broker-signers` verifies broker result entries.
   Unsigned receipts remain valid unless the policy says otherwise (compatibility).
 - **`SIGSTOP` freeze is not a security boundary**; use the cgroup or microVM path.
-- **The audit pack `index.json` is not signed** — the chain and the RFC 3161
-  anchor are the evidence, the index is a convenience index.
-- **Single anchor point**: timestamps between anchors are self-asserted.
+- **Pack contents include the ledger and anchors** (0.37.0), so a reviewer does not
+  have to trust the summary; sign the index to bind it.
+
+## Ops commands (0.37.0)
+
+`mandate backup` / `mandate restore` (tar + per-file sha256 + chain check on restore),
+`mandate sbom` (CycloneDX 1.5, zero runtime dependencies).
+- **Anchoring is multi-TSA since 0.37.0** (`--tsa` repeatable): each server's token is
+  stored and its imprint checked, so one dishonest TSA cannot fake existence alone.
+  Timestamps between anchors are still self-asserted.
+- **The audit pack index can be signed** (`pack --key/--signer`); unsigned packs are
+  still generated so old flows keep working.

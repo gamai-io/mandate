@@ -153,8 +153,15 @@ DORA_ROI = {
 def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
          owners: dict[str, str] | None = None,
          controls_path: str | None = None,
-         signers_path: str | None = None) -> dict:
-    """Row 11: everything an auditor asks for, generated from the ledger."""
+         signers_path: str | None = None,
+         anchors_dir: str | None = None,
+         sign_key: str | None = None, signer: str | None = None) -> dict:
+    """Row 11: everything an auditor asks for, generated from the ledger.
+
+    The pack now carries the ledger itself, the anchors, and (optionally) a
+    signature over its own index — otherwise the index is just a text file that
+    anyone could rewrite.
+    """
     os.makedirs(out_dir, exist_ok=True)
     for stale in os.listdir(out_dir):   # never bless a file we did not generate now
         path = os.path.join(out_dir, stale)
@@ -170,6 +177,19 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
     chg = changes(ledger_path, signers_path)
     with open(os.path.join(out_dir, "changes.json"), "w", encoding="utf-8") as fh:
         json.dump(chg, fh, indent=1, sort_keys=True)
+
+    # the evidence the pack talks about, so a reviewer does not have to trust us
+    if os.path.exists(ledger_path):
+        shutil.copy2(ledger_path, os.path.join(out_dir, "ledger.jsonl"))
+        if os.path.exists(ledger_path + ".head"):
+            shutil.copy2(ledger_path + ".head", os.path.join(out_dir, "ledger.jsonl.head"))
+    if anchors_dir and os.path.isdir(anchors_dir):
+        target = os.path.join(out_dir, "anchors")
+        os.makedirs(target, exist_ok=True)
+        for name in sorted(os.listdir(anchors_dir)):
+            src = os.path.join(anchors_dir, name)
+            if os.path.isfile(src):
+                shutil.copy2(src, os.path.join(target, name))
 
     with open(os.path.join(out_dir, "dora_roi.json"), "w", encoding="utf-8") as fh:
         json.dump(DORA_ROI, fh, indent=1, sort_keys=True)
@@ -189,6 +209,14 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
         if os.path.isfile(full) and name != "index.json":
             files[name] = {"sha256": hashlib.sha256(open(full, "rb").read()).hexdigest(),
                            "bytes": os.path.getsize(full)}
+    anchors_dir_out = os.path.join(out_dir, "anchors")
+    if os.path.isdir(anchors_dir_out):
+        for name in sorted(os.listdir(anchors_dir_out)):
+            full = os.path.join(anchors_dir_out, name)
+            if os.path.isfile(full):
+                files["anchors/" + name] = {
+                    "sha256": hashlib.sha256(open(full, "rb").read()).hexdigest(),
+                    "bytes": os.path.getsize(full)}
 
     index = {
         "generated_at": int(time.time()),
@@ -205,6 +233,107 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
         "note": ("this pack is generated from the ledger, not written by hand; if a number "
                  "here disagrees with the ledger, the ledger wins"),
     }
+    if sign_key:
+        from . import sign as _sign
+        index["signature"] = _sign.sign(canonicalize(index), sign_key)
+        index["signer"] = signer or ""
     with open(os.path.join(out_dir, "index.json"), "w", encoding="utf-8") as fh:
         json.dump(index, fh, indent=1, sort_keys=True)
     return {"path": out_dir, "index": os.path.join(out_dir, "index.json"), **index}
+
+
+def backup(ledger_path: str, out_dir: str, anchors_dir: str | None = "anchors") -> dict:
+    """A restorable copy of the evidence: ledger, head, anchors + a hash manifest."""
+    import tarfile
+    os.makedirs(out_dir, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    name = f"mandate-backup-{stamp}.tar.gz"
+    archive = os.path.join(out_dir, name)
+    members = [p for p in (ledger_path, ledger_path + ".head") if os.path.exists(p)]
+    if anchors_dir and os.path.isdir(anchors_dir):
+        members += [os.path.join(anchors_dir, f) for f in sorted(os.listdir(anchors_dir))
+                    if os.path.isfile(os.path.join(anchors_dir, f))]
+    with tarfile.open(archive, "w:gz") as tf:
+        for path in members:
+            tf.add(path, arcname=os.path.basename(path) if not path.startswith(anchors_dir or "")
+                   else os.path.join("anchors", os.path.basename(path)))
+    manifest = {
+        "created_at": int(time.time()),
+        "ledger": os.path.basename(ledger_path),
+        "ledger_head": open(ledger_path + ".head").read().strip()
+        if os.path.exists(ledger_path + ".head") else "",
+        "members": {os.path.basename(p): hashlib.sha256(open(p, "rb").read()).hexdigest()
+                    for p in members},
+        "archive_name": name,
+        "archive_sha256": hashlib.sha256(open(archive, "rb").read()).hexdigest(),
+    }
+    manifest_path = os.path.join(out_dir, name.replace(".tar.gz", ".manifest.json"))
+    with open(manifest_path, "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=1, sort_keys=True)
+    return {"archive": archive, "manifest": manifest_path, **manifest}
+
+
+def restore(archive_path: str, out_dir: str) -> dict:
+    """Extract a backup and verify every hash and the chain before reporting ok."""
+    import tarfile
+    manifest_path = archive_path.replace(".tar.gz", ".manifest.json")
+    manifest = json.load(open(manifest_path, encoding="utf-8")) if os.path.exists(manifest_path) else {}
+    os.makedirs(out_dir, exist_ok=True)
+    with tarfile.open(archive_path, "r:gz") as tf:
+        tf.extractall(out_dir)
+    problems = []
+    for name, want in (manifest.get("members") or {}).items():
+        found = None
+        for root, _dirs, files in os.walk(out_dir):
+            if name in files:
+                found = os.path.join(root, name)
+                break
+        if not found:
+            problems.append(f"missing: {name}")
+            continue
+        got = hashlib.sha256(open(found, "rb").read()).hexdigest()
+        if got != want:
+            problems.append(f"hash mismatch: {name}")
+    ledger = None
+    for root, _dirs, files in os.walk(out_dir):
+        if (manifest.get("ledger") or "ledger.jsonl") in files:
+            ledger = os.path.join(root, manifest.get("ledger") or "ledger.jsonl")
+    chain_ok = bool(ledger) and _verify_chain(ledger)
+    return {"ok": not problems and chain_ok, "restored_to": out_dir, "ledger": ledger,
+            "chain_valid": chain_ok, "problems": problems}
+
+
+def _verify_chain(path: str) -> bool:
+    from .core import verify_chain
+    try:
+        return bool(verify_chain(path))
+    except Exception:
+        return False
+
+
+def sbom(app_version: str = "", out_path: str = "sbom.json") -> dict:
+    """Minimal CycloneDX SBOM: one component, zero runtime dependencies."""
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    files = {}
+    for name in ("LICENSE", "README.md", "pyproject.toml"):
+        path = os.path.join(here, name)
+        if os.path.exists(path):
+            files[name] = hashlib.sha256(open(path, "rb").read()).hexdigest()
+    doc = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.5",
+        "version": 1,
+        "metadata": {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     "component": {"type": "library", "name": "gama-mandate",
+                                   "version": app_version or "unknown",
+                                   "licenses": [{"license": {"id": "MIT"}}],
+                                   "purl": f"pkg:pypi/gama-mandate@{app_version or 'unknown'}"}},
+        "components": [],
+        "properties": [{"name": "runtime_dependencies", "value": "0"}],
+        "files": [{"name": n, "hashes": [{"alg": "SHA-256", "content": h}]}
+                  for n, h in files.items()],
+    }
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(doc, fh, indent=1, sort_keys=True)
+    return {"path": out_path, "component": "gama-mandate", "dependencies": 0,
+            "files": len(files)}

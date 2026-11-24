@@ -30,6 +30,27 @@ DEFAULT_TSA = "https://freetsa.org/tsr"
 SHA256_OID = bytes.fromhex("0609608648016503040201")  # DER OID 2.16.840.1.101.3.4.2.1
 
 
+def cms_structure_ok(raw: bytes) -> tuple[bool, str]:
+    """Parse the token with openssl (deep ASN.1), not just match an OID.
+
+    Returns (ok, detail). If openssl is missing we fall back to the OID scan and
+    say so — never silently claim more than we checked.
+    """
+    import shutil as _shutil
+    import tempfile as _tempfile
+    if not _shutil.which("openssl"):
+        oid = b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07\x02" in raw
+        return oid, "openssl not installed: OID scan only"
+    with _tempfile.NamedTemporaryFile(suffix=".tsr") as fh:
+        fh.write(raw)
+        fh.flush()
+        out = subprocess.run(["openssl", "ts", "-reply", "-in", fh.name, "-text"],
+                             capture_output=True, text=True, timeout=30)
+    text = out.stdout + out.stderr
+    ok = out.returncode == 0 and "TST info" in text and "Status: Granted" in text
+    return ok, text.strip()[-300:]
+
+
 def _der_len(n: int) -> bytes:
     if n < 128:
         return bytes([n])
@@ -135,21 +156,48 @@ def request_token(head_hex: str, tsa: str = DEFAULT_TSA, timeout: int = 40) -> b
         return resp.read()
 
 
-def anchor(ledger_path: str, tsa: str = DEFAULT_TSA, out_dir: str | None = None,
-           ca_path: str | None = None) -> dict:
+def anchor(ledger_path: str, tsa: str | None = None, out_dir: str | None = None,
+           ca_path: str | None = None, tsas: list[str] | None = None) -> dict:
     head = ledger_head(ledger_path)
     if not head:
         raise ValueError("empty ledger: nothing to anchor")
     digest = hashlib.sha256(head.encode()).hexdigest()
-    raw = request_token(digest, tsa)
+    servers = [t for t in (tsas or [tsa or DEFAULT_TSA]) if t]
+    entries = []
+    for server in servers:
+        try:
+            raw = request_token(digest, server)
+        except Exception as exc:      # one TSA down must not lose the others
+            entries.append({"tsa": server, "error": str(exc)[:160], "ok": False})
+            continue
+        info = parse_response(raw)
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        token_path = os.path.join(out_dir or "anchors",
+                                  "%s-%s.tsr" % (head[:16], stamp + "-" + str(len(entries))))
+        entries.append({"tsa": server, "token": os.path.basename(token_path),
+                        "token_sha256": hashlib.sha256(raw).hexdigest(),
+                        "imprint_ok": info.get("imprint_sha256") == digest,
+                        "gen_time": info.get("gen_time"), "status": info.get("status"),
+                        "ok": info.get("imprint_sha256") == digest and info.get("status") == 0,
+                        "_raw": raw, "_path": token_path})
+    # first successful token keeps the legacy top-level fields
+    ok_entries = [e for e in entries if e.get("ok")]
+    if not ok_entries:
+        raise ValueError("no TSA returned a usable token: %s"
+                         % [e.get("tsa") for e in entries])
+    raw = ok_entries[0]["_raw"]
+    tsa = ok_entries[0]["tsa"]
+    info = parse_response(raw)
     info = parse_response(raw)
     out_dir = out_dir or "anchors"
     os.makedirs(out_dir, exist_ok=True)
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    token_path = os.path.join(out_dir, f"{head[:16]}-{stamp}.tsr")
-    with open(token_path, "wb") as fh:
-        fh.write(raw)
-    sidecar = {"head": head, "head_sha256": digest, "tsa": tsa,
+    token_path = ok_entries[0]["_path"]
+    for entry in entries:
+        if entry.get("_raw"):
+            with open(entry["_path"], "wb") as fh:
+                fh.write(entry["_raw"])
+    anchors = [{k: v for k, v in e.items() if not k.startswith("_")} for e in entries]
+    sidecar = {"head": head, "head_sha256": digest, "tsa": tsa, "anchors": anchors,
                "token": os.path.basename(token_path),
                "token_sha256": hashlib.sha256(raw).hexdigest(), **info}
     if ca_path:
@@ -221,9 +269,11 @@ def verify_anchor(ledger_path: str, token_path: str, ca_path: str | None = None)
     result = {"token": token_path, "tsa_head": head, "head_sha256": digest, **info,
               "imprint_matches_head": info.get("imprint_sha256") == digest,
               "imprint_ok": bool(imprint_ok), "valid": False}
-    if not info.get("has_cms_signed_data"):
+    structure_ok, detail = cms_structure_ok(raw)
+    result["cms_parsed"] = structure_ok
+    if not (info.get("has_cms_signed_data") and structure_ok):
         result["code"] = "no_cms_token"
-        result["note"] = "this file is not a CMS timestamp token; nothing can be verified"
+        result["note"] = "not a parseable CMS timestamp token: " + str(detail)[:160]
         return result
     if not ca_path:
         result["code"] = "cms_unverified"
