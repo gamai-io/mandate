@@ -10,6 +10,7 @@ import urllib.parse
 import urllib.request
 
 from . import anchor, core, detect, egress, governance, sign, svid, warden
+from . import report as audit_report
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -420,6 +421,29 @@ def main(argv=None) -> int:
     p_limits.add_argument("--ledger", default="ledger.jsonl")
     p_limits.add_argument("--policy", default=None)
 
+    p_inv = sub.add_parser("inventory")
+    p_inv.add_argument("--ledger", default="ledger.jsonl")
+    p_inv.add_argument("--out", default=None)
+    p_inv.add_argument("--csv", default=None)
+    p_inv.add_argument("--svid", action="append", default=None)
+    p_inv.add_argument("--owner", action="append", default=None, help="agent=owner")
+
+    p_chg = sub.add_parser("change")
+    p_chg.add_argument("action", choices=("record", "list"))
+    p_chg.add_argument("--ledger", default="ledger.jsonl")
+    p_chg.add_argument("--file", default=None)
+    p_chg.add_argument("--approver", default=None)
+    p_chg.add_argument("--key", default=None)
+    p_chg.add_argument("--reason", default="")
+    p_chg.add_argument("--signers", default=None)
+
+    p_pack = sub.add_parser("pack")
+    p_pack.add_argument("--ledger", default="ledger.jsonl")
+    p_pack.add_argument("--out", default="audit-pack")
+    p_pack.add_argument("--svid", action="append", default=None)
+    p_pack.add_argument("--owner", action="append", default=None)
+    p_pack.add_argument("--controls", default=None)
+
     p_detect = sub.add_parser("detect")
     p_detect.add_argument("--ledger", default="ledger.jsonl")
     p_detect.add_argument("--policy", default=argparse.SUPPRESS)
@@ -745,6 +769,42 @@ def main(argv=None) -> int:
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked)
             _emit(receipt, None)
+            return 0
+
+        if args.cmd == "inventory":
+            tokens = [svid.load(t) for t in (args.svid or [])]
+            owners = dict(pair.split("=", 1) for pair in (args.owner or []) if "=" in pair)
+            inv = audit_report.inventory(args.ledger, tokens, owners)
+            if args.out:
+                with open(args.out, "w", encoding="utf-8") as fh:
+                    json.dump(inv, fh, indent=1, sort_keys=True)
+            if args.csv:
+                audit_report.write_inventory_csv(inv, args.csv)
+            _emit({"count": inv["count"], "agents": [a["agent"] for a in inv["agents"]],
+                   "out": args.out, "csv": args.csv}, None)
+            return 0
+
+        if args.cmd == "change":
+            if args.action == "record":
+                if not (args.file and args.approver and args.key):
+                    _emit({"error": "Usage",
+                           "message": "change record --file F --approver A --key K --reason R"}, None)
+                    return 2
+                res = audit_report.change_record(args.ledger, args.file, args.approver, args.key,
+                                           args.reason)
+                _emit({k: res[k] for k in ("entry", "file", "sha256", "actor", "reason")}, None)
+                return 0
+            res = audit_report.changes(args.ledger, args.signers)
+            _emit(res, None)
+            return 0
+
+        if args.cmd == "pack":
+            tokens = [svid.load(t) for t in (args.svid or [])]
+            owners = dict(pair.split("=", 1) for pair in (args.owner or []) if "=" in pair)
+            res = audit_report.pack(args.ledger, args.out, tokens, owners, args.controls)
+            _emit({"path": res["path"], "files": sorted(res["files"]),
+                   "agents": res["agents"], "changes": res["changes"],
+                   "ledger_head": res["ledger_head"]}, None)
             return 0
 
         if args.cmd == "detect":

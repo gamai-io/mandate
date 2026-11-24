@@ -28,7 +28,7 @@ an auditor would accept; **gap** = not built.
 
 | # | Control | Our artifact today | Status | What is missing | Effort |
 |---|---|---|---|---|---|
-| 1 | Agent inventory, owner, model version | `mandate init` creates config; receipts carry agent, commit, version | partial | a register export: agent → owner → scopes → last seen, reconciled with IdP | 3 d |
+| 1 | Agent inventory, owner, model version | **`mandate inventory` — per agent: effects, kinds, approvers, token scopes, first/last seen, amount total; JSON + CSV; owner assigned** | **have (partial)** | reconcile against the IdP/cloud inventory; model version per agent | 2 d |
 | 2 | Unique non-human identity, no shared creds | **`mandate svid` — per-agent Ed25519-signed token, TTL ≤ 1 h, audience-bound, scope-bound; redeem refuses on expiry/audience/subject** | **have (partial)** | issuance from the bank IdP/SPIFFE instead of a local key; revocation list wiring; token rotation | 3 d |
 | 3 | Delegation chain, attenuated scopes | **`mandate svid delegate` + `verify_chain`: child scopes ⊆ parent, exp ≤ parent, same audience, no self-delegation, parent must be supplied** | **have (partial)** | originator is still a service name, not a verified natural person; depth/audit export | 2 d |
 | 4 | **Human approval of a specific effect, attributable** | **have**: Ed25519 grant over the canonical commitment, one-shot nonce, receipt with approver + render hash; four-eyes refused (exit 3) | **have** | approval over a *human-readable render* is there; add WebAuthn/FIDO2 for the approver device | 3 d |
@@ -37,8 +37,8 @@ an auditor would accept; **gap** = not built.
 | 7 | Software-enforced limits (spend, velocity, volume) | `limits` in policy: effects/hour, amount, runtime, currency — enforced at redeem, refusals in the ledger | **have** | per-tool data-volume caps; cost accounting | 2 d |
 | 8 | Egress control | **`mandate egress` (deny-all proxy, token, allowlist, metadata/SSRF guard, every decision in the ledger) + red-team demo** | **have (partial)** | enforcement at network layer (namespace/VM rules) so a raw socket cannot bypass the proxy; DNS pinning | 4 d |
 | 9 | **Tamper-evident, agent-inaccessible log, retention, clock** | hash chain + `.head` + `mandate chain`; **`mandate anchor` (RFC 3161, verified with `openssl ts`, FreeTSA OK); `mandate worm-export` (0444 + manifest + retention + clock snapshot)** | **have (partial)** | bank-held key (HSM/PKCS#11), object-lock storage instead of local chmod, clock attested by a third party | 5 d |
-| 10 | Change control over prompts/models/permissions | receipts carry commitment + render hash, so a changed prompt changes the hash | partial | tie diffs to change tickets and approvals; model version pinning | 3 d |
-| 11 | Third-party register / due diligence | Apache-2.0 code, published artifact, spec, `CITATION.cff` | partial | DORA RoI row, subprocessor list, exit/transition plan, DD pack | 3 d docs |
+| 10 | Change control over prompts/models/permissions | **`mandate change record` — file sha256 + Ed25519 signature + reason + entry; `change list --signers` verifies each signature** | **have (partial)** | tie a change to an existing ticket id; model version pinning | 2 d |
+| 11 | Third-party register / due diligence | **`mandate pack` — inventory, changes, `dora_roi.json` (8 RoI fields), controls.md, index.json with per-file sha256 + ledger head + verification commands** | **have (partial)** | contract clauses template, subprocessor list, dated DD answers | 1 d docs |
 | 12 | Detection & reporting of agent incidents | **`mandate detect`: human-credential use, self-approval in the ledger, velocity, amount ceiling, off-hours, scope-not-granted; `--write` puts the alert in the hash chain; receipts carry agent+session** | **have (partial)** | tool-sequence anomalies (needs tool-level events), SIEM export format, incident classification per DORA Art. 18 | 3 d |
 
 ## What the market research says about the wedge

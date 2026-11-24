@@ -78,6 +78,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 10 | [`examples/10-warden-cgroup.sh`](examples/10-warden-cgroup.sh) | cgroup freeze observed by the kernel, signed stop, uid network quarantine |
 | 11 | [`examples/11-vm-pause-remote.sh`](examples/11-vm-pause-remote.sh) | find a KVM host in the fleet, boot a microVM, pause it, prove the guest stopped |
 | 12 | [`examples/12-detect.sh`](examples/12-detect.sh) | runtime detection: human identity used by an agent, velocity spike, alert in the chain |
+| 13 | [`examples/13-audit-pack.sh`](examples/13-audit-pack.sh) | agent inventory, signed change records, DORA-style evidence pack |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -90,6 +91,29 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## The documents an auditor asks for
+
+Three controls are paperwork, not runtime. They are generated from the ledger so
+they cannot drift from what happened:
+
+```bash
+mandate inventory --ledger L --owner bank-agent=payments-ops --out inv.json --csv inv.csv
+# one row per agent: effects, kinds, approvers, scopes, first/last seen, amount total
+
+mandate change record --ledger L --file mandate/policy.json \
+  --approver approver --key ./approver_key --reason "raise effect budget to 5/h"
+mandate change list --ledger L --signers trust/allowed_signers
+# sha256 of the file + Ed25519 signature + entry hash; verified on demand
+
+mandate pack --ledger L --out audit-pack --controls docs/BANK_CONTROL_MATRIX.md
+# inventory.json/.csv, changes.json, dora_roi.json, controls.md, index.json with sha256 of each
+```
+
+`index.json` also carries `ledger_head` and the three commands an auditor runs
+(`chain`, `anchor-verify`, `sha256sum`). The DORA row (service, provider, data
+location, subcontracting, reliance, exit plan, audit rights, security evidence)
+is in `dora_roi.json` — the fields a register-of-information entry needs.
 
 ## Detection: what a bank watches at runtime
 
