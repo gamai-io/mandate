@@ -71,6 +71,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 3 | [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md) | lock and proxy an MCP server for Claude Code / Codex / Cursor |
 | 4 | [`examples/04-full-stack.sh`](examples/04-full-stack.sh) | all five packages on one payment: guard → policy → grant → claim check → seal |
 | 5 | [`examples/05-bank-scenario.sh`](examples/05-bank-scenario.sh) | budget, kill switch and four-eyes: the controls banks started enforcing in Nov 2026 |
+| 6 | [`examples/06-anchor-and-worm.sh`](examples/06-anchor-and-worm.sh) | RFC 3161 anchor, read-only evidence pack, tamper test |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -83,6 +84,32 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Anchoring and evidence export
+
+A hash chain is tamper-*evident* only relative to itself; whoever holds the file
+can rewrite chain and head together. An RFC 3161 timestamp from a third party
+fixes the head in time:
+
+```bash
+mandate anchor --ledger ledger.jsonl --tsa https://freetsa.org/tsr
+# {"tsa": ..., "gen_time": "261124212228Z", "imprint_matches_head": true}
+
+mandate anchor-verify --ledger ledger.jsonl --token anchors/<...>.tsr
+# offline: status + imprint + genTime
+mandate anchor-verify ... --ca tsa-ca.pem     # full CMS check via `openssl ts -verify`
+
+mandate worm-export --ledger ledger.jsonl --out worm --retention-days 180 --anchors anchors
+# dated directory, files chmod 0444, manifest with sha256 + retention_until + clock snapshot
+```
+
+Verified in `examples/06-anchor-and-worm.sh` against FreeTSA: imprint matches the
+head, `openssl ts -verify` returns `Verification: OK`, the export is read-only,
+and editing one byte of the ledger breaks `mandate chain`.
+
+Honest limits: the timestamp proves *when a head existed*, not that the ledger is
+complete; the local chmod is not WORM (use object lock for that); the signing key
+is still a file on disk — HSM/PKCS#11 is the next step.
 
 ## Governance: budget, kill switch, four-eyes
 

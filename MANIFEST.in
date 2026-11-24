@@ -11,3 +11,4 @@ recursive-include mandate/data *.json
 prune bench
 prune .github
 global-exclude *.pyc __pycache__ *.sbatch *.env .env* *.log
+recursive-include tests *.py *.tsr *.json

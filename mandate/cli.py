@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import core, governance, sign
+from . import anchor, core, governance, sign
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -416,6 +416,23 @@ def main(argv=None) -> int:
     p_limits.add_argument("--ledger", default="ledger.jsonl")
     p_limits.add_argument("--policy", default=None)
 
+    p_anchor = sub.add_parser("anchor")
+    p_anchor.add_argument("--ledger", default="ledger.jsonl")
+    p_anchor.add_argument("--tsa", default=anchor.DEFAULT_TSA)
+    p_anchor.add_argument("--out", default="anchors")
+    p_anchor.add_argument("--ca", default=None)
+
+    p_anchor_verify = sub.add_parser("anchor-verify")
+    p_anchor_verify.add_argument("--ledger", default="ledger.jsonl")
+    p_anchor_verify.add_argument("--token", required=True)
+    p_anchor_verify.add_argument("--ca", default=None)
+
+    p_worm = sub.add_parser("worm-export")
+    p_worm.add_argument("--ledger", default="ledger.jsonl")
+    p_worm.add_argument("--out", default="worm")
+    p_worm.add_argument("--retention-days", dest="retention_days", type=int, default=180)
+    p_worm.add_argument("--anchors", default="anchors")
+
     p_verify = sub.add_parser("verify")
     p_verify.add_argument("--receipt", required=True)
     p_verify.add_argument("--intent", required=True)
@@ -654,6 +671,23 @@ def main(argv=None) -> int:
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked)
             _emit(receipt, None)
+            return 0
+
+        if args.cmd == "anchor":
+            res = anchor.anchor(args.ledger, args.tsa, args.out, args.ca)
+            _emit(res, None)
+            return 0 if res.get("imprint_matches_head") else 4
+
+        if args.cmd == "anchor-verify":
+            res = anchor.verify_anchor(args.ledger, args.token, args.ca)
+            _emit(res, None)
+            return 0 if res.get("valid") else 4
+
+        if args.cmd == "worm-export":
+            res = anchor.worm_export(args.ledger, args.out, args.retention_days, args.anchors)
+            _emit({"path": res["path"], "manifest": res["manifest_path"],
+                   "retention_until": res["retention_until"],
+                   "files": len(res["files"])}, None)
             return 0
 
         if args.cmd == "halt":

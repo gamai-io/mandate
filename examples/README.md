@@ -7,6 +7,7 @@
 | 3 | `03-mcp-claude.md` | same | `mandate mcp lock` / `proxy` for Claude Code, Codex, Cursor |
 | 4 | `04-full-stack.sh` | all five packages installed | guard → plugins policy → mandate grant → trust claims → gama-l seal |
 | 5 | `05-bank-scenario.sh` | `gama-mandate`, `ssh-keygen` | budget, kill switch, four-eyes, audit re-check |
+| 6 | `06-anchor-and-worm.sh` | `gama-mandate`, `ssh-keygen`, network for the TSA call | RFC 3161 anchor, offline verify, read-only export, tamper test |
 
 Run 1 and 2 in a throwaway directory:
 

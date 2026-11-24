@@ -1,0 +1,16 @@
+{
+ "der_bytes": 4633,
+ "gen_time": "261124212159Z",
+ "has_certificate": true,
+ "head": "49b33b265ba63d9877f51202bb8fda0a5e97d948449d56715296f59c4c30b388",
+ "head_sha256": "57a7cfb92ca56eb3f73127dc0401228a6efcffacbb9bb0121c0af2508bb13243",
+ "imprint_sha256": "57a7cfb92ca56eb3f73127dc0401228a6efcffacbb9bb0121c0af2508bb13243",
+ "openssl_verify": {
+  "openssl": "Verification: OK\nUsing configuration from /usr/lib/ssl/openssl.cnf",
+  "verified": true
+ },
+ "status": 0,
+ "token": "49b33b265ba63d98-20261124T212159Z.tsr",
+ "token_sha256": "ac2dbeaf20c0c3b3758c5cc4d6f01440e5f9f95efad8fd9dacf1bde69e10e0aa",
+ "tsa": "https://freetsa.org/tsr"
+}

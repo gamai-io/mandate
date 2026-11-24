@@ -1,7 +1,7 @@
 # Bank control matrix — what we can prove, what we cannot (yet)
 
-Status: 24 Nov 2026. Basis: the twelve control rows in
-`/root/research/bank_agent_regulation.md` (83 sources with URLs, each claim dated).
+Status: 24 Nov 2026. Basis: the twelve control rows in the internal research
+dossier (83 sources with URLs, each claim dated).
 **Legal statements here are research, not legal advice — verify with counsel before
 putting any article number in a customer document.**
 
@@ -36,7 +36,7 @@ an auditor would accept; **gap** = not built.
 | 6 | Policy outside the model, deterministic | `gamai-plugins` trust plugin: deny wins, fail-closed, exit codes | **have** | joined decision log per tool call with policy version | 1 d |
 | 7 | Software-enforced limits (spend, velocity, volume) | `limits` in policy: effects/hour, amount, runtime, currency — enforced at redeem, refusals in the ledger | **have** | per-tool data-volume caps; cost accounting | 2 d |
 | 8 | Egress control | `protean` sandbox + `--sandbox-net` flags; lab has Firecracker/gVisor | partial | allowlist-as-code + a red-team egress test modelled on the proxy/registry escape | 3 d |
-| 9 | **Tamper-evident, agent-inaccessible log, retention, clock** | hash chain + `.head` anchor + `mandate chain`; offline verify | **partial — the weakest row, and the market's weakest row too** | **external anchor (RFC 3161 TSA)**, WORM export, retention policy, clock-sync evidence | **2 d for the anchor**, 2 d WORM |
+| 9 | **Tamper-evident, agent-inaccessible log, retention, clock** | hash chain + `.head` + `mandate chain`; **`mandate anchor` (RFC 3161, verified with `openssl ts`, FreeTSA OK); `mandate worm-export` (0444 + manifest + retention + clock snapshot)** | **have (partial)** | bank-held key (HSM/PKCS#11), object-lock storage instead of local chmod, clock attested by a third party | 5 d |
 | 10 | Change control over prompts/models/permissions | receipts carry commitment + render hash, so a changed prompt changes the hash | partial | tie diffs to change tickets and approvals; model version pinning | 3 d |
 | 11 | Third-party register / due diligence | Apache-2.0 code, published artifact, spec, `CITATION.cff` | partial | DORA RoI row, subprocessor list, exit/transition plan, DD pack | 3 d docs |
 | 12 | Detection & reporting of agent incidents | `gamai-trust` claim-vs-evidence; `crossnode-bench` false-success rate | partial | agent-specific detection rules (credential switching, unusual tool sequences, volume spikes) | 4 d |
