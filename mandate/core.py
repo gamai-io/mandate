@@ -360,6 +360,27 @@ def append_receipt(path: str, body: dict) -> dict:
         return _append_locked(path, body)
 
 
+def _nonce_db_path() -> str:
+    return os.environ.get("MANDATE_NONCE_DB") or os.path.expanduser(
+        "~/.mandate/nonces.sqlite")
+
+
+def claim_nonce_db(nonce: str) -> bool:
+    """Atomically claim a grant nonce across ledgers. False = already used."""
+    path = _nonce_db_path()
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    import sqlite3
+    con = sqlite3.connect(path, timeout=10)
+    try:
+        con.execute("CREATE TABLE IF NOT EXISTS used (nonce TEXT PRIMARY KEY, ts REAL)")
+        cur = con.execute("INSERT OR IGNORE INTO used (nonce, ts) VALUES (?, ?)",
+                          (str(nonce), time.time()))
+        con.commit()
+        return cur.rowcount == 1
+    finally:
+        con.close()
+
+
 def _used_nonces(path: str) -> set[str]:
     return {str(e.get("body", {}).get("grant_nonce")) for e in read_ledger(path)}
 
@@ -454,6 +475,29 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
             "moment": moment}
 
 
+RECEIPT_SIGN_EXCLUDE = ("prev", "signature", "signer")
+
+
+def _receipt_signable(body: dict) -> dict:
+    return {k: v for k, v in body.items() if k not in RECEIPT_SIGN_EXCLUDE}
+
+
+def sign_receipt(body: dict, key_path: str, signer: str) -> dict:
+    body = dict(body)
+    body["signature"] = sign.sign(jcs(_receipt_signable(body)), key_path)
+    body["signer"] = signer
+    return body
+
+
+def verify_receipt_signature(body: dict, signers_path: str,
+                             revoked_path: str | None = None) -> bool:
+    if not body.get("signature"):
+        return False
+    return bool(sign.verify(jcs(_receipt_signable(body)), str(body.get("signer") or ""),
+                            str(body["signature"]), signers_path,
+                            sign.DEFAULT_NAMESPACE, revoked_path=revoked_path))
+
+
 def build_receipt(intent: dict, grant_core: dict, commitment: str,
                   result_hash: str, decision: str = "executed",
                   ts: float | None = None) -> dict:
@@ -480,7 +524,8 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            claim=None, policy: dict | None = None,
            audience: str | None = None,
            require_audience: bool = False,
-           revoked_path: str | None = None) -> dict:
+           revoked_path: str | None = None,
+           sign_key: str | None = None, signer: str | None = None) -> dict:
     verified = verify_authorization(
         intent, grant_obj, signers_path, namespace, allow_self, now, policy,
         audience, require_audience, revoked_path)
@@ -489,6 +534,10 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     nonce = str(grant_core.get("nonce") or "")
     receipt = build_receipt(intent, grant_core, verified["commitment"],
                             sha256(jcs(intent)), ts=verified["moment"])
+    if (policy or {}).get("require_signed_receipts") and not sign_key:
+        raise MandateError("policy requires signed receipts: pass --key/--signer")
+    if sign_key:
+        receipt = sign_receipt(receipt, sign_key, signer or str(grant_core.get("approver") or ""))
     if claim is not None:
         if not claim(nonce):
             raise GrantReplayed("grant already used")
@@ -497,6 +546,8 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     with _ledger_lock(ledger_path):
         if nonce in _used_nonces(ledger_path):
             raise GrantReplayed("grant already used")
+        if not claim_nonce_db(nonce):
+            raise GrantReplayed("grant already used (nonce seen in another ledger)")
         return _append_locked(ledger_path, receipt)
 
 
@@ -515,6 +566,9 @@ def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
         return False
     core = (grant_obj or {}).get("grant") or {}
     if body.get("grant_nonce") != core.get("nonce"):
+        return False
+    if body.get("signature") and not verify_receipt_signature(
+            body, signers_path, revoked_path=revoked_path):
         return False
     if core.get("render_hash") != render_hash(intent):
         return False

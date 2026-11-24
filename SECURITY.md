@@ -66,12 +66,14 @@ test in `tests/test_redteam_fixes.py`:
 
 ## Known limitations (open, not hidden)
 
-- **One-shot is per ledger file.** The same grant can be redeemed into a second
-  ledger. Deployments must pin one ledger per broker; a cross-ledger nonce check
-  is not implemented.
-- **Receipts are not signed by default.** They are hash-chained and bound to the
-  grant via `grant_nonce`/`commitment`; broker result signatures are optional and
-  `mandate chain` does not verify them.
+- **One-shot is enforced across ledgers** since 0.36.0: a nonce is claimed in a
+  SQLite store (`MANDATE_NONCE_DB`, default `~/.mandate/nonces.sqlite`) before the
+  receipt is appended, so the same grant cannot be redeemed into a second ledger.
+- **Receipts are signed only when asked.** `mandate redeem --key/--signer` signs the
+  receipt and `verify_receipt` checks it; a policy can require it with
+  `"require_signed_receipts": true`. `mandate chain --signers` verifies every
+  signature present, and `--broker-signers` verifies broker result entries.
+  Unsigned receipts remain valid unless the policy says otherwise (compatibility).
 - **`SIGSTOP` freeze is not a security boundary**; use the cgroup or microVM path.
 - **The audit pack `index.json` is not signed** — the chain and the RFC 3161
   anchor are the evidence, the index is a convenience index.

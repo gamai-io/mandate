@@ -122,7 +122,11 @@ def verify_chain(child: dict, parents: list[dict], signers_path: str,
             return {**res, "valid": False, "code": "expiry_extended"}
         if cp.get("aud") != pp.get("aud"):
             return {**res, "valid": False, "code": "audience_changed"}
-        if cp.get("parent_sub") and cp.get("sub") == pp.get("sub"):
+        declared_parent = cp.get("parent_sub")
+        if declared_parent is not None and declared_parent != pp.get("sub"):
+            return {**res, "valid": False, "code": "parent_subject_mismatch",
+                    "declared": declared_parent, "actual": pp.get("sub")}
+        if cp.get("sub") == pp.get("sub"):
             return {**res, "valid": False, "code": "self_delegation"}
         current = parent
     return {**res, "valid": True, "code": "ok", "depth": depth}

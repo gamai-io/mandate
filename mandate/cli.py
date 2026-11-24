@@ -406,6 +406,8 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--svid", action="append", default=None,
                           help="agent token (repeatable: child first, then parents)")
     p_redeem.add_argument("--svid-audience", dest="svid_audience", default=None)
+    p_redeem.add_argument("--key", default=None, help="sign the receipt")
+    p_redeem.add_argument("--signer", default=None)
 
     p_halt = sub.add_parser("halt")
     p_halt.add_argument("--reason", required=True)
@@ -523,6 +525,9 @@ def main(argv=None) -> int:
 
     p_chain = sub.add_parser("chain")
     p_chain.add_argument("--ledger", default="ledger.jsonl")
+    p_chain.add_argument("--signers", default=None, help="verify receipt signatures")
+    p_chain.add_argument("--broker-signers", dest="broker_signers", default=None,
+                         help="verify broker result entries")
 
     p_vr = sub.add_parser("verify-result")
     p_vr.add_argument("--entry", required=True)
@@ -768,7 +773,9 @@ def main(argv=None) -> int:
                 _read(args.intent), _read(args.grant), args.signers,
                 args.ledger, allow_self=args.allow_self,
                 policy=core.load_policy(args.policy),
-                revoked_path=args.revoked)
+                revoked_path=args.revoked,
+                sign_key=getattr(args, "key", None),
+                signer=getattr(args, "signer", None))
             _emit(receipt, None)
             return 0
 
@@ -1045,7 +1052,25 @@ def main(argv=None) -> int:
         if args.cmd == "chain":
             entries = core.read_ledger(args.ledger)
             ok = core.verify_chain(args.ledger)
-            _emit({"valid": ok, "entries": len(entries)}, None)
+            report = {"valid": ok, "entries": len(entries)}
+            if args.signers:
+                signed = [e for e in entries
+                          if (e.get("body") or {}).get("signature")]
+                bad = [e["hash"] for e in signed
+                       if not core.verify_receipt_signature(e["body"], args.signers,
+                                                            revoked_path=args.revoked)]
+                report.update({"signed_receipts": len(signed), "bad_signatures": bad})
+                ok = ok and not bad
+            if args.broker_signers:
+                results = [e for e in entries
+                           if (e.get("body") or {}).get("type") == "result"]
+                bad = [e["hash"] for e in results
+                       if not core.verify_result_entry(e, args.broker_signers,
+                                                       revoked_path=args.revoked)]
+                report.update({"broker_results": len(results), "bad_results": bad})
+                ok = ok and not bad
+            report["valid"] = ok
+            _emit(report, None)
             return 0 if ok else 1
 
         if args.cmd == "verify-result":
