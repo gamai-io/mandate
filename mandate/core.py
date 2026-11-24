@@ -144,8 +144,12 @@ def normalize_intent(intent: dict) -> dict:
 
 
 def intent_core(intent: dict) -> dict:
+    """What the approver signs: the effect AND who is allowed to execute it."""
+    actor = intent.get("actor") or {}
     return {
         "v": VERSION,
+        "actor": {"agent": actor.get("agent"), "session": actor.get("session")},
+        "nonce": intent.get("nonce"),
         "effect": intent["effect"],
         "requested_by": intent.get("requested_by"),
         "render_hash": render_hash(intent),

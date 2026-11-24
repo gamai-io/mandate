@@ -15,6 +15,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 import time
 from collections import defaultdict
 
@@ -151,15 +152,22 @@ DORA_ROI = {
 
 def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
          owners: dict[str, str] | None = None,
-         controls_path: str | None = None) -> dict:
+         controls_path: str | None = None,
+         signers_path: str | None = None) -> dict:
     """Row 11: everything an auditor asks for, generated from the ledger."""
     os.makedirs(out_dir, exist_ok=True)
+    for stale in os.listdir(out_dir):   # never bless a file we did not generate now
+        path = os.path.join(out_dir, stale)
+        if os.path.isfile(path):
+            os.remove(path)
+        elif os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
     inv = inventory(ledger_path, tokens, owners)
     with open(os.path.join(out_dir, "inventory.json"), "w", encoding="utf-8") as fh:
         json.dump(inv, fh, indent=1, sort_keys=True)
     write_inventory_csv(inv, os.path.join(out_dir, "inventory.csv"))
 
-    chg = changes(ledger_path)
+    chg = changes(ledger_path, signers_path)
     with open(os.path.join(out_dir, "changes.json"), "w", encoding="utf-8") as fh:
         json.dump(chg, fh, indent=1, sort_keys=True)
 

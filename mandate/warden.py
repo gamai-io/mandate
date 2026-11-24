@@ -104,6 +104,7 @@ def stop(target: int, method: str = "freeze", by_pgid: bool = False,
         "verified": not remaining,
         "reason": reason,
         "actor": actor,
+        "ts": time.time(),
     }
     entry = None
     if ledger_path:
@@ -136,6 +137,7 @@ def resume(target: int, by_pgid: bool = False, ledger_path: str | None = None,
         "states_after": {str(pid): state for pid, state in seen.items()},
         "reason": reason,
         "actor": actor,
+        "ts": time.time(),
     }
     entry = None
     if ledger_path:

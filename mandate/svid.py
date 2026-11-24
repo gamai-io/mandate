@@ -75,6 +75,11 @@ def verify(token: dict, signers_path: str, audience: str | None = None,
 
     if payload.get("typ") != "mandate-svid" or payload.get("v") != 1:
         return {**result, "code": "not_a_svid"}
+    # The subject must be the principal that signed: otherwise any key in
+    # allowed_signers could mint a token for any agent.
+    if str(payload.get("sub") or "") != str(payload.get("iss") or "") or issuer != payload.get("iss"):
+        return {**result, "code": "issuer_subject_mismatch",
+                "sub": payload.get("sub"), "iss": payload.get("iss"), "signer": issuer}
     if not sign.verify(_payload_json(payload), issuer, signature, signers_path,
                        sign.DEFAULT_NAMESPACE, revoked_path=revoked_path):
         return {**result, "code": "bad_signature"}

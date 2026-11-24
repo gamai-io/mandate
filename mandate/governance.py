@@ -90,7 +90,8 @@ def _receipts(ledger_path: str) -> list[dict]:
 
 def _amount(body: dict) -> tuple[float, str]:
     render = body.get("render") or {}
-    amount = render.get("amount") or {}
+    fields = render.get("fields") or {}
+    amount = render.get("amount") or fields.get("amount") or {}
     if isinstance(amount, dict):
         try:
             return float(amount.get("value") or 0.0), str(amount.get("currency") or "")

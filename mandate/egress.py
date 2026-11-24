@@ -68,10 +68,21 @@ def load_policy(path: str | None) -> dict:
 
 
 def _is_private(ip: str) -> bool:
+    ip = (ip or "").lower()
+    if ip.startswith("::ffff:"):        # IPv4-mapped IPv6
+        ip = ip.split("::ffff:")[-1]
     if ip in METADATA_HOSTS:
         return True
     if ip.startswith(PRIVATE_PREFIXES):
         return True
+    try:
+        first, second = (int(x) for x in ip.split(".")[:2])
+        if first == 172 and 16 <= second <= 31:   # RFC1918 172.16/12
+            return True
+        if first == 169 and second == 254:        # link-local
+            return True
+    except (TypeError, ValueError):
+        pass
     if ip.startswith("::1") or ip.startswith("fc") or ip.startswith("fd") or ip.startswith("fe80"):
         return True
     return False
@@ -95,18 +106,29 @@ def decide(policy: dict, host: str, port: int) -> dict:
     except socket.gaierror as exc:
         return {"allow": False, "code": "dns_failure", "detail": str(exc)[:120]}
     ips = sorted({info[4][0] for info in infos})
+    allowed_host = False
+    allowed_ips: set[str] = set()
     for entry in allow:
         ahost, aport = _split(str(entry))
         if aport != int(port):
             continue
         if ahost.lower() == host:
-            return {"allow": True, "code": "allowlist_host", "ip": ips[0]}
+            allowed_host = True
         if ahost in ips:
-            return {"allow": True, "code": "allowlist_ip", "ip": ahost}
-    if host in METADATA_HOSTS or any(ip in METADATA_HOSTS for ip in ips):
+            allowed_ips.add(ahost)
+
+    # SSRF and metadata guards run BEFORE the allowlist: a hostname entry must not
+    # become a way to reach loopback or a cloud metadata service.
+    if any(ip in METADATA_HOSTS for ip in ips) and not (set(ips) & allowed_ips):
         return {"allow": False, "code": "metadata_endpoint", "ips": ips}
-    if all(_is_private(ip) for ip in ips):
-        return {"allow": False, "code": "private_destination", "ips": ips}
+    private = [ip for ip in ips if _is_private(ip) and ip not in allowed_ips]
+    if private:
+        return {"allow": False, "code": "private_destination", "ips": private}
+
+    if allowed_host:
+        return {"allow": True, "code": "allowlist_host", "ip": ips[0]}
+    if allowed_ips:
+        return {"allow": True, "code": "allowlist_ip", "ip": sorted(allowed_ips)[0]}
     return {"allow": False, "code": "not_allowlisted", "ips": ips}
 
 

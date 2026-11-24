@@ -443,6 +443,7 @@ def main(argv=None) -> int:
     p_pack.add_argument("--svid", action="append", default=None)
     p_pack.add_argument("--owner", action="append", default=None)
     p_pack.add_argument("--controls", default=None)
+    p_pack.add_argument("--signers", default=None)
 
     p_detect = sub.add_parser("detect")
     p_detect.add_argument("--ledger", default="ledger.jsonl")
@@ -801,7 +802,8 @@ def main(argv=None) -> int:
         if args.cmd == "pack":
             tokens = [svid.load(t) for t in (args.svid or [])]
             owners = dict(pair.split("=", 1) for pair in (args.owner or []) if "=" in pair)
-            res = audit_report.pack(args.ledger, args.out, tokens, owners, args.controls)
+            res = audit_report.pack(args.ledger, args.out, tokens, owners, args.controls,
+                                    getattr(args, "signers", None))
             _emit({"path": res["path"], "files": sorted(res["files"]),
                    "agents": res["agents"], "changes": res["changes"],
                    "ledger_head": res["ledger_head"]}, None)
@@ -901,6 +903,8 @@ def main(argv=None) -> int:
                         results.append({"action": body.get("action"),
                                         **warden.verify_evidence(body, signers_path)})
                 _emit({"signed_controls": len(results), "results": results}, None)
+                if not results:
+                    return 6   # nothing to verify is not a pass
                 return 0 if all(r["valid"] for r in results) else 6
 
             if args.quarantine:

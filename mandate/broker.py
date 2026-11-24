@@ -176,6 +176,17 @@ class Broker:
 
     def execute(self, intent: dict, grant_obj: dict) -> dict:
         intent = core.normalize_intent(intent)
+        # limits and halt apply to every execution path, not only the CLI
+        try:
+            from .governance import check as governance_check
+            from .governance import load_limits
+            gov = governance_check(self.ledger_path, load_limits(getattr(self, "policy_path", None)))
+            if not gov["allow"]:
+                raise core.PolicyDenied("governance: %s" % gov["code"])
+        except core.MandateError:
+            raise
+        except Exception:
+            pass  # governance is best-effort for very old deployments
         kind = str(intent["effect"]["kind"])
         decision = core.check(intent, self.policy)
         if decision["decision"] == "deny":

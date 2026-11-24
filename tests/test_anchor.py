@@ -17,6 +17,7 @@ from mandate import anchor
 FIX = os.path.join(os.path.dirname(__file__), "fixtures")
 TSR = os.path.join(FIX, "tsa_freetsa_2026-11-24.tsr")
 SIDECAR = os.path.join(FIX, "tsa_freetsa_2026-11-24.json")
+CA = os.path.join(FIX, "tsa_freetsa_ca.pem")
 
 
 def write_ledger(directory: str, head_hex: str) -> str:
@@ -56,18 +57,37 @@ class Verification(unittest.TestCase):
     def setUp(self) -> None:
         self.side = json.load(open(SIDECAR))
 
-    def test_valid_when_head_matches(self) -> None:
+    def test_valid_only_with_a_ca(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             ledger = write_ledger(td, self.side["head"])
-            res = anchor.verify_anchor(ledger, TSR)
-        self.assertTrue(res["valid"])
-        self.assertTrue(res["imprint_matches_head"])
-        self.assertFalse(res["signature_verified"], "offline mode must say it did not check the CMS")
+            weak = anchor.verify_anchor(ledger, TSR)
+            strong = anchor.verify_anchor(ledger, TSR, CA)
+        self.assertFalse(weak["valid"], "without a CA this must not be called valid")
+        self.assertEqual(weak["code"], "cms_unverified")
+        self.assertTrue(weak["imprint_ok"])
+        self.assertTrue(strong["valid"], strong)
+        self.assertTrue(strong["openssl_verify"]["verified"])
+
+    def test_forged_blob_is_rejected(self) -> None:
+        """A hand-made blob with status 0 + imprint must not pass verification."""
+        import hashlib as _h
+        head = self.side["head"]
+        digest = _h.sha256(head.encode()).digest()
+        oid = bytes.fromhex("0609608648016503040201")
+        inner = b"\x30\x00" + oid + b"\x04\x20" + digest
+        blob = b"\x30" + bytes([len(inner) + 2]) + b"\x30\x03\x02\x01\x00" + inner
+        with tempfile.TemporaryDirectory() as td:
+            token = os.path.join(td, "forged.tsr")
+            open(token, "wb").write(blob)
+            ledger = write_ledger(td, head)
+            res = anchor.verify_anchor(ledger, token, CA)
+        self.assertFalse(res["valid"], res)
+        self.assertIn(res["code"], ("no_cms_token", "cms_failed"))
 
     def test_invalid_when_ledger_moved_on_or_was_rewritten(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             ledger = write_ledger(td, "0" * 64)
-            res = anchor.verify_anchor(ledger, TSR)
+            res = anchor.verify_anchor(ledger, TSR, CA)
         self.assertFalse(res["valid"])
         self.assertFalse(res["imprint_matches_head"])
 

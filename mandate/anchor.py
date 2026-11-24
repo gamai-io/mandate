@@ -115,6 +115,7 @@ def parse_response(raw: bytes) -> dict:
     if m:
         out["gen_time"] = m.group(0).decode("ascii")
     out["has_certificate"] = b"\x30\x82" in blob and len(blob) > 1500
+    out["has_cms_signed_data"] = b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x07\x02" in blob
     return out
 
 
@@ -206,22 +207,32 @@ def _openssl_verify(token_path: str, ledger_path: str, ca_path: str) -> dict:
 
 
 def verify_anchor(ledger_path: str, token_path: str, ca_path: str | None = None) -> dict:
+    """A token is only 'valid' when the CMS signature is verified with a CA.
+
+    Without --ca we can check the imprint, the status and the time — but an
+    attacker can fabricate those fields in a 1 KB blob. Reporting that as valid
+    would be the same mistake as calling a log "tamper-proof".
+    """
     raw = open(token_path, "rb").read()
     info = parse_response(raw)
     head = ledger_head(ledger_path)
     digest = hashlib.sha256(head.encode()).hexdigest()
+    imprint_ok = info.get("imprint_sha256") == digest and info.get("status") == 0
     result = {"token": token_path, "tsa_head": head, "head_sha256": digest, **info,
               "imprint_matches_head": info.get("imprint_sha256") == digest,
-              "valid": bool(info.get("status") == 0
-                            and info.get("imprint_sha256") == digest)}
-    if ca_path:
-        result["openssl_verify"] = _openssl_verify(token_path, ledger_path, ca_path)
-        result["valid"] = bool(result["valid"]
-                               and result["openssl_verify"].get("verified"))
-    else:
-        result["signature_verified"] = False
-        result["note"] = ("imprint, status and time verified; CMS signature not checked "
-                          "offline — pass --ca <tsa-ca.pem> for full openssl verification")
+              "imprint_ok": bool(imprint_ok), "valid": False}
+    if not info.get("has_cms_signed_data"):
+        result["code"] = "no_cms_token"
+        result["note"] = "this file is not a CMS timestamp token; nothing can be verified"
+        return result
+    if not ca_path:
+        result["code"] = "cms_unverified"
+        result["note"] = ("imprint/status/time checked, but the CMS signature was NOT verified; "
+                          "pass --ca <tsa-ca.pem> to make this evidence")
+        return result
+    result["openssl_verify"] = _openssl_verify(token_path, ledger_path, ca_path)
+    result["valid"] = bool(imprint_ok and result["openssl_verify"].get("verified"))
+    result["code"] = "ok" if result["valid"] else "cms_failed"
     return result
 
 
