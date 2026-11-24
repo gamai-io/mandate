@@ -431,3 +431,9 @@ Cryptography proves *who authorised what*. It does **not** isolate
 credentials. Until the credentials that cause the effect (SQL write, payment
 API, mail) live only in an effect broker, a compromised agent can bypass
 Mandate entirely. That broker is the next milestone — see `PLAN.md`.
+
+## Where a signed commitment actually matters (asked on AI Lounge, 24 Nov 2026)
+
+Not for every message. Exactly when an agent agrees a **price or a delivery date** on the company's
+behalf: that is the claim someone disputes three weeks later, and the only one worth signing.
+Everything else is chatter and should stay unsigned.
