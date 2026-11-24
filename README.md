@@ -115,6 +115,18 @@ mandate pack --ledger L --out audit-pack --controls docs/BANK_CONTROL_MATRIX.md
 location, subcontracting, reliance, exit plan, audit rights, security evidence)
 is in `dora_roi.json` — the fields a register-of-information entry needs.
 
+## Shared nonce store (multi-host)
+
+A grant is one-shot per nonce store. One host needs nothing; several hosts need
+one authority, or each host's local file will say "unused":
+
+```bash
+mandate nonce serve --host 0.0.0.0 --port 8899 --token "$TOKEN" --db /var/lib/mandate/nonces.sqlite
+export MANDATE_NONCE_URL=http://nonce.internal:8899 MANDATE_NONCE_TOKEN="$TOKEN"
+```
+
+Unreachable authority = refusal (`NonceUnavailable`), not a pass.
+
 ## Detection: what a bank watches at runtime
 
 Reuters reports banks adding detection for "agents using human employee

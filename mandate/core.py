@@ -360,29 +360,13 @@ def append_receipt(path: str, body: dict) -> dict:
         return _append_locked(path, body)
 
 
-def _nonce_db_path(ledger_path: str | None = None) -> str:
-    if os.environ.get("MANDATE_NONCE_DB"):
-        return os.environ["MANDATE_NONCE_DB"]
-    if ledger_path:
-        return os.path.join(os.path.dirname(os.path.abspath(ledger_path)),
-                            ".mandate-nonces.sqlite")
-    return os.path.expanduser("~/.mandate/nonces.sqlite")
-
-
 def claim_nonce_db(nonce: str, ledger_path: str | None = None) -> bool:
-    """Atomically claim a grant nonce across ledgers. False = already used."""
-    path = _nonce_db_path(ledger_path)
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    import sqlite3
-    con = sqlite3.connect(path, timeout=10)
+    """Atomically claim a grant nonce. False = already used, raises = cannot tell."""
+    from . import nonce as _nonce
     try:
-        con.execute("CREATE TABLE IF NOT EXISTS used (nonce TEXT PRIMARY KEY, ts REAL)")
-        cur = con.execute("INSERT OR IGNORE INTO used (nonce, ts) VALUES (?, ?)",
-                          (str(nonce), time.time()))
-        con.commit()
-        return cur.rowcount == 1
-    finally:
-        con.close()
+        return _nonce.claim(nonce, ledger_path)
+    except _nonce.NonceUnavailable as exc:
+        raise MandateError("nonce store unavailable: %s" % str(exc)[:120]) from exc
 
 
 def _used_nonces(path: str) -> set[str]:

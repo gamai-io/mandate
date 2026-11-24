@@ -439,6 +439,14 @@ def main(argv=None) -> int:
     p_chg.add_argument("--reason", default="")
     p_chg.add_argument("--signers", default=None)
 
+    p_nonce = sub.add_parser("nonce")
+    p_nonce.add_argument("action", choices=("serve", "check"))
+    p_nonce.add_argument("--host", default="127.0.0.1")
+    p_nonce.add_argument("--port", type=int, default=8899)
+    p_nonce.add_argument("--db", default=None)
+    p_nonce.add_argument("--token", default="")
+    p_nonce.add_argument("--value", default=None, help="nonce to test with action=check")
+
     p_backup = sub.add_parser("backup")
     p_backup.add_argument("--ledger", default="ledger.jsonl")
     p_backup.add_argument("--out", default="backup")
@@ -827,6 +835,29 @@ def main(argv=None) -> int:
                 return 0
             res = audit_report.changes(args.ledger, args.signers)
             _emit(res, None)
+            return 0
+
+        if args.cmd == "nonce":
+            from . import nonce as nonce_mod
+            if args.action == "check":
+                if not args.value:
+                    _emit({"error": "Usage", "message": "nonce check --value N"}, None)
+                    return 2
+                try:
+                    ok = nonce_mod.claim(args.value, args.db)
+                except nonce_mod.NonceUnavailable as exc:
+                    _emit({"error": "NonceUnavailable", "message": str(exc)}, None)
+                    return 4
+                _emit({"nonce": args.value, "claimed": ok}, None)
+                return 0 if ok else 1
+            server = nonce_mod.serve(args.host, args.port, args.db, args.token)
+            _emit({"serving": f"http://{args.host}:{args.port}", "db": server.db_path}, None)
+            try:
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.server_close()
             return 0
 
         if args.cmd == "backup":

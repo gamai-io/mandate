@@ -98,8 +98,10 @@ test in `tests/test_redteam_fixes.py`:
 - **"Tamper-evident" means "evident relative to the last anchor".** Receipts are
   unsigned by default; the RFC 3161 stamp covers the ledger head, so events between
   two anchors are only as good as the ledger's own chain.
-- **"One-shot" is one-shot per nonce store.** The SQLite store is local to one
-  deployment directory (`MANDATE_NONCE_DB` to override); two hosts with separate
-  stores can both redeem the same grant. Use a shared store before multi-host.
+- **"One-shot" is one-shot per nonce store.** Single host: SQLite next to the
+  ledger (`MANDATE_NONCE_DB`). Multi-host: run one shared authority
+  (`mandate nonce serve --port 8899 --token ...`) and point every host at it with
+  `MANDATE_NONCE_URL` + `MANDATE_NONCE_TOKEN`. If that authority is unreachable the
+  redemption is refused (`NonceUnavailable`), never silently allowed.
 - **Token revocation requires configuration**: `trust/revoked_signers` is honoured
   only when the path is passed to `redeem`/`svid verify`.
