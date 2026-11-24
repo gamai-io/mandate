@@ -6,13 +6,13 @@ Only the latest released version receives security fixes.
 
 | Version | Supported |
 |---------|-----------|
-| 0.10.x  | yes       |
-| < 0.10  | no        |
+| 0.34.x  | yes       |
+| < 0.33  | no        |
 
 ## Reporting a vulnerability
 
 Do **not** open a public issue for a security problem. Report privately to
-`security@example.com` with:
+`renato@gamatrade.ba` with:
 
 - affected version and component (core, broker, witness, log, adapters),
 - a reproducer or a precise description,

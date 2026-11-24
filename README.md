@@ -690,7 +690,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**Alpha** — reference implementation v0.16.1: canonical commitment, Ed25519
+**v0.34.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
