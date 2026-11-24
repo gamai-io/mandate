@@ -83,8 +83,10 @@ def _is_private(ip: str) -> bool:
             return True
     except (TypeError, ValueError):
         pass
-    if ip.startswith("::1") or ip.startswith("fc") or ip.startswith("fd") or ip.startswith("fe80"):
+    if ip in ("::", "::1") or ip.startswith("fc") or ip.startswith("fd"):
         return True
+    if ip.startswith("fe80") or ip.startswith("2001:db8") or ip.startswith("64:ff9b"):
+        return True     # link-local, documentation, NAT64
     return False
 
 
@@ -200,8 +202,11 @@ class _Handler(socketserver.StreamRequestHandler):
                               % verdict["code"]).encode())
             return
 
+        # Connect to the IP we validated, not to the name we validated: a DNS
+        # answer that changes between decide() and connect() must not matter.
+        target_ip = verdict.get("ip") or host
         try:
-            upstream = socket.create_connection((host, port), timeout=15)
+            upstream = socket.create_connection((target_ip, port), timeout=15)
         except OSError as exc:
             _record(policy, ledger, {"action": "egress", "decision": "deny",
                                      "code": "connect_failed", "host": host, "port": port,

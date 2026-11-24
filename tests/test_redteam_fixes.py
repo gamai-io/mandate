@@ -115,6 +115,16 @@ class EgressPrivateDestinations(unittest.TestCase):
     def test_rfc1918_172_16_is_private(self) -> None:
         self.assertTrue(egress._is_private("172.20.5.5"))
 
+    def test_ipv6_reserved_ranges(self) -> None:
+        for ip in ("2001:db8::1", "64:ff9b::1", "::", "::1", "fe80::1"):
+            self.assertTrue(egress._is_private(ip), ip)
+
+    def test_allow_decision_returns_the_validated_ip(self) -> None:
+        verdict = egress.decide(self.policy(["127.0.0.1:80"]), "127.0.0.1", 80)
+        self.assertTrue(verdict["allow"])
+        self.assertEqual(verdict.get("ip"), "127.0.0.1",
+                         "the proxy must connect to the IP it validated")
+
     def test_metadata_still_denied(self) -> None:
         self.assertEqual(egress.decide(self.policy([]), "169.254.169.254", 80)["code"],
                          "metadata_endpoint")
