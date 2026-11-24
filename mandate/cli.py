@@ -11,6 +11,7 @@ import urllib.request
 
 from . import anchor, core, detect, egress, governance, sign, svid, warden
 from . import report as audit_report
+from . import ship as ship_mod
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -439,6 +440,14 @@ def main(argv=None) -> int:
     p_chg.add_argument("--reason", default="")
     p_chg.add_argument("--signers", default=None)
 
+    p_ship = sub.add_parser("ship")
+    p_ship.add_argument("--ledger", default="ledger.jsonl")
+    p_ship.add_argument("--url", required=True)
+    p_ship.add_argument("--token", default="")
+    p_ship.add_argument("--offset", default="ship.state")
+    p_ship.add_argument("--batch", type=int, default=200)
+    p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
+
     p_nonce = sub.add_parser("nonce")
     p_nonce.add_argument("action", choices=("serve", "check"))
     p_nonce.add_argument("--host", default="127.0.0.1")
@@ -834,6 +843,16 @@ def main(argv=None) -> int:
                 _emit({k: res[k] for k in ("entry", "file", "sha256", "actor", "reason")}, None)
                 return 0
             res = audit_report.changes(args.ledger, args.signers)
+            _emit(res, None)
+            return 0
+
+        if args.cmd == "ship":
+            try:
+                res = ship_mod.ship(args.ledger, args.url, args.token, args.offset,
+                                    args.batch, args.dry_run)
+            except ship_mod.ShipError as exc:
+                _emit({"error": "ShipError", "message": str(exc)}, None)
+                return 4
             _emit(res, None)
             return 0
 
