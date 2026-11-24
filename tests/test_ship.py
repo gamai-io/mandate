@@ -20,10 +20,13 @@ class Collector(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode()
         if Collector.fail:
-            self.send_response(500); self.end_headers(); return
+            self.send_response(500)
+            self.end_headers()
+            return
         for line in body.strip().splitlines():
             Collector.got.append(json.loads(line))
-        self.send_response(200); self.end_headers()
+        self.send_response(200)
+        self.end_headers()
 
     def log_message(self, *args):
         pass
