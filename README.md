@@ -446,6 +446,15 @@ happen. The other four answer the questions around it — was the claim true
 (`trust`), was the input hostile (`guard`), is the tool allowed (`plugins`), and
 can the computation be proven (`gama-l`).
 
+## Bank control matrix
+
+`docs/BANK_CONTROL_MATRIX.md` maps the twelve controls a bank needs (DORA Level 2
+RTS 2024/1774, AI Act where in scope, NIST agent-identity tenets) to what this
+repository can prove today, what is partial, and what is missing — with effort
+estimates. Short version: rows 4, 6 and 7 are done; row 9 (tamper-evident,
+independently verifiable evidence) is partial and is also the row with no
+credible vendor in the market.
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on
