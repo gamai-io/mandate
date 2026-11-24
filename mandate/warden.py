@@ -17,13 +17,17 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
+import subprocess
 import time
 
 from .core import append_receipt
 
 FREEZE_STATES = ("T", "t")
 GONE_STATES = ("Z", "X", "x")
+CGROUP_ROOT = os.environ.get("MANDATE_CGROUP_ROOT", "/sys/fs/cgroup")
+QUARANTINE_CHAIN = "MANDATE_QUARANTINE"
 
 
 def _stat(pid: int) -> dict | None:
@@ -153,3 +157,150 @@ def last_stop(ledger_path: str) -> dict | None:
         if body.get("type") == "control" and body.get("action") in ("halt", "resume"):
             last = body
     return last
+
+
+# --- cgroup v2 freezer: the kernel observes the freeze, not us -----------------
+
+
+def cgroup_available() -> bool:
+    return os.path.exists(os.path.join(CGROUP_ROOT, "cgroup.controllers"))
+
+
+def attach(pid: int, name: str, root: str | None = None) -> str:
+    """Put a process into its own cgroup so it can be frozen as a unit."""
+    root = root or CGROUP_ROOT
+    base = os.path.join(root, "mandate")
+    path = os.path.join(base, name)
+    os.makedirs(path, exist_ok=True)
+    procs = os.path.join(path, "cgroup.procs")
+    with open(procs, "w", encoding="utf-8") as fh:
+        fh.write(str(pid))
+    time.sleep(0.02)
+    members = open(procs, encoding="utf-8").read().split()
+    if str(pid) not in members:
+        raise ValueError(f"pid {pid} is not in {path} (cgroup delegation may be restricted)")
+    return path
+
+
+def cgroup_state(path: str) -> dict:
+    events = {}
+    try:
+        for line in open(os.path.join(path, "cgroup.events"), encoding="utf-8"):
+            key, _, value = line.strip().partition(" ")
+            events[key] = value
+    except OSError:
+        pass
+    return {"frozen": events.get("frozen") == "1", "events": events}
+
+
+def freeze_cgroup(path: str, timeout_ms: int = 3000) -> dict:
+    t0 = _now_ms()
+    with open(os.path.join(path, "cgroup.freeze"), "w", encoding="utf-8") as fh:
+        fh.write("1")
+    deadline = t0 + timeout_ms
+    state = cgroup_state(path)
+    while _now_ms() < deadline and not state["frozen"]:
+        time.sleep(0.005)
+        state = cgroup_state(path)
+    return {"frozen": state["frozen"], "time_to_halt_ms": round(_now_ms() - t0, 1),
+            "cgroup": path, "events": state["events"]}
+
+
+def thaw_cgroup(path: str) -> dict:
+    with open(os.path.join(path, "cgroup.freeze"), "w", encoding="utf-8") as fh:
+        fh.write("0")
+    time.sleep(0.02)
+    return cgroup_state(path)
+
+
+def kill_cgroup(path: str) -> dict:
+    with open(os.path.join(path, "cgroup.kill"), "w", encoding="utf-8") as fh:
+        fh.write("1")
+    return {"killed": True, "cgroup": path}
+
+
+def cgroup_pids(path: str) -> list[int]:
+    try:
+        return sorted(int(x) for x in open(os.path.join(path, "cgroup.procs")).read().split())
+    except OSError:
+        return []
+
+
+# --- network quarantine by uid (the agent must run under its own uid) --------
+
+
+def _nft(*args: str) -> dict:
+    out = subprocess.run(["nft", *args], capture_output=True, text=True, timeout=30)
+    return {"ok": out.returncode == 0,
+            "out": (out.stdout + out.stderr).strip()[:300]}
+
+
+def _nft_init() -> None:
+    _nft("add", "table", "inet", "mandate")
+    _nft("add", "set", "inet", "mandate", "q_uids", "{", "type", "uid;", "}")
+    _nft("add", "chain", "inet", "mandate", "out",
+         "{", "type", "filter", "hook", "output", "priority", "0;", "}")
+    rules = subprocess.run(["nft", "list", "chain", "inet", "mandate", "out"],
+                           capture_output=True, text=True, timeout=30).stdout
+    if "@q_uids" not in rules:
+        _nft("add", "rule", "inet", "mandate", "out", "meta", "skuid", "@q_uids", "drop")
+
+
+def quarantine_members() -> list[int]:
+    out = subprocess.run(["nft", "list", "set", "inet", "mandate", "q_uids"],
+                         capture_output=True, text=True, timeout=30)
+    members = []
+    for token in out.stdout.replace("{", " ").replace("}", " ").split():
+        if token.isdigit():
+            members.append(int(token))
+    return sorted(members)
+
+
+def quarantine(uid: int, undo: bool = False) -> dict:
+    """Cut every packet from one uid (the agent must run under its own uid).
+
+    Implemented with nftables so it works without the iptables owner module:
+    a single set of quarantined uids and one drop rule on the output hook.
+    """
+    if not shutil.which("nft"):
+        return {"action": "quarantine" if not undo else "quarantine_undo", "uid": uid,
+                "ok": False, "out": "nft not installed"}
+    _nft_init()
+    if undo:
+        res = _nft("delete", "element", "inet", "mandate", "q_uids", "{", str(uid), "}")
+    else:
+        res = _nft("add", "element", "inet", "mandate", "q_uids", "{", str(uid), "}")
+    return {"action": "quarantine" if not undo else "quarantine_undo", "uid": uid,
+            "ok": res["ok"], "out": res["out"], "members": quarantine_members()}
+
+
+def quarantine_active(uid: int) -> bool:
+    return uid in quarantine_members()
+
+
+# --- signed stop evidence ----------------------------------------------------
+
+
+SIGN_EXCLUDE = ("v", "type", "prev", "entry", "signature", "signed", "signer", "ledger_head")
+
+
+def _signable(evidence: dict) -> dict:
+    return {k: v for k, v in evidence.items() if k not in SIGN_EXCLUDE}
+
+
+def sign_evidence(evidence: dict, key_path: str, signer: str) -> dict:
+    from . import sign
+    from .jcs import canonicalize
+    body = _signable(evidence)
+    signature = sign.sign(canonicalize(body), key_path)
+    return {"signer": signer, "signature": signature, "signed": True}
+
+
+def verify_evidence(evidence: dict, signers_path: str) -> dict:
+    from . import sign
+    from .jcs import canonicalize
+    body = _signable(evidence)
+    ok = sign.verify(canonicalize(body), evidence.get("signer") or "",
+                     evidence.get("signature") or "", signers_path,
+                     sign.DEFAULT_NAMESPACE)
+    return {"valid": bool(ok), "signer": evidence.get("signer")}

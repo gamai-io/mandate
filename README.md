@@ -75,6 +75,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 7 | [`examples/07-warden.sh`](examples/07-warden.sh) | external freeze with verified time-to-halt, resume, hard stop — all in the ledger |
 | 8 | [`examples/08-egress.sh`](examples/08-egress.sh) | deny-all egress proxy: allowlist, token, metadata guard, every decision in the ledger |
 | 9 | [`examples/09-identity.sh`](examples/09-identity.sh) | short-lived agent tokens and delegation that can only narrow |
+| 10 | [`examples/10-warden-cgroup.sh`](examples/10-warden-cgroup.sh) | cgroup freeze observed by the kernel, signed stop, uid network quarantine |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -87,6 +88,34 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Warden, tier 2: kernel-observed freeze, signed stops, quarantine
+
+```bash
+mandate warden --attach agent-1 --pid 4242 --reason "runaway loop" --actor ops --ledger L.jsonl
+# method=cgroup-freeze frozen=True events={"populated":"1","frozen":"1"} time_to_halt_ms=0.3
+
+mandate warden --cgroup /sys/fs/cgroup/mandate/agent-1 --resume --actor ops --ledger L.jsonl
+mandate warden --cgroup /sys/fs/cgroup/mandate/agent-1 --method kill --key ./ops_key \
+  --signer ops --ledger L.jsonl          # stop signed by the operator
+mandate warden --verify --ledger L.jsonl --signers allowed_signers   # all signed controls valid
+
+mandate warden --quarantine --uid 65534 --reason "network isolation" --ledger L.jsonl
+mandate warden --quarantine --uid 65534 --undo --ledger L.jsonl
+```
+
+- **cgroup v2 freezer** (`cgroup.freeze` + `cgroup.events`): the evidence is the
+  kernel saying `frozen 1`, not our claim; `cgroup.kill` for the hard stop.
+- **signed stops**: with `--key/--signer` the stop evidence is Ed25519-signed and
+  `warden --verify` re-checks it, so "ops stopped it at 14:32" is non-repudiable.
+- **quarantine by uid** through an nftables set (`meta skuid @q_uids drop`), which
+  works where the iptables `owner` module is missing. The agent must run under its
+  own uid for this to mean anything.
+
+Honest limits: a cgroup freeze keeps memory and can be thawed by anyone with
+write access to that cgroup; quarantine is per-uid, not per-process; neither is a
+hypervisor boundary. VM pause and safe-state definitions remain open (see the
+control matrix, row 5).
 
 ## Short-lived identity and delegation
 

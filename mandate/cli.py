@@ -455,6 +455,15 @@ def main(argv=None) -> int:
     p_warden.add_argument("--actor", default="ops")
     p_warden.add_argument("--ledger", default=None)
     p_warden.add_argument("--resume", action="store_true")
+    p_warden.add_argument("--cgroup", default=None)
+    p_warden.add_argument("--attach", default=None)
+    p_warden.add_argument("--quarantine", action="store_true")
+    p_warden.add_argument("--uid", type=int, default=None)
+    p_warden.add_argument("--undo", action="store_true")
+    p_warden.add_argument("--key", default=None)
+    p_warden.add_argument("--signer", default=None)
+    p_warden.add_argument("--verify", action="store_true")
+    p_warden.add_argument("--signers", default=None)
 
     p_anchor = sub.add_parser("anchor")
     p_anchor.add_argument("--ledger", default="ledger.jsonl")
@@ -798,6 +807,70 @@ def main(argv=None) -> int:
             return 0
 
         if args.cmd == "warden":
+            if args.verify:
+                ledger = args.ledger or "ledger.jsonl"
+                signers_path = args.signers or args.signers_path
+                results = []
+                for line in open(ledger, encoding="utf-8") if os.path.exists(ledger) else []:
+                    body = ((json.loads(line) or {}).get("body") or {})
+                    if body.get("type") == "control" and body.get("signature"):
+                        results.append({"action": body.get("action"),
+                                        **warden.verify_evidence(body, signers_path)})
+                _emit({"signed_controls": len(results), "results": results}, None)
+                return 0 if all(r["valid"] for r in results) else 6
+
+            if args.quarantine:
+                if args.uid is None:
+                    _emit({"error": "Usage", "message": "warden --quarantine --uid N [--undo]"}, None)
+                    return 2
+                res = warden.quarantine(args.uid, undo=args.undo)
+                if args.ledger:
+                    body = {"v": 1, "type": "control", "target": args.uid,
+                            "method": "quarantine", "reason": args.reason, "actor": args.actor,
+                            **{k: v for k, v in res.items() if k != "action"},
+                            "action": "halt" if not args.undo else "resume"}
+                    core.append_receipt(args.ledger, body)
+                _emit(res, None)
+                return 0 if res.get("ok") else 5
+
+            if args.attach or args.cgroup:
+                path = args.cgroup
+                if args.attach:
+                    if args.pid is None:
+                        _emit({"error": "Usage", "message": "warden --attach NAME --pid N"}, None)
+                        return 2
+                    path = warden.attach(args.pid, args.attach)
+                try:
+                    if args.resume:
+                        state = warden.thaw_cgroup(path)
+                        evidence = {"action": "resume", "method": "cgroup", "cgroup": path,
+                                    "pids": warden.cgroup_pids(path), "states_after": state,
+                                    "reason": args.reason, "actor": args.actor}
+                    elif args.method == "kill":
+                        out = warden.kill_cgroup(path)
+                        evidence = {"action": "halt", "method": "cgroup-kill", "cgroup": path,
+                                    **out, "reason": args.reason, "actor": args.actor,
+                                    "verified": True}
+                    else:
+                        frozen = warden.freeze_cgroup(path, args.timeout_ms)
+                        evidence = {"action": "halt", "method": "cgroup-freeze",
+                                    "cgroup": path, "pids": warden.cgroup_pids(path),
+                                    "states_after": frozen.get("events"),
+                                    "time_to_halt_ms": frozen["time_to_halt_ms"],
+                                    "verified": bool(frozen["frozen"]),
+                                    "reason": args.reason, "actor": args.actor}
+                except (OSError, ValueError) as exc:
+                    _emit({"error": type(exc).__name__, "message": str(exc)}, None)
+                    return 4
+                if args.key:
+                    evidence.update(warden.sign_evidence(evidence, args.key,
+                                                         args.signer or args.actor))
+                if args.ledger:
+                    entry = core.append_receipt(args.ledger, {"v": 1, "type": "control", **evidence})
+                    evidence["ledger_head"] = entry["hash"]
+                _emit(evidence, None)
+                return 0 if evidence.get("verified", True) else 5
+
             target = args.pgid if args.pgid is not None else args.pid
             if target is None:
                 _emit({"error": "Usage", "message": "pass --pid or --pgid"}, None)
