@@ -397,6 +397,23 @@ mandate --signers trust/allowed_signers audit verify \
 `valid` is true only if the envelope signature, receipt/grant, STH signature,
 inclusion proof and witness state all check out. Details: `docs/AUDITOR_BUNDLE.md`.
 
+## The stack
+
+Five packages, one purpose: an agent's "done" should be provable.
+
+| Package | Job | Start with |
+|---|---|---|
+| **`gama-mandate`** | who authorised this exact effect: commitment → Ed25519 grant → receipt | `pip install gama-mandate` |
+| [`gamai-trust`](https://pypi.org/project/gamai-trust/) | is the claim true against observed evidence (`confirmed` / `refuted` / `unverified`) | `gamai-trust verify claims.json` |
+| [`gamai-guard`](https://pypi.org/project/gamai-guard/) | block prompt injection, multilingual, with a false-positive brake | `gamai-guard text "..."` |
+| [`gamai-plugins`](https://pypi.org/project/gamai-plugins/) | policy evaluation (deny wins), sandbox leases, team coordination | `gamai-plugins list` |
+| [`gama-l`](https://pypi.org/project/gama-l/) | small language with `prove`/`verify` and hash-chained receipts | `gama-l run proof.gm` |
+
+Mandate is the entry point: it is the piece that decides *whether* an effect may
+happen. The other four answer the questions around it — was the claim true
+(`trust`), was the input hostile (`guard`), is the tool allowed (`plugins`), and
+can the computation be proven (`gama-l`).
+
 ## Design invariants
 
 1. **Effect, not tool.** The registry keys on `payment.send`, not on
