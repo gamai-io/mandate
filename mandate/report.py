@@ -98,7 +98,7 @@ def write_inventory_csv(inv: dict, path: str) -> None:
 
 
 def change_record(ledger_path: str, path: str, approver: str, key_path: str,
-                  reason: str) -> dict:
+                  reason: str, signer_cmd: str | None = None) -> dict:
     """Row 10: a change to a control file, hashed and signed by its approver."""
     raw = open(path, "rb").read()
     body = {
@@ -112,8 +112,15 @@ def change_record(ledger_path: str, path: str, approver: str, key_path: str,
         "bytes": len(raw),
         "ts": int(time.time()),
     }
-    body["signature"] = sign.sign(canonicalize(body), key_path)
-    body["signer"] = approver
+    if signer_cmd:
+        from . import signing as _signing
+        signed = _signing.sign_with(signer_cmd, canonicalize(body))
+        body["signature"] = signed["sig"]
+        body["signer"] = signed["signer"] or approver
+        body["signer_backend"] = "external"
+    else:
+        body["signature"] = sign.sign(canonicalize(body), key_path)
+        body["signer"] = approver
     entry = append_receipt(ledger_path, body)
     return {"entry": entry["hash"], **body}
 

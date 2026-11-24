@@ -463,7 +463,8 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
             "moment": moment}
 
 
-RECEIPT_SIGN_EXCLUDE = ("prev", "signature", "signer")
+RECEIPT_SIGN_EXCLUDE = ("prev", "signature", "signer", "signer_backend",
+                        "signer_command", "ledger_head")
 
 
 def _receipt_signable(body: dict) -> dict:
@@ -474,6 +475,19 @@ def sign_receipt(body: dict, key_path: str, signer: str) -> dict:
     body = dict(body)
     body["signature"] = sign.sign(jcs(_receipt_signable(body)), key_path)
     body["signer"] = signer
+    return body
+
+
+def sign_receipt_external(body: dict, command: str) -> dict:
+    """Sign the receipt with an external HSM/KMS adapter (no key in our process)."""
+    from . import signing as _signing
+    payload = jcs(_receipt_signable(body))
+    result = _signing.sign_with(command, payload)
+    body = dict(body)
+    body["signature"] = result["sig"]
+    body["signer"] = result["signer"]
+    body["signer_backend"] = "external"
+    body["signer_command"] = command.split()[0] if command else ""
     return body
 
 
@@ -513,7 +527,8 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            audience: str | None = None,
            require_audience: bool = False,
            revoked_path: str | None = None,
-           sign_key: str | None = None, signer: str | None = None) -> dict:
+           sign_key: str | None = None, signer: str | None = None,
+           signer_cmd: str | None = None) -> dict:
     verified = verify_authorization(
         intent, grant_obj, signers_path, namespace, allow_self, now, policy,
         audience, require_audience, revoked_path)
@@ -522,10 +537,13 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     nonce = str(grant_core.get("nonce") or "")
     receipt = build_receipt(intent, grant_core, verified["commitment"],
                             sha256(jcs(intent)), ts=verified["moment"])
-    if (policy or {}).get("require_signed_receipts") and not sign_key:
-        raise MandateError("policy requires signed receipts: pass --key/--signer")
+    if (policy or {}).get("require_signed_receipts") and not (sign_key or signer_cmd):
+        raise MandateError("policy requires signed receipts: pass --key/--signer "
+                           "or --signer-cmd")
     if sign_key:
         receipt = sign_receipt(receipt, sign_key, signer or str(grant_core.get("approver") or ""))
+    elif signer_cmd:
+        receipt = sign_receipt_external(receipt, signer_cmd)
     if claim is not None:
         if not claim(nonce):
             raise GrantReplayed("grant already used")

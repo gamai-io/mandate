@@ -58,7 +58,7 @@ Sizing: 2 vCPU / 2 GB is enough for the pilot; the ledger is append-only JSONL
 | Integration | Shipped | Gap / what the bank must add |
 |---|---|---|
 | **Approver identity** | Ed25519 key signs the commitment; principal name in `allowed_signers` | Bind the key to an IdP session (OIDC `sub`, MFA method, device). Today the receipt names a key, not a verified person. |
-| **Key custody** | `ssh-keygen` keys, `sk-` hardware keys accepted | PKCS#11/HSM provider; key never leaves the module. `mandate sign` already goes through `ssh-keygen`, so a provider shim is the change. |
+| **Key custody** | `ssh-keygen` keys, `sk-` hardware keys, **and `--signer-cmd`**: the bank's HSM/KMS adapter receives the canonical payload on stdin and returns `{sig, signer}` with an SSH-armored signature. Verification is unchanged (`allowed_signers`); we never see the key. | A native PKCS#11 provider inside the process (the adapter is a separate binary today). |
 | **Agent identity** | `mandate svid issue/delegate` (TTL ≤ 1 h, audience, scopes) | Issue from the bank IdP/SPIFFE instead of a local key; wire `revoked_signers`. |
 | **Nonce authority** | `mandate nonce serve` + `MANDATE_NONCE_URL` | HA (shared Postgres/Redis behind the same HTTP contract). |
 | **Log shipping** | `mandate ship` → Splunk HEC style endpoint, offset state, fail-closed on rejection | Sentinel needs a small relay (Logic App / DCR) in front of the same endpoint |

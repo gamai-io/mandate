@@ -409,6 +409,8 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--svid-audience", dest="svid_audience", default=None)
     p_redeem.add_argument("--key", default=None, help="sign the receipt")
     p_redeem.add_argument("--signer", default=None)
+    p_redeem.add_argument("--signer-cmd", dest="signer_cmd", default=None,
+                          help="external HSM/KMS adapter that prints {sig, signer}")
 
     p_halt = sub.add_parser("halt")
     p_halt.add_argument("--reason", required=True)
@@ -439,6 +441,7 @@ def main(argv=None) -> int:
     p_chg.add_argument("--key", default=None)
     p_chg.add_argument("--reason", default="")
     p_chg.add_argument("--signers", default=None)
+    p_chg.add_argument("--signer-cmd", dest="signer_cmd", default=None)
 
     p_ship = sub.add_parser("ship")
     p_ship.add_argument("--ledger", default="ledger.jsonl")
@@ -815,7 +818,8 @@ def main(argv=None) -> int:
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked,
                 sign_key=getattr(args, "key", None),
-                signer=getattr(args, "signer", None))
+                signer=getattr(args, "signer", None),
+                signer_cmd=getattr(args, "signer_cmd", None))
             _emit(receipt, None)
             return 0
 
@@ -838,8 +842,9 @@ def main(argv=None) -> int:
                     _emit({"error": "Usage",
                            "message": "change record --file F --approver A --key K --reason R"}, None)
                     return 2
-                res = audit_report.change_record(args.ledger, args.file, args.approver, args.key,
-                                           args.reason)
+                res = audit_report.change_record(args.ledger, args.file, args.approver,
+                                                 args.key, args.reason,
+                                                 getattr(args, "signer_cmd", None))
                 _emit({k: res[k] for k in ("entry", "file", "sha256", "actor", "reason")}, None)
                 return 0
             res = audit_report.changes(args.ledger, args.signers)

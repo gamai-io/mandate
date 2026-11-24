@@ -35,7 +35,7 @@ Usora, Bosnia and Herzegovina.
 | Question | Answer |
 |---|---|
 | Algorithms | Ed25519 signatures (SSH key format), SHA-256, RFC 8785 canonical JSON, RFC 3161 timestamps. |
-| Key generation / storage | `ssh-keygen` today (file on the approver's device or an `sk-` hardware key). **HSM/PKCS#11 is a gap** — a provider shim is the planned change. |
+| Key generation / storage | `ssh-keygen` file keys or `sk-` hardware keys; **HSM/KMS through `--signer-cmd`** — the bank's adapter signs the canonical payload, our process never holds the key. A native in-process PKCS#11 provider is not shipped. |
 | Key rotation | `allowed_signers` supports multiple keys; remove the old one, add the new one, record it with `change record`. No automated rotation tooling. |
 | Where are private keys? | Never in the repository or the ledger; the approver's environment only. We never see them. |
 | Crypto library | None — the code calls `ssh-keygen`/`openssl`. No home-grown primitives. |
