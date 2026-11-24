@@ -77,7 +77,9 @@ class Warden(unittest.TestCase):
         before = counter(self.counter)
         warden.resume(self.proc.pid, by_pgid=True, ledger_path=self.ledger,
                       reason="fixed", actor="ops")
-        time.sleep(0.25)
+        deadline = time.time() + 5
+        while counter(self.counter) <= before and time.time() < deadline:
+            time.sleep(0.02)
         self.assertGreater(counter(self.counter), before, "resumed process did not run")
         last = warden.last_stop(self.ledger)
         self.assertEqual(last["action"], "resume")
