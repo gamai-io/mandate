@@ -4,11 +4,12 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import anchor, core, egress, governance, sign, warden
+from . import anchor, core, egress, governance, sign, svid, warden
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -401,6 +402,9 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--grant", required=True)
     p_redeem.add_argument("--ledger", default="ledger.jsonl")
     p_redeem.add_argument("--allow-self", action="store_true")
+    p_redeem.add_argument("--svid", action="append", default=None,
+                          help="agent token (repeatable: child first, then parents)")
+    p_redeem.add_argument("--svid-audience", dest="svid_audience", default=None)
 
     p_halt = sub.add_parser("halt")
     p_halt.add_argument("--reason", required=True)
@@ -415,6 +419,19 @@ def main(argv=None) -> int:
     p_limits = sub.add_parser("limits")
     p_limits.add_argument("--ledger", default="ledger.jsonl")
     p_limits.add_argument("--policy", default=None)
+
+    p_svid = sub.add_parser("svid")
+    p_svid.add_argument("action", choices=("issue", "verify", "delegate"))
+    p_svid.add_argument("--token", default=None)
+    p_svid.add_argument("--parent", default=None)
+    p_svid.add_argument("--sub", default=None)
+    p_svid.add_argument("--issuer", default=None)
+    p_svid.add_argument("--key", default=None)
+    p_svid.add_argument("--audience", default="local-broker")
+    p_svid.add_argument("--scope", action="append", default=None)
+    p_svid.add_argument("--ttl", type=int, default=300)
+    p_svid.add_argument("--out", default=None)
+    p_svid.add_argument("--signers", default=None)
 
     p_egress = sub.add_parser("egress")
     p_egress.add_argument("action", choices=("policy", "proxy", "check", "summary"))
@@ -682,6 +699,22 @@ def main(argv=None) -> int:
             return 0
 
         if args.cmd == "redeem":
+            if args.svid:
+                intent_obj = _read(args.intent)
+                tokens = [svid.load(p) for p in args.svid]
+                child, parents = tokens[0], tokens[1:]
+                chk = svid.verify_chain(child, parents, args.signers,
+                                        audience=args.svid_audience,
+                                        revoked_path=args.revoked)
+                if not chk["valid"]:
+                    _emit({"error": "SvidInvalid", "code": chk["code"]}, None)
+                    return 6
+                cov = svid.covers(child, str(((intent_obj.get("effect") or {}).get("kind")) or ""),
+                                  subject=str(((intent_obj.get("actor") or {}).get("agent")) or ""))
+                if not cov["ok"]:
+                    _emit({"error": "SvidScope", "code": cov["code"],
+                           "detail": {k: v for k, v in cov.items() if k != "ok"}}, None)
+                    return 6
             gov = governance.check(args.ledger, governance.load_limits(args.policy))
             if not gov["allow"]:
                 _emit({"error": "Governance", "code": gov["code"],
@@ -695,6 +728,43 @@ def main(argv=None) -> int:
                 revoked_path=args.revoked)
             _emit(receipt, None)
             return 0
+
+        if args.cmd == "svid":
+            signers_path = getattr(args, "signers", None) or getattr(args, "signers_path", None)
+            if args.action == "issue":
+                if not (args.sub and args.key):
+                    _emit({"error": "Usage", "message": "svid issue --sub NAME --key KEY [--scope ...]"}, None)
+                    return 2
+                token = svid.issue(args.sub, args.key, args.issuer or args.sub,
+                                   args.audience, args.scope or [], args.ttl)
+                if args.out:
+                    svid.save(token, args.out)
+                _emit({"jti": token["payload"]["jti"], "sub": args.sub,
+                       "exp": token["payload"]["exp"], "out": args.out}, None)
+                return 0
+            if args.action == "delegate":
+                if not (args.parent and args.sub and args.key):
+                    _emit({"error": "Usage", "message": "svid delegate --parent T --sub S --key K --scope ..."}, None)
+                    return 2
+                parent_tok = svid.load(args.parent)
+                parent_payload = parent_tok["payload"]
+                scopes = args.scope or parent_payload.get("scopes") or []
+                token = svid.issue(args.sub, args.key, args.issuer or args.sub,
+                                   parent_payload.get("aud"), scopes,
+                                   min(args.ttl, parent_payload["exp"] - int(time.time())),
+                                   parent=parent_payload)
+                if args.out:
+                    svid.save(token, args.out)
+                _emit({"jti": token["payload"]["jti"], "sub": args.sub,
+                       "parent_jti": parent_payload["jti"], "out": args.out}, None)
+                return 0
+            if not args.token:
+                _emit({"error": "Usage", "message": "svid verify --token T"}, None)
+                return 2
+            token = svid.load(args.token)
+            res = svid.verify(token, signers_path, args.audience)
+            _emit(res, None)
+            return 0 if res["valid"] else 6
 
         if args.cmd == "egress":
             if args.action == "policy":

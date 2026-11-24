@@ -74,6 +74,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 6 | [`examples/06-anchor-and-worm.sh`](examples/06-anchor-and-worm.sh) | RFC 3161 anchor, read-only evidence pack, tamper test |
 | 7 | [`examples/07-warden.sh`](examples/07-warden.sh) | external freeze with verified time-to-halt, resume, hard stop — all in the ledger |
 | 8 | [`examples/08-egress.sh`](examples/08-egress.sh) | deny-all egress proxy: allowlist, token, metadata guard, every decision in the ledger |
+| 9 | [`examples/09-identity.sh`](examples/09-identity.sh) | short-lived agent tokens and delegation that can only narrow |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -86,6 +87,38 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Short-lived identity and delegation
+
+An agent should not hold a long-lived key in its filesystem, and a sub-agent
+should never be able to do more than its parent.
+
+```bash
+mandate svid issue --sub bank-agent --issuer bank-agent --key agent_key \
+  --ttl 120 --audience local-broker --scope payment.send --out token.json
+
+mandate redeem ... --svid token.json --svid-audience local-broker
+# exit 6 + code=scope_not_granted | expired | subject_mismatch | bad_signature
+
+mandate svid delegate --parent token.json --sub sub-agent --issuer sub-agent \
+  --key sub_key --ttl 30 --scope payment.send --out child.json
+mandate redeem ... --svid child.json --svid token.json --svid-audience local-broker
+```
+
+Enforced on every redeem that passes `--svid`:
+
+- signature against `allowed_signers` (same key story as grants — no second PKI);
+- `exp` and `iat` (no tokens from the future), TTL capped at one hour;
+- **audience** must equal the broker;
+- `sub` must equal `intent.actor.agent`;
+- scope must contain the effect kind (`payment.send`, `order.create`, `*`);
+- **chain**: child scopes ⊆ parent scopes, child `exp` ≤ parent `exp`, same
+  audience, parent token must be supplied, self-delegation refused.
+
+Honest limits: tokens are bearer credentials — whoever holds the file can use it
+until it expires; that is why the TTL is short and why revocation is next
+(`trust/revoked_signers` already exists for grants). A real deployment should
+issue these from the bank's IdP/SPIFFE rather than from `svid issue`.
 
 ## Egress: deny by default
 
