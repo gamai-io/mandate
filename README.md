@@ -73,6 +73,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 5 | [`examples/05-bank-scenario.sh`](examples/05-bank-scenario.sh) | budget, kill switch and four-eyes: the controls banks started enforcing in Nov 2026 |
 | 6 | [`examples/06-anchor-and-worm.sh`](examples/06-anchor-and-worm.sh) | RFC 3161 anchor, read-only evidence pack, tamper test |
 | 7 | [`examples/07-warden.sh`](examples/07-warden.sh) | external freeze with verified time-to-halt, resume, hard stop — all in the ledger |
+| 8 | [`examples/08-egress.sh`](examples/08-egress.sh) | deny-all egress proxy: allowlist, token, metadata guard, every decision in the ledger |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -85,6 +86,34 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Egress: deny by default
+
+The July 2026 incident used a reachable network path, not a clever model. The
+proxy refuses anything not named, refuses unauthenticated callers, and refuses
+the cloud metadata endpoint:
+
+```bash
+mandate egress policy --allow 127.0.0.1:8080 --out egress.json
+export MANDATE_EGRESS_TOKEN=...
+mandate egress proxy --policy egress.json --port 3128 --ledger egress.jsonl
+
+mandate egress check --policy egress.json --target pypi.org:443   # deny: not_allowlisted
+mandate egress summary --ledger egress.jsonl                      # counts per decision
+```
+
+- **default deny**, allowlist by `host:port` or by IP;
+- **bearer token required** (`407` otherwise), token read from the env var named
+  in the policy;
+- **SSRF/metadata guard**: destinations resolving to loopback, private,
+  link-local or metadata addresses are refused unless the IP itself is listed;
+- **every decision** — allow and deny — is a `control` record in the same hash
+  chain, so "the agent could not reach X at 14:32" is provable;
+- works for `CONNECT` (TLS) and plain HTTP.
+
+Honest scope: an application-level proxy does not contain an agent that opens raw
+sockets or has host networking. Pair it with network-namespace or VM egress rules
+— that is the bank tier and it is on the roadmap, not in this release.
 
 ## Warden: a stop you can prove
 

@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import anchor, core, governance, sign, warden
+from . import anchor, core, egress, governance, sign, warden
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -416,6 +416,19 @@ def main(argv=None) -> int:
     p_limits.add_argument("--ledger", default="ledger.jsonl")
     p_limits.add_argument("--policy", default=None)
 
+    p_egress = sub.add_parser("egress")
+    p_egress.add_argument("action", choices=("policy", "proxy", "check", "summary"))
+    p_egress.add_argument("target", nargs="?", default=None, help="host:port for action=check")
+    p_egress.add_argument("--policy", default=argparse.SUPPRESS)
+    p_egress.add_argument("--allow", action="append", default=None)
+    p_egress.add_argument("--out", default=None)
+    p_egress.add_argument("--host", default="127.0.0.1")
+    p_egress.add_argument("--port", type=int, default=3128)
+    p_egress.add_argument("--ledger", default=None)
+    p_egress.add_argument("--token-env", dest="token_env", default=None)
+    p_egress.add_argument("--target", dest="target_opt", default=None,
+                          help="host:port to test (same as the positional, avoids argparse ambiguity)")
+
     p_warden = sub.add_parser("warden")
     p_warden.add_argument("--pid", type=int, default=None)
     p_warden.add_argument("--pgid", type=int, default=None)
@@ -681,6 +694,37 @@ def main(argv=None) -> int:
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked)
             _emit(receipt, None)
+            return 0
+
+        if args.cmd == "egress":
+            if args.action == "policy":
+                pol = egress.default_policy()
+                pol["allow"] = list(args.allow or [])
+                if args.token_env:
+                    pol["token_env"] = args.token_env
+                target = args.out or "egress.json"
+                with open(target, "w", encoding="utf-8") as fh:
+                    json.dump(pol, fh, indent=1)
+                _emit({"written": target, **pol}, None)
+                return 0
+            policy_path = getattr(args, "policy", None)
+            target = args.target_opt or args.target
+            if args.action == "check":
+                if not target:
+                    _emit({"error": "Usage", "message": "egress check host:port"}, None)
+                    return 2
+                host, _, port_s = target.partition(":")
+                verdict = egress.decide(egress.load_policy(policy_path), host, int(port_s or 443))
+                _emit({"target": target, **verdict}, None)
+                return 0 if verdict["allow"] else 4
+            if args.action == "summary":
+                _emit(egress.summary(args.ledger or "egress.jsonl"), None)
+                return 0
+            pol = egress.load_policy(policy_path)
+            try:
+                egress.run_forever(pol, args.host, args.port, args.ledger)
+            except KeyboardInterrupt:
+                return 0
             return 0
 
         if args.cmd == "warden":
