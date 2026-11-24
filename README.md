@@ -72,6 +72,7 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 4 | [`examples/04-full-stack.sh`](examples/04-full-stack.sh) | all five packages on one payment: guard → policy → grant → claim check → seal |
 | 5 | [`examples/05-bank-scenario.sh`](examples/05-bank-scenario.sh) | budget, kill switch and four-eyes: the controls banks started enforcing in Nov 2026 |
 | 6 | [`examples/06-anchor-and-worm.sh`](examples/06-anchor-and-worm.sh) | RFC 3161 anchor, read-only evidence pack, tamper test |
+| 7 | [`examples/07-warden.sh`](examples/07-warden.sh) | external freeze with verified time-to-halt, resume, hard stop — all in the ledger |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -84,6 +85,32 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Warden: a stop you can prove
+
+`halt` stops the *ledger* (no new grants are honoured). `warden` stops the
+*process*, from outside, and waits until the kernel confirms it:
+
+```bash
+mandate warden --pgid 4242 --reason "runaway loop" --actor ops --ledger ledger.jsonl
+# {"verified": true, "states_after": {"4242": "T"}, "time_to_halt_ms": 6.0}
+
+mandate warden --pgid 4242 --resume --reason "fixed" --actor ops --ledger ledger.jsonl
+mandate warden --pgid 4242 --method kill --reason "credential misuse" --ledger ledger.jsonl
+```
+
+- **freeze** = `SIGSTOP` to the process group, then poll `/proc/<pid>/stat` until
+  every pid reports `T`; **verified** is false if any pid is still running when
+  the timeout expires (`exit 5`).
+- **kill** = `SIGKILL`, verified by the process disappearing.
+- Every stop, resume and hard stop is a `control` record in the same hash chain
+  as receipts — actor, reason, pids, states, time-to-halt.
+
+Honest limits: this is a host-level stop, not a hypervisor control plane; a
+`SIGSTOP` freeze keeps memory and can be resumed by anyone who can signal the
+process; an agent holding credentials the warden does not control is out of
+scope. VM pause and network quarantine are the next tier (see
+`docs/BANK_CONTROL_MATRIX.md`, row 5).
 
 ## Anchoring and evidence export
 

@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import anchor, core, governance, sign
+from . import anchor, core, governance, sign, warden
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -416,6 +416,16 @@ def main(argv=None) -> int:
     p_limits.add_argument("--ledger", default="ledger.jsonl")
     p_limits.add_argument("--policy", default=None)
 
+    p_warden = sub.add_parser("warden")
+    p_warden.add_argument("--pid", type=int, default=None)
+    p_warden.add_argument("--pgid", type=int, default=None)
+    p_warden.add_argument("--method", choices=("freeze", "kill"), default="freeze")
+    p_warden.add_argument("--timeout-ms", dest="timeout_ms", type=int, default=3000)
+    p_warden.add_argument("--reason", default="")
+    p_warden.add_argument("--actor", default="ops")
+    p_warden.add_argument("--ledger", default=None)
+    p_warden.add_argument("--resume", action="store_true")
+
     p_anchor = sub.add_parser("anchor")
     p_anchor.add_argument("--ledger", default="ledger.jsonl")
     p_anchor.add_argument("--tsa", default=anchor.DEFAULT_TSA)
@@ -672,6 +682,27 @@ def main(argv=None) -> int:
                 revoked_path=args.revoked)
             _emit(receipt, None)
             return 0
+
+        if args.cmd == "warden":
+            target = args.pgid if args.pgid is not None else args.pid
+            if target is None:
+                _emit({"error": "Usage", "message": "pass --pid or --pgid"}, None)
+                return 2
+            by_pgid = args.pgid is not None
+            try:
+                if args.resume:
+                    res = warden.resume(target, by_pgid=by_pgid, ledger_path=args.ledger,
+                                        reason=args.reason, actor=args.actor)
+                else:
+                    res = warden.stop(target, method=args.method, by_pgid=by_pgid,
+                                      timeout_ms=args.timeout_ms, ledger_path=args.ledger,
+                                      reason=args.reason, actor=args.actor)
+            except (ValueError, PermissionError, ProcessLookupError) as exc:
+                _emit({"error": type(exc).__name__, "message": str(exc)}, None)
+                return 4
+            res.pop("entry", None)
+            _emit(res, None)
+            return 0 if res.get("verified", True) else 5
 
         if args.cmd == "anchor":
             res = anchor.anchor(args.ledger, args.tsa, args.out, args.ca)
