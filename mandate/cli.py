@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import anchor, core, egress, governance, sign, svid, warden
+from . import anchor, core, detect, egress, governance, sign, svid, warden
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -420,6 +420,13 @@ def main(argv=None) -> int:
     p_limits.add_argument("--ledger", default="ledger.jsonl")
     p_limits.add_argument("--policy", default=None)
 
+    p_detect = sub.add_parser("detect")
+    p_detect.add_argument("--ledger", default="ledger.jsonl")
+    p_detect.add_argument("--policy", default=argparse.SUPPRESS)
+    p_detect.add_argument("--svid", action="append", default=None)
+    p_detect.add_argument("--write", action="store_true",
+                          help="append findings as control records (type=alert)")
+
     p_svid = sub.add_parser("svid")
     p_svid.add_argument("action", choices=("issue", "verify", "delegate"))
     p_svid.add_argument("--token", default=None)
@@ -739,6 +746,21 @@ def main(argv=None) -> int:
                 revoked_path=args.revoked)
             _emit(receipt, None)
             return 0
+
+        if args.cmd == "detect":
+            tokens = [svid.load(p) for p in (args.svid or [])]
+            res = detect.detect(args.ledger,
+                                detect.load_config(getattr(args, "policy", None)),
+                                tokens=tokens)
+            if args.write and res["findings"]:
+                core.append_receipt(args.ledger, {"v": 1, "type": "control",
+                                                  "action": "alert",
+                                                  "actor": "detect",
+                                                  "reason": "runtime detection",
+                                                  "ts": res["checked_at"],
+                                                  "findings": res["findings"]})
+            _emit(res, None)
+            return 0 if res["ok"] else 1
 
         if args.cmd == "svid":
             signers_path = getattr(args, "signers", None) or getattr(args, "signers_path", None)

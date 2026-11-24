@@ -76,6 +76,8 @@ Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
 | 8 | [`examples/08-egress.sh`](examples/08-egress.sh) | deny-all egress proxy: allowlist, token, metadata guard, every decision in the ledger |
 | 9 | [`examples/09-identity.sh`](examples/09-identity.sh) | short-lived agent tokens and delegation that can only narrow |
 | 10 | [`examples/10-warden-cgroup.sh`](examples/10-warden-cgroup.sh) | cgroup freeze observed by the kernel, signed stop, uid network quarantine |
+| 11 | [`examples/11-vm-pause-remote.sh`](examples/11-vm-pause-remote.sh) | find a KVM host in the fleet, boot a microVM, pause it, prove the guest stopped |
+| 12 | [`examples/12-detect.sh`](examples/12-detect.sh) | runtime detection: human identity used by an agent, velocity spike, alert in the chain |
 
 ```bash
 ./examples/01-invoice-approval.sh ./demo1
@@ -88,6 +90,30 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 `mandate mcp proxy` sits between the agent and any MCP server. The tool list the
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
+
+## Detection: what a bank watches at runtime
+
+Reuters reports banks adding detection for "agents using human employee
+credentials", unusual volume and unusual tool use. `mandate detect` runs
+deterministic rules over the ledger and the agent tokens:
+
+```bash
+mandate detect --ledger ledger.jsonl --policy policy.json            # read-only
+mandate detect --ledger ledger.jsonl --policy policy.json --write    # alert into the chain
+```
+
+| rule | what it catches |
+|---|---|
+| `sod_ledger` | a receipt where approver == agent |
+| `human_credential` | the acting identity is a human principal (`renato`, `ops`, …) |
+| `velocity` | more than N effects per agent per hour |
+| `amount` | single effect above the ceiling |
+| `off_hours` | effect outside the configured UTC window |
+| `scope_unknown` | effect kind never granted in any supplied agent token |
+
+Receipts now carry `agent` and `session`, so an auditor can see *who acted*, not
+only who approved. `--write` appends one `control`/`alert` record with the full
+findings — same hash chain, same `mandate chain` verification.
 
 ## Warden, tier 2: kernel-observed freeze, signed stops, quarantine
 

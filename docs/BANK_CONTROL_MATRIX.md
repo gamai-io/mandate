@@ -39,7 +39,7 @@ an auditor would accept; **gap** = not built.
 | 9 | **Tamper-evident, agent-inaccessible log, retention, clock** | hash chain + `.head` + `mandate chain`; **`mandate anchor` (RFC 3161, verified with `openssl ts`, FreeTSA OK); `mandate worm-export` (0444 + manifest + retention + clock snapshot)** | **have (partial)** | bank-held key (HSM/PKCS#11), object-lock storage instead of local chmod, clock attested by a third party | 5 d |
 | 10 | Change control over prompts/models/permissions | receipts carry commitment + render hash, so a changed prompt changes the hash | partial | tie diffs to change tickets and approvals; model version pinning | 3 d |
 | 11 | Third-party register / due diligence | Apache-2.0 code, published artifact, spec, `CITATION.cff` | partial | DORA RoI row, subprocessor list, exit/transition plan, DD pack | 3 d docs |
-| 12 | Detection & reporting of agent incidents | `gamai-trust` claim-vs-evidence; `crossnode-bench` false-success rate | partial | agent-specific detection rules (credential switching, unusual tool sequences, volume spikes) | 4 d |
+| 12 | Detection & reporting of agent incidents | **`mandate detect`: human-credential use, self-approval in the ledger, velocity, amount ceiling, off-hours, scope-not-granted; `--write` puts the alert in the hash chain; receipts carry agent+session** | **have (partial)** | tool-sequence anomalies (needs tool-level events), SIEM export format, incident classification per DORA Art. 18 | 3 d |
 
 ## What the market research says about the wedge
 
