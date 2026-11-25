@@ -198,6 +198,10 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(target, name))
 
+    dec = decisions(ledger_path)
+    with open(os.path.join(out_dir, "decisions.json"), "w", encoding="utf-8") as fh:
+        json.dump(dec, fh, indent=1, sort_keys=True)
+
     with open(os.path.join(out_dir, "dora_roi.json"), "w", encoding="utf-8") as fh:
         json.dump(DORA_ROI, fh, indent=1, sort_keys=True)
 

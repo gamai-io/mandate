@@ -27,6 +27,18 @@ class Decisions(unittest.TestCase):
             self.assertEqual(result["median_wait_s"], 30.0)
             self.assertEqual(result["max_wait_s"], 90.0)
 
+    def test_the_pack_carries_the_latency_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "l.jsonl")
+            append_receipt(ledger, approval("approved", 20.0))
+            out = os.path.join(td, "pack")
+            result = report.pack(ledger, out)
+            import json
+            data = json.load(open(os.path.join(out, "decisions.json")))
+            self.assertEqual(data["approved"], 1)
+            self.assertEqual(data["median_wait_s"], 20.0)
+            self.assertIn("decisions.json", result.get("files") or {})
+
     def test_an_empty_ledger_reports_nothing_rather_than_zero(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             result = report.decisions(os.path.join(td, "l.jsonl"))

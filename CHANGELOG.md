@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.54.0 — 2026-11-25
+- **`mandate pack` carries decision latency**: the audit pack now includes
+  `decisions.json` (approved/rejected counts, median/p95/max wait), so the number a
+  reviewer asks for travels with the evidence.
+- **`tools/make_pilot_kit.py`**: assembles the folder we actually send to a bank —
+  one printable page, SOW, control matrix, procurement answers, incident response,
+  threat context, performance, DORA supplier pack, SECURITY — plus a SHA-256
+  manifest so the recipient can confirm nothing was swapped. Nine files, no
+  internal paths (tested).
+- 360 tests.
+
 ## 0.53.0 — 2026-11-25
 - **Decision latency is recorded.** Approval records carry `waited_s` (request
   arrival to the decision), and `mandate decisions --ledger` reports approved /
