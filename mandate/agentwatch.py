@@ -107,18 +107,29 @@ def _session(rows: list[dict]) -> dict:
                          "detail": "%d request(s) came from an API/spec document" % len(docs)})
         points += 3
 
-    # key probing: several auth values (or none) on one path in under a minute
+    # key probing: several auth values (or none) on one path in under a minute.
+    # Sliding window with a counter, not a per-row rescan: one address can send
+    # a hundred thousand requests and the quadratic version never finished.
     by_path = defaultdict(list)
     for r in rows:
-        by_path[str(r.get("path") or "")].append((float(r.get("ts") or 0), str(r.get("auth") or "none")))
+        by_path[str(r.get("path") or "")].append(
+            (float(r.get("ts") or 0), str(r.get("auth") or "none")))
     for path, hits in by_path.items():
         hits.sort()
-        for i in range(len(hits)):
-            window = [h for h in hits if 0 <= h[0] - hits[i][0] <= 60]
-            distinct = {v for _t, v in window}
-            if len(distinct) >= 3:
+        counts: dict[str, int] = {}
+        left = 0
+        for right, (ts, value) in enumerate(hits):
+            counts[value] = counts.get(value, 0) + 1
+            while ts - hits[left][0] > 60:
+                old = hits[left][1]
+                counts[old] -= 1
+                if not counts[old]:
+                    del counts[old]
+                left += 1
+            if len(counts) >= 3:
                 findings.append({"rule": "key_probing", "points": 4,
-                                 "detail": "%d auth values on %s within 60s" % (len(distinct), path)})
+                                 "detail": "%d auth values on %s within 60s"
+                                           % (len(counts), path)})
                 points += 4
                 break
 

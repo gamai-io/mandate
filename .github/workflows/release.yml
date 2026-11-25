@@ -21,7 +21,7 @@ jobs:
       - name: Lint
         run: ruff check .
       - name: Claims
-        run: python3 tools/claims.py --check
+        run: python3 tools/claims.py --check --strict
       - name: Tests
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Build

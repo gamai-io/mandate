@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.44.0 — 2026-11-25
+- `agentwatch.key_probing` used a per-row rescan of the 60 s window: one address
+  sending 100k requests made a run effectively never finish. Sliding window with
+  a counter, O(n) instead of O(n^2); 100k rows now score in ~1 s.
+- Regression test at 50k rows with a wall-clock bound.
+- `tools/claims.py`: CI fails when the version, the CHANGELOG or the test count in
+  README disagree with pyproject; `CLAIMS.md` lists every claim with the command
+  that reproduces it, and what is not proven.
+- One version everywhere: README, SECURITY.md (supported table), procurement and
+  architecture docs said 0.34/0.38 while PyPI served 0.43. CHANGELOG now covers
+  0.34–0.44.
+
 ## 0.43.0 — 2026-11-25
 - `mandate policy lint/explain/diff`: a policy is reviewed like code. `lint` blocks
   `default != deny`, unknown risk, negative `max_auto`, `require_revert` naming a

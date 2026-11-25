@@ -23,6 +23,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STRICT = [False]
 
 ANCHORS = [
     ("README.md", r"\*\*v(?P<v>\d+\.\d+\.\d+)\*\*", "status line"),
@@ -79,8 +80,12 @@ def check_versions() -> list[str]:
                             % (path, label, ", ".join(sorted(matches))))
     installed = module_version()
     if installed != current:
-        problems.append("mandate.__version__ is %s, pyproject says %s"
-                        % (installed, current))
+        line = ("installed distribution is %s, pyproject says %s"
+                % (installed, current))
+        if STRICT[0]:
+            problems.append(line)
+        else:
+            print("warn: %s (fine in a checkout, a problem in a release)" % line)
     return problems
 
 
@@ -143,8 +148,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--strict", action="store_true",
+                    help="also require the installed distribution to match")
     ap.add_argument("--version", action="store_true")
     args = ap.parse_args()
+    STRICT[0] = args.strict
     if args.version:
         print(version())
         return 0
