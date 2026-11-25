@@ -9,7 +9,19 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import agentwatch, anchor, core, detect, egress, governance, policy_tools, sign, svid, warden
+from . import (
+    agentwatch,
+    anchor,
+    approval_page,
+    core,
+    detect,
+    egress,
+    governance,
+    policy_tools,
+    sign,
+    svid,
+    warden,
+)
 from . import report as audit_report
 from . import ship as ship_mod
 
@@ -247,6 +259,22 @@ def _cmd_approver(args) -> int:
             not args.allow_remote:
         _emit({"error": "remote_requires_allow_remote"}, None)
         return 2
+    if getattr(args, "page", False):
+        server = approval_page.serve(
+            args.key, args.approver, args.host, args.port,
+            audience=args.audience, ttl=args.ttl, wait_s=args.wait,
+            token=args.token, ledger=getattr(args, "ledger", "") or "",
+            allow_remote=getattr(args, "allow_remote", False))
+        host, port = server.server_address[:2]
+        print("mandate approval page on http://%s:%s (approver=%s) - open it in a "
+              "browser on this host" % (host, port, args.approver), flush=True)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+        return 0
     token = os.environ.get(args.telegram_token_env, "") \
         if args.telegram_token_env else ""
     chat = args.telegram_chat or os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -685,6 +713,11 @@ def main(argv=None) -> int:
         "MANDATE_APPROVER_TOKEN", ""))
     p_as.add_argument("--telegram-chat", default=os.environ.get(
         "TELEGRAM_CHAT_ID", ""))
+    p_as.add_argument("--page", action="store_true",
+                      help="serve a browser approval page instead of a terminal prompt")
+    p_as.add_argument("--wait", type=float, default=300,
+                      help="seconds a pending request waits for a human")
+    p_as.add_argument("--ledger", default="", help="append approval decisions here")
     p_as.add_argument("--telegram-token-env", default="TELEGRAM_BOT_TOKEN")
     p_as.add_argument("--rate-limit-per-min", type=float,
                       default=float(os.environ.get("MANDATE_RATE_PER_MIN", "0")))

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.47.0 — 2026-11-25
+- `mandate approver serve --page`: a browser page a human can actually use. It
+  shows the rendered effect (amount, target, agent, broker), and the button signs
+  that snapshot. A request changed after display is refused; a guessed form token
+  is refused (HMAC per process); every decision is an `approval` record in the
+  ledger.
+- Loopback by default; `0.0.0.0` needs `--allow-remote`; the page states that the
+  signature comes from the key on this host via `ssh-keygen` and that it is not
+  WebAuthn.
+- 296 tests (6 new: approve, reject reaching the waiting agent, forged token,
+  tampered-after-display, bind guard, health).
+
 ## 0.46.0 — 2026-11-25
 - **Credential custody is now a tested claim, not a design note.**
   `tests/test_broker_custody.py` runs three processes (fake provider, broker,

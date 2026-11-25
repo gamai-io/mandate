@@ -231,6 +231,21 @@ write access to that cgroup; quarantine is per-uid, not per-process; neither is 
 hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
 Firecracker; "safe state" remains the bank's definition, not ours (row 5).
 
+## Approve in a browser, not a terminal
+
+```bash
+mandate approver serve --page --key ~/.ssh/approver --approver "Amina H." \
+    --audience local-broker --ledger ledger.jsonl
+# then open http://127.0.0.1:8898 on that machine
+```
+
+The page shows the **rendered effect** — amount, supplier, agent, broker — and
+the button signs that exact snapshot. If the request changes after it was shown,
+approval is refused (`render_hash` no longer matches). Every decision is appended
+to the ledger as an `approval` record. The page binds to loopback and says, in
+the page, that it signs with the key on this host via `ssh-keygen` and that this
+is **not** WebAuthn: an honest limitation, not a hidden one.
+
 ## Verify without our code
 
 `spec/verify_offline.py` checks a grant and a receipt with the Python standard
@@ -790,7 +805,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.46.0** — canonical commitment, Ed25519
+**v0.47.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
