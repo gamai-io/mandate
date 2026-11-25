@@ -355,6 +355,36 @@ def sbom(app_version: str = "", out_path: str = "sbom.json") -> dict:
             "files": len(files)}
 
 
+def decisions(ledger_path: str) -> dict:
+    """How long a human took to decide. The number nobody can produce in minutes."""
+    waited = []
+    approved = rejected = 0
+    for entry in _entries(ledger_path):
+        body = entry.get("body") or {}
+        if body.get("type") != "approval":
+            continue
+        if body.get("decision") == "approved":
+            approved += 1
+        else:
+            rejected += 1
+        if body.get("waited_s") is not None:
+            waited.append(float(body["waited_s"]))
+    waited.sort()
+
+    def percentile(values: list[float], q: float) -> float | None:
+        if not values:
+            return None
+        index = min(len(values) - 1, max(0, int(round(q * (len(values) - 1)))))
+        return round(values[index], 1)
+
+    return {"ledger": ledger_path, "approved": approved, "rejected": rejected,
+            "decisions": approved + rejected,
+            "median_wait_s": percentile(waited, 0.5),
+            "p95_wait_s": percentile(waited, 0.95),
+            "max_wait_s": round(max(waited), 1) if waited else None,
+            "note": "wait is measured from the request arriving to the decision"}
+
+
 def observe_summary(ledger_path: str) -> dict:
     """What would have run: observe-mode receipts against real executions.
 

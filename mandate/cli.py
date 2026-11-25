@@ -628,6 +628,9 @@ def main(argv=None) -> int:
     p_policy.add_argument("--amount", type=float, default=None)
     p_policy.add_argument("--currency", default=None)
 
+    p_dec = sub.add_parser("decisions")
+    p_dec.add_argument("--ledger", default="ledger.jsonl")
+
     p_obs = sub.add_parser("observe-summary")
     p_obs.add_argument("--ledger", default="ledger.jsonl")
     p_obs.add_argument("--out", default=None)
@@ -1379,6 +1382,10 @@ def main(argv=None) -> int:
                 return 2
             old = core.load_policy(args.against)
             _emit(policy_tools.diff(old, policy), None)
+            return 0
+
+        if args.cmd == "decisions":
+            _emit(audit_report.decisions(args.ledger), None)
             return 0
 
         if args.cmd == "observe-summary":

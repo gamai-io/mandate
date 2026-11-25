@@ -266,6 +266,7 @@ class ApprovalPage:
         if not self.ledger:
             return
         body = {"v": 1, "type": "approval", "decision": decision,
+                "waited_s": round(max(0.0, time.time() - item.created), 1),
                 "approver": self.approver_name,
                 "commitment": item.proposal["commitment"],
                 "render_hash": item.proposal["render_hash"],

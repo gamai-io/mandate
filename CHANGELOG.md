@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.53.0 — 2026-11-25
+- **Decision latency is recorded.** Approval records carry `waited_s` (request
+  arrival to the decision), and `mandate decisions --ledger` reports approved /
+  rejected counts with median, p95 and max wait. The reporting on AI-accelerated
+  attacks says the bottleneck is the decision after the alert; this is the number
+  that argument needs.
+- `docs/THREAT_CONTEXT.md` maps the ARTEX/FBI reporting to the code, names what it
+  threatens, and lists the next three pieces of work.
+- 357 tests.
+
 ## 0.52.0 — 2026-11-25
 Security pass after an external review. Breaking where the old behaviour was unsafe:
 - **Audience is enforced.** A grant bound to an audience can no longer be redeemed
