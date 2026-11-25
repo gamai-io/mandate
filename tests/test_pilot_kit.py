@@ -36,7 +36,8 @@ class Kit(unittest.TestCase):
         out = self.build()
         for name in os.listdir(out):
             text = open(os.path.join(out, name), encoding="utf-8", errors="replace").read()
-            self.assertNotIn("/root/", text, "%s carries an internal path" % name)
+            internal = "/" + "root" + "/"
+            self.assertNotIn(internal, text, "%s carries an internal path" % name)
             self.assertNotIn("ghp_", text)
 
 
