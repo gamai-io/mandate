@@ -2,14 +2,87 @@
   "version": 1,
   "default": "deny",
   "effects": {
-    "read.lookup": {"risk": "low"},
-    "quote.create": {"risk": "medium", "max_auto": 0, "require_data_ref": ["target", "amount"]},
-    "order.create": {"risk": "high", "max_auto": 0, "require_data_ref": ["target", "amount"]},
-    "payment.send": {"risk": "high", "max_auto": 0, "require_data_ref": ["target", "amount"]},
-    "supplier.change": {"risk": "high", "max_auto": 0, "require_data_ref": ["target"]},
-    "price.change": {"risk": "high", "max_auto": 0, "require_data_ref": ["target", "amount"]},
-    "message.send": {"risk": "medium", "max_auto": 0, "require_data_ref": ["target"]},
-    "file.export": {"risk": "medium", "max_auto": 0},
-    "mcp.call": {"risk": "high", "max_auto": 0}
+    "read.lookup": {
+      "risk": "low",
+      "purpose": "read a stored record for the user, no side effect"
+    },
+    "quote.create": {
+      "risk": "medium",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target",
+        "amount"
+      ],
+      "purpose": "prepare a quotation for an identified customer and amount"
+    },
+    "order.create": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target",
+        "amount"
+      ],
+      "purpose": "place an order against a confirmed quote"
+    },
+    "payment.send": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target",
+        "amount"
+      ],
+      "purpose": "pay an approved invoice to a known supplier"
+    },
+    "supplier.change": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "change the bank details or identity of a supplier"
+    },
+    "price.change": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target",
+        "amount"
+      ],
+      "purpose": "change a price that customers will see"
+    },
+    "message.send": {
+      "risk": "medium",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "send a message to a customer or supplier"
+    },
+    "file.export": {
+      "risk": "medium",
+      "max_auto": 0,
+      "purpose": "export data out of the system"
+    },
+    "mcp.call": {
+      "risk": "high",
+      "max_auto": 0,
+      "purpose": "call an external MCP tool"
+    },
+    "sql.write": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "apply one INSERT or UPDATE the broker owns"
+    },
+    "package.publish": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "publish an artefact to a registry"
+    }
   }
 }

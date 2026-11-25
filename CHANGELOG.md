@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.59.0 — 2026-11-25
+- **`sql.write` and `package.publish` are broker-owned effects.** One INSERT or
+  UPDATE per effect (no DDL, no DELETE), bound parameters, row count in the result;
+  one artefact per publish, idempotency key, registry token only in the broker's
+  environment. Replays are recovered, not repeated.
+- `normalize_intent` accepts nested params (`_check_params` validates leaves), so an
+  effect can carry a structured statement or tool binding and still be committed.
+- The shipped `policy.json` now lists 11 effect kinds, including both new ones.
+- 3 end-to-end tests through the broker; 386 pass, 3 documented skips.
+
 ## 0.58.0 — 2026-11-25
 - **Tool schemas are pinned.** `mandate tool lock --name X --file schema.json`
   records the JCS hash of the schema in a registry; the intent commits to that hash

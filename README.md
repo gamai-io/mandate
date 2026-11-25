@@ -274,6 +274,24 @@ certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
 
+## Not just payments
+
+The incident list is full of non-payment effects: a package published to a
+registry, a database written to. Both are now effects the broker owns, with the
+same grant, one-shot nonce and receipt:
+
+```json
+{"kind": "sql.write",       "params": {"sql": "INSERT INTO invoices(id,paid) VALUES(:id,1)",
+                                       "args": {"id": "inv-1"}}}
+{"kind": "package.publish", "target": "pypi:internal",
+ "params": {"artefact": "pkg-1.0.0.whl"}}
+```
+
+`sql.write` accepts one INSERT or UPDATE per effect (no DDL, no DELETE), binds
+parameters, and records the row count. `package.publish` sends one artefact with an
+idempotency key and the registry token from the broker's environment — the agent
+never holds it.
+
 ## A tool approval is a schema hash, not a name
 
 `erp.read` today is not `erp.read` tomorrow — that is the Deadbugz shape. So a
@@ -931,7 +949,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.58.0** — canonical commitment, Ed25519
+**v0.59.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

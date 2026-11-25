@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import agents as agent_store
 from . import core, sign
-from .adapters import ErpChecker, PaymentAdapter, SmtpSender, WriteAdapter
+from .adapters import ErpChecker, PaymentAdapter, Publisher, SmtpSender, SqlWriter, WriteAdapter
 from .journal import Journal
 from .metrics import Registry
 from .ratelimit import RateLimiter
@@ -41,7 +41,8 @@ class Broker:
                  recover_on_start: bool = True, token: str = "",
                  rate_per_min: float = 0, rate_burst: float = 0,
                  agents_path: str = "", tls_client_ca: str = "",
-                 tools_path: str = ""):
+                 tools_path: str = "", sql: dict | None = None,
+                 publish: dict | None = None):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -61,6 +62,8 @@ class Broker:
         self.agents_path = agents_path
         self.tls_client_ca = tls_client_ca
         self.tools_path = tools_path
+        self.sql = SqlWriter(sql) if sql else None
+        self.publisher = Publisher(publish) if publish else None
         self.metrics = Registry("mandate_broker")
         self.limiter = (RateLimiter(rate_per_min, rate_burst)
                         if rate_per_min and float(rate_per_min) > 0 else None)
@@ -76,6 +79,10 @@ class Broker:
     def _store(self, kind: str):
         if kind == "payment.send" and self.payment is not None:
             return self.payment
+        if kind == "sql.write" and self.sql is not None:
+            return self.sql
+        if kind == "package.publish" and self.publisher is not None:
+            return self.publisher
         if kind == "message.send" and self.smtp is not None:
             return None
         return self.writer
@@ -549,6 +556,7 @@ def main(argv=None) -> int:
                     effects_dir=args.effects_dir, outbox=args.outbox,
                     smtp=cfg.get("smtp"), erp=cfg.get("erp"),
                     write=cfg.get("write"), payment=cfg.get("payment"),
+                    sql=cfg.get("sql"), publish=cfg.get("publish"),
                     require_audience=not args.allow_any_audience,
                     revoked_path=args.revoked,
                     journal_db=args.journal_db or None,

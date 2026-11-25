@@ -67,6 +67,22 @@
       "risk": "high",
       "max_auto": 0,
       "purpose": "call an external MCP tool"
+    },
+    "sql.write": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "apply one INSERT or UPDATE the broker owns"
+    },
+    "package.publish": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "publish an artefact to a registry"
     }
   }
 }

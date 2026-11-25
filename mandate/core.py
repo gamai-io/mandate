@@ -78,6 +78,25 @@ def load_policy(path: str | None = None) -> dict:
     return data
 
 
+def _check_params(value, where: str) -> None:
+    """Params may nest (JCS handles it); every leaf must be JSON-safe."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise MandateError("%s keys must be strings" % where)
+            _check_params(item, "%s.%s" % (where, key))
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _check_params(item, "%s[%d]" % (where, index))
+        return
+    if isinstance(value, float) and not math.isfinite(value):
+        raise MandateError("%s values must be finite" % where)
+    if isinstance(value, (str, int, bool)) or value is None or isinstance(value, float):
+        return
+    raise MandateError("%s has an unsupported type" % where)
+
+
 def normalize_intent(intent: dict) -> dict:
     if not isinstance(intent, dict):
         raise MandateError("intent must be an object")
@@ -108,13 +127,7 @@ def normalize_intent(intent: dict) -> dict:
     params = effect.get("params") or {}
     if not isinstance(params, dict):
         raise MandateError("effect.params must be an object")
-    for key, value in params.items():
-        if not isinstance(key, str):
-            raise MandateError("params keys must be strings")
-        if isinstance(value, (dict, list)):
-            raise MandateError("params values must be scalars")
-        if isinstance(value, float) and not math.isfinite(value):
-            raise MandateError("params values must be finite")
+    _check_params(params, "params")
     actor = intent.get("actor")
     if not isinstance(actor, dict) or not actor.get("agent"):
         raise MandateError("intent.actor.agent is required")
