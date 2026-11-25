@@ -92,6 +92,14 @@ Each script is self-contained: init, keys, propose, grant, redeem, verify.
 agent sees is unchanged; what changes is that mutating calls need a grant and
 every call leaves a receipt. See [`examples/03-mcp-claude.md`](examples/03-mcp-claude.md).
 
+## Operations documents
+
+- [`docs/REFERENCE_ARCHITECTURE.md`](docs/REFERENCE_ARCHITECTURE.md) — topologies, integrations, failure modes, ports
+- [`docs/PROCUREMENT_ANSWERS.md`](docs/PROCUREMENT_ANSWERS.md) — ~40 questionnaire answers, including the honest "no"s
+- [`docs/INCIDENT_RESPONSE.md`](docs/INCIDENT_RESPONSE.md) — first 5 minutes, classification, containment, notification, post-mortem
+- [`docs/PILOT_SOW_TEMPLATE.md`](docs/PILOT_SOW_TEMPLATE.md) — 6-week pilot scope, acceptance criteria, exit
+- [`docs/BANK_CONTROL_MATRIX.md`](docs/BANK_CONTROL_MATRIX.md) — 12 controls vs what we can prove
+
 ## The documents an auditor asks for
 
 Three controls are paperwork, not runtime. They are generated from the ledger so
