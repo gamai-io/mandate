@@ -79,11 +79,16 @@ def release(ledger_path: str, pid: int, approver: str, key_path: str,
     decision = {"pid": int(pid), "action": "release", "approver": approver,
                 "reason": reason, "decided_at": int(time.time())}
     signature = sign.sign(core.jcs(decision), key_path)
+    try:
+        warden.resume(int(pid), ledger_path=ledger_path)
+        resumed = True
+    except ValueError:
+        resumed = False          # already gone; the record still says who decided
     entry = core.append_receipt(ledger_path, {
         "v": 1, "type": CONTROL, "action": "release", "pid": int(pid),
-        "reason": reason, "actor": approver, "ts": decision["decided_at"],
-        "decision": decision, "sig": signature})
-    return {"ok": True, "pid": int(pid), "entry": entry}
+        "reason": reason, "actor": approver, "resumed": resumed,
+        "ts": decision["decided_at"], "decision": decision, "sig": signature})
+    return {"ok": True, "pid": int(pid), "resumed": resumed, "entry": entry}
 
 
 def verify_release(entry: dict, signers_path: str) -> bool:
@@ -106,14 +111,15 @@ def sweep(ledger_path: str, now: float | None = None,
         if body.get("type") != CONTROL:
             continue
         pid = int(body.get("pid") or 0)
-        if body.get("action") in ("contain", "extend"):
+        if body.get("action") == "contain":
             state[pid] = body
+        elif body.get("action") == "extend":
+            # an unsigned extension would keep a process frozen for ever
+            if signers_path and verify_extend(entry, signers_path):
+                state[pid] = body
         elif body.get("action") == "release":
-            # an unsigned release from anywhere is ignored: it would otherwise stop
-            # the deadline from ever firing and leave the process stopped forever
-            if body.get("actor") == "containment-sweep":
-                state.pop(pid, None)
-            elif signers_path and verify_release(entry, signers_path):
+            # a release record only counts if a human signed it
+            if signers_path and verify_release(entry, signers_path):
                 state.pop(pid, None)
     released = []
     for pid, body in state.items():

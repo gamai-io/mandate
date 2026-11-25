@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.66.0 — 2026-11-25
+Second red-team pass, this time over the modules added in 0.62–0.65. Every fix has
+a test that fails on the previous behaviour:
+- **Refusals are now ledger records.** `redeem` wraps every path; a `PolicyDenied`,
+  `GrantReplayed` or `CommitmentMismatch` appends `control/refuse` with the code,
+  kind, target, nonce and approver before it is raised. "Show me every refused
+  effect yesterday" is now answerable, and a SIEM sees refusals, not only successes.
+- **`memory revoke` is signed.** An unsigned revocation record is treated as
+  tampering, not as a revocation, so deleting or forging one is refused.
+- **Containment:** an unsigned `extend` no longer keeps a process frozen, the
+  `containment-sweep` actor name is no longer a release bypass, and `--release`
+  actually sends SIGCONT (it previously recorded success and left the process
+  stopped).
+- **`sql.write` may not touch the audit table**, `sqlite_master` or `PRAGMA`: an
+  effect could pre-seed `applied_effects` and make the next real effect return a
+  forged "recovered" result.
+- **The config lock anchor is the first record**, so appending a forged
+  `config_lock` no longer wins; and **tool pinning is required for `mcp.call`**,
+  including the schema hash.
+- 430 pass, 4 documented skips.
+
 ## 0.65.0 — 2026-11-25
 Hardening after a red-team pass over the new surface:
 - **The instruction store is checked as a chain.** `check_provenance` refuses when

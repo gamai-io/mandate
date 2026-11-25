@@ -1481,7 +1481,8 @@ def main(argv=None) -> int:
             if not args.id:
                 _emit({"error": "Usage", "message": "memory revoke --id m-..."}, None)
                 return 2
-            _emit(memory_store.revoke(args.store, args.id, args.reason), None)
+            _emit(memory_store.revoke(args.store, args.id, args.approver,
+                                      args.key or "", args.reason), None)
             return 0
 
         if args.cmd == "tool":

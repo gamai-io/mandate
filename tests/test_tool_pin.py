@@ -63,7 +63,7 @@ class ToolPin(unittest.TestCase):
         item = core.normalize_intent({
             "v": 1, "actor": {"agent": "a", "session": "s"},
             "effect": {"kind": "mcp.call", "target": "x",
-                       "params": {"tool": "ghost.tool"}},
+                       "params": {"tool": "ghost.tool", "schema_sha256": "a" * 64}},
             "requested_by": "ops", "nonce": "n2",
             "provenance": [{"type": "data_ref", "source": "erp:x"}]})
         result = tools.verify(item, self.registry)

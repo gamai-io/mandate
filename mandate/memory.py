@@ -93,16 +93,34 @@ def get(path: str, instruction_id: str) -> dict | None:
     return found
 
 
-def revoke(path: str, instruction_id: str, reason: str = "") -> dict:
+def revoke(path: str, instruction_id: str, approver: str, key_path: str,
+           reason: str = "") -> dict:
+    """A revocation is a decision too, so it is signed like the instruction."""
     record = get(path, instruction_id)
     if record is None:
         raise MemoryError("no such instruction: %s" % instruction_id)
+    if not approver or not key_path:
+        raise MemoryError("revoking needs --approver and --key")
+    decision = {"id": instruction_id, "action": "revoke", "approver": approver,
+                "reason": reason, "decided_at": int(time.time())}
+    signature = sign.sign(core.jcs(decision), key_path)
     body = {k: record.get(k) for k in ("id", "text", "scope", "created_by",
                                        "approver", "created", "expires")}
     body.update({"v": 1, "type": "instruction", "revoked": True,
-                 "reason": reason, "revoked_at": int(time.time())})
+                 "reason": reason, "revoked_at": decision["decided_at"],
+                 "decision": decision, "sig": signature})
     _append(path, body)
     return body
+
+
+def revoke_valid(record: dict, signers_path: str) -> bool:
+    decision = (record or {}).get("decision") or {}
+    if (record or {}).get("action") in (None, "") and not (record or {}).get("revoked"):
+        return False
+    if not decision:
+        return False
+    return sign.verify(core.jcs(decision), str(decision.get("approver") or ""),
+                       str((record or {}).get("sig") or ""), signers_path, "mandate")
 
 
 def verify(record: dict, signers_path: str, now: float | None = None) -> bool:
@@ -160,9 +178,13 @@ def check_provenance(intent: dict, store_path: str, signers_path: str,
         if record is None:
             raise MemoryError("instruction %r is cited but not in the store"
                               % instruction_id)
+        if record.get("revoked"):
+            if not revoke_valid(record, signers_path):
+                raise MemoryError("instruction %r carries an unsigned revocation; "
+                                  "treat the store as tampered" % instruction_id)
+            raise MemoryError("instruction %r was revoked" % instruction_id)
         if not verify(record, signers_path, now):
-            raise MemoryError("instruction %r is unsigned, revoked or expired"
-                              % instruction_id)
+            raise MemoryError("instruction %r is unsigned or expired" % instruction_id)
         if not scope_covers(record.get("scope") or [], kind, target):
             raise MemoryError("instruction %r does not cover %s:%s"
                               % (instruction_id, kind, target))

@@ -58,12 +58,26 @@ class Instructions(Base):
         self.assertFalse(memory.verify(record, self.signers,
                                        now=record["expires"] + 1))
 
-    def test_a_revoked_instruction_does_not_verify(self) -> None:
+    def test_a_signed_revocation_is_honoured(self) -> None:
         record = memory.add(self.store, "pay Acme", ["payment.send:Acme"],
                             "alice", self.key)
-        memory.revoke(self.store, record["id"], "changed supplier")
-        self.assertFalse(memory.verify(memory.get(self.store, record["id"]),
-                                       self.signers))
+        memory.revoke(self.store, record["id"], "alice", self.key, "changed supplier")
+        cited = self.intent([{"type": "instruction", "source": record["id"]}])
+        with self.assertRaises(memory.MemoryError):
+            memory.check_provenance(cited, self.store, self.signers)
+
+    def test_an_unsigned_revocation_is_tampering(self) -> None:
+        record = memory.add(self.store, "pay Acme", ["payment.send:Acme"],
+                            "alice", self.key)
+        from mandate import core
+        core.append_receipt(self.store, {"v": 1, "type": "instruction",
+                                        "id": record["id"], "text": record["text"],
+                                        "scope": record["scope"],
+                                        "approver": record["approver"],
+                                        "revoked": True, "ts": 1})
+        cited = self.intent([{"type": "instruction", "source": record["id"]}])
+        with self.assertRaises(memory.MemoryError):
+            memory.check_provenance(cited, self.store, self.signers)
 
 
 class Scopes(Base):

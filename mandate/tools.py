@@ -66,8 +66,15 @@ def verify(intent: dict, registry_path: str) -> dict:
     """Compare the tool on disk with the registry and with what was approved."""
     params = (intent.get("effect") or {}).get("params") or {}
     name = str(params.get("tool") or "")
+    kind = str((intent.get("effect") or {}).get("kind") or "")
     if not name:
-        return {"ok": True, "checked": [], "drift": [], "skipped": "no tool named"}
+        if kind == "mcp.call":
+            return {"ok": False, "checked": [], "drift": [{
+                "tool": "-", "reason": "an mcp.call must name the tool it uses"}]}
+        return {"ok": True, "checked": [], "drift": [], "skipped": "not a tool effect"}
+    if not str(params.get("schema_sha256") or ""):
+        return {"ok": False, "checked": [], "drift": [{
+            "tool": name, "reason": "the approval did not name a schema hash"}]}
     registry = load(registry_path)
     entry = (registry.get("tools") or {}).get(name)
     if not entry:

@@ -115,6 +115,26 @@ class EarlyRelease(unittest.TestCase):
                                    signers_path=self.signers)
         self.assertEqual(result["released"], [self.proc.pid])
 
+    def test_an_unsigned_extend_does_not_hold_it_frozen(self) -> None:
+        core.append_receipt(self.ledger, {"v": 1, "type": "containment",
+                                          "action": "extend", "pid": self.proc.pid,
+                                          "until": int(time.time()) + 10 ** 8,
+                                          "ts": 1})
+        # without a signature the extension is ignored, so the deadline fires
+        containment.contain(self.proc.pid, minutes=1, ledger_path=self.ledger)
+        result = containment.sweep(self.ledger, now=int(time.time()) + 120,
+                                   signers_path=self.signers)
+        self.assertIn(self.proc.pid, result["released"])
+
+    def test_the_sweep_actor_name_is_not_a_bypass(self) -> None:
+        core.append_receipt(self.ledger, {"v": 1, "type": "containment",
+                                          "action": "release", "pid": self.proc.pid,
+                                          "actor": "containment-sweep", "ts": 1})
+        result = containment.sweep(self.ledger, now=int(time.time()) + 10 ** 6,
+                                   signers_path=self.signers)
+        self.assertEqual(result["released"], [self.proc.pid])
+        self.assertNotEqual(warden.states([self.proc.pid])[self.proc.pid], "T")
+
     def test_a_signed_release_ends_it_early(self) -> None:
         result = containment.release(self.ledger, self.proc.pid, "approver", self.key)
         self.assertTrue(result["ok"])

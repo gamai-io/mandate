@@ -106,6 +106,7 @@ def locked_digest(ledger: str) -> str:
         body = entry.get("body") or {}
         if body.get("action") == "config_lock":
             digest = str(body.get("store_sha256") or "")
+            break          # the earliest anchor wins; a later one is a forgery
     return digest
 
 

@@ -57,6 +57,12 @@ class SqlWriter:
             raise SqlWriteError("only INSERT and UPDATE are allowed, got %r" % keyword)
         if _BLOCKED.search(statement):
             raise SqlWriteError("one statement per effect")
+        lowered = statement.lower()
+        forbidden = (self.audit_table.lower(), "sqlite_master", "sqlite_schema",
+                     "pragma")
+        for word in forbidden:
+            if word in lowered:
+                raise SqlWriteError("an effect may not touch %r" % word)
         bound = params.get("args") or {}
         if not isinstance(bound, dict):
             raise SqlWriteError("params.args must be an object")

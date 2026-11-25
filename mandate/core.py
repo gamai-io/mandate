@@ -646,6 +646,47 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            sign_key: str | None = None, signer: str | None = None,
            signer_cmd: str | None = None, observe: bool = False,
            instruction_store: str = "") -> dict:
+    """Redeem a grant; any refusal is written to the ledger before it is raised."""
+    try:
+        return _redeem(intent, grant_obj, signers_path, ledger_path, namespace,
+                       allow_self, now, claim, policy, audience, require_audience,
+                       revoked_path, sign_key, signer, signer_cmd, observe,
+                       instruction_store)
+    except MandateError as exc:
+        _record_refusal(ledger_path, intent if isinstance(intent, dict) else {},
+                        exc, grant_obj)
+        raise
+
+
+def _record_refusal(ledger_path: str, intent: dict, exc: Exception,
+                    grant_obj: dict | None = None) -> None:
+    """A refused effect is evidence too. Record it, never let it hide."""
+    try:
+        grant_core = ((grant_obj or {}).get("grant") or {})
+        effect = (intent or {}).get("effect") or {}
+        append_receipt(ledger_path, {
+            "v": 1, "type": "control", "action": "refuse",
+            "code": type(exc).__name__, "message": str(exc)[:300],
+            "grant_nonce": str(grant_core.get("nonce") or ""),
+            "approver": str(grant_core.get("approver") or ""),
+            "kind": str(effect.get("kind") or ""),
+            "target": str(effect.get("target") or ""),
+            "actor": str((intent or {}).get("requested_by") or ""),
+            "ts": int(time.time())})
+    except Exception:
+        pass          # a broken ledger must not turn a refusal into a crash
+
+
+def _redeem(intent: dict, grant_obj: dict, signers_path: str,
+            ledger_path: str, namespace: str = "mandate",
+           allow_self: bool = False, now: float | None = None,
+           claim=None, policy: dict | None = None,
+           audience: str | None = None,
+           require_audience: bool = False,
+           revoked_path: str | None = None,
+           sign_key: str | None = None, signer: str | None = None,
+           signer_cmd: str | None = None, observe: bool = False,
+           instruction_store: str = "") -> dict:
     verified = verify_authorization(
         intent, grant_obj, signers_path, namespace, allow_self, now, policy,
         audience, require_audience, revoked_path)
