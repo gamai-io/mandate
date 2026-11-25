@@ -409,6 +409,8 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--svid-audience", dest="svid_audience", default=None)
     p_redeem.add_argument("--key", default=None, help="sign the receipt")
     p_redeem.add_argument("--signer", default=None)
+    p_redeem.add_argument("--observe", action="store_true",
+                          help="record what would happen without spending the grant")
     p_redeem.add_argument("--signer-cmd", dest="signer_cmd", default=None,
                           help="external HSM/KMS adapter that prints {sig, signer}")
 
@@ -786,7 +788,8 @@ def main(argv=None) -> int:
                 commitment, args.approver, ttl_s=args.ttl,
                 render_hash=rhash,
                 agent=str(intent["actor"]["agent"]),
-                audience=args.audience)
+                audience=args.audience,
+                policy_fingerprint=core.policy_digest(core.load_policy(args.policy)))
             _emit(core.make_grant(grant_core, args.key), args.out)
             return 0
 
@@ -826,7 +829,8 @@ def main(argv=None) -> int:
                 revoked_path=args.revoked,
                 sign_key=getattr(args, "key", None),
                 signer=getattr(args, "signer", None),
-                signer_cmd=getattr(args, "signer_cmd", None))
+                signer_cmd=getattr(args, "signer_cmd", None),
+                observe=getattr(args, "observe", False))
             _emit(receipt, None)
             return 0
 

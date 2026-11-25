@@ -87,7 +87,7 @@ def normalize_intent(intent: dict) -> dict:
     if not isinstance(effect, dict) or not isinstance(effect.get("kind"), str) \
             or not effect.get("kind"):
         raise MandateError("intent.effect.kind is required")
-    extra = set(effect) - {"kind", "target", "amount", "params"}
+    extra = set(effect) - {"kind", "target", "amount", "params", "revert"}
     if extra:
         raise MandateError("unknown effect fields: %s" % sorted(extra))
     if effect.get("target") is not None and not isinstance(effect["target"], str):
@@ -146,11 +146,13 @@ def normalize_intent(intent: dict) -> dict:
 def intent_core(intent: dict) -> dict:
     """What the approver signs: the effect AND who is allowed to execute it."""
     actor = intent.get("actor") or {}
+    effect = dict(intent["effect"])
+    effect["revert"] = str(effect.get("revert") or "irreversible")
     return {
         "v": VERSION,
         "actor": {"agent": actor.get("agent"), "session": actor.get("session")},
         "nonce": intent.get("nonce"),
-        "effect": intent["effect"],
+        "effect": effect,
         "requested_by": intent.get("requested_by"),
         "render_hash": render_hash(intent),
         "provenance_hash": provenance_hash(intent),
@@ -230,6 +232,11 @@ def missing_provenance(intent: dict, spec: dict) -> list[str]:
     return missing
 
 
+def policy_digest(policy: dict | None) -> str:
+    """Stable fingerprint of the policy that authorised an effect."""
+    return sha256(jcs(policy or {}))[:32]
+
+
 def check(intent: dict, policy: dict | None = None) -> dict:
     intent = normalize_intent(intent)
     pol = policy if isinstance(policy, dict) else load_policy()
@@ -278,7 +285,7 @@ def propose(intent: dict) -> dict:
 def build_grant_core(commitment: str, approver: str, max_uses: int = 1,
                      ttl_s: int = 900, nonce: str | None = None,
                      render_hash: str = "", agent: str = "",
-                     audience: str = "") -> dict:
+                     audience: str = "", policy_fingerprint: str = "") -> dict:
     now = int(time.time())
     return {
         "v": VERSION,
@@ -286,6 +293,7 @@ def build_grant_core(commitment: str, approver: str, max_uses: int = 1,
         "render_hash": str(render_hash or ""),
         "agent": str(agent or ""),
         "audience": str(audience or ""),
+        "policy_digest": str(policy_fingerprint or ""),
         "approver": str(approver),
         "scope": {"max_uses": 1, "not_after": now + max(1, int(ttl_s))},
         "nonce": nonce or uuid.uuid4().hex,
@@ -370,7 +378,13 @@ def claim_nonce_db(nonce: str, ledger_path: str | None = None) -> bool:
 
 
 def _used_nonces(path: str) -> set[str]:
-    return {str(e.get("body", {}).get("grant_nonce")) for e in read_ledger(path)}
+    used = set()
+    for entry in read_ledger(path):
+        body = entry.get("body") or {}
+        if body.get("binding") is False or body.get("decision") == "observe":
+            continue          # observation must not consume the grant
+        used.add(str(body.get("grant_nonce")))
+    return used
 
 
 def verify_chain(path: str, anchor: bool = True) -> bool:
@@ -419,6 +433,10 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
     intent = normalize_intent(intent)
     policy_obj = policy if isinstance(policy, dict) else load_policy()
     decision = check(intent, policy_obj)
+    approved_digest = str(((grant_obj or {}).get("grant") or {}).get("policy_digest") or "")
+    if approved_digest and approved_digest != policy_digest(policy_obj):
+        raise PolicyDenied("policy changed since approval: %s != %s"
+                           % (approved_digest, policy_digest(policy_obj)))
     if decision["decision"] == "deny":
         if decision.get("missing"):
             raise ProvenanceMissing(
@@ -528,7 +546,7 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            require_audience: bool = False,
            revoked_path: str | None = None,
            sign_key: str | None = None, signer: str | None = None,
-           signer_cmd: str | None = None) -> dict:
+           signer_cmd: str | None = None, observe: bool = False) -> dict:
     verified = verify_authorization(
         intent, grant_obj, signers_path, namespace, allow_self, now, policy,
         audience, require_audience, revoked_path)
@@ -536,7 +554,18 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     grant_core = verified["grant"]
     nonce = str(grant_core.get("nonce") or "")
     receipt = build_receipt(intent, grant_core, verified["commitment"],
-                            sha256(jcs(intent)), ts=verified["moment"])
+                            sha256(jcs(intent)), ts=verified["moment"],
+                            decision="observe" if observe else "executed")
+    if policy is not None:
+        receipt["policy_digest"] = policy_digest(policy)
+    receipt["binding"] = not observe
+    effect = intent.get("effect") or {}
+    receipt["revert"] = str(effect.get("revert") or ("irreversible" if not effect.get("revert") else ""))
+    if policy is not None and (policy.get("require_revert") or {}).get(str(effect.get("kind"))):
+        if not effect.get("revert"):
+            raise MandateError("policy requires a revert step for %s" % effect.get("kind"))
+    if observe:      # observation must not spend the grant
+        return append_receipt(ledger_path, receipt)
     if (policy or {}).get("require_signed_receipts") and not (sign_key or signer_cmd):
         raise MandateError("policy requires signed receipts: pass --key/--signer "
                            "or --signer-cmd")
@@ -574,6 +603,9 @@ def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
         return False
     core = (grant_obj or {}).get("grant") or {}
     if body.get("grant_nonce") != core.get("nonce"):
+        return False
+    if body.get("policy_digest") and core.get("policy_digest") and \
+            body["policy_digest"] != core["policy_digest"]:
         return False
     if body.get("signature") and not verify_receipt_signature(
             body, signers_path, revoked_path=revoked_path):

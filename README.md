@@ -222,6 +222,22 @@ write access to that cgroup; quarantine is per-uid, not per-process; neither is 
 hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
 Firecracker; "safe state" remains the bank's definition, not ours (row 5).
 
+## Policy digest, observe mode, revert
+
+Approval binds the policy it was granted under; a changed policy invalidates old
+grants. Observation is free, execution spends the grant, and every receipt says
+what would undo the effect.
+
+```bash
+mandate grant ...            # records policy_digest of the policy the approver saw
+mandate redeem ... --observe # receipt with binding=false, grant NOT spent
+mandate redeem ...           # real execution; if the policy changed -> PolicyDenied
+```
+
+- `policy.json` may declare `"require_revert": {"payment.send": true}`; a missing
+  `revert` step then blocks the effect.
+- Receipts carry `policy_digest`, `binding` and `revert` (`irreversible` when none).
+
 ## Short-lived identity and delegation
 
 An agent should not hold a long-lived key in its filesystem, and a sub-agent
