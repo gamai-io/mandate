@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import html
 import json
+import os
 import secrets
 import threading
 import time
@@ -31,7 +32,7 @@ import urllib.parse
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import core
+from . import core, webauthn
 
 MAX_BODY = 64 * 1024
 PAGE_TTL = 900
@@ -56,7 +57,9 @@ class Pending:
 class ApprovalPage:
     def __init__(self, key_path: str, approver_name: str, audience: str = "",
                  ttl: int = 900, wait_s: float = 300, token: str = "",
-                 ledger: str = "", signers: str = ""):
+                 ledger: str = "", signers: str = "",
+                 passkeys_path: str = "", rp_id: str = "127.0.0.1",
+                 origin: str = "", require_passkey: bool = False):
         self.key_path = key_path
         self.approver_name = approver_name
         self.audience = audience
@@ -68,6 +71,94 @@ class ApprovalPage:
         self.secret = secrets.token_bytes(32)
         self.pending: dict[str, Pending] = {}
         self.lock = threading.Lock()
+        self.passkeys_path = passkeys_path
+        self.rp_id = rp_id or "127.0.0.1"
+        self.origin = origin
+        self.require_passkey = require_passkey
+        self.passkeys: dict[str, dict] = self._load_passkeys()
+        self.challenges: dict[str, dict] = {}
+
+    # ------------------------------------------------------------- passkeys
+    def _load_passkeys(self) -> dict:
+        if not self.passkeys_path or not os.path.exists(self.passkeys_path):
+            return {}
+        try:
+            data = json.load(open(self.passkeys_path, encoding="utf-8"))
+        except (OSError, ValueError):
+            raise core.MandateError(
+                "passkey registry %s is unreadable; refusing to fall back to "
+                "key-only approval" % self.passkeys_path)
+        return data.get("credentials") or {}
+
+    def _save_passkeys(self) -> None:
+        if not self.passkeys_path:
+            return
+        directory = os.path.dirname(os.path.abspath(self.passkeys_path))
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        tmp = self.passkeys_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "credentials": self.passkeys}, fh,
+                      indent=1, sort_keys=True)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, self.passkeys_path)
+
+    def challenge(self, purpose: str, pending_id: str = "") -> dict:
+        value = webauthn.b64e(secrets.token_bytes(32))
+        with self.lock:
+            self.challenges[value] = {"purpose": purpose, "id": pending_id,
+                                      "expires": time.time() + 120}
+        return {"challenge": value, "rp_id": self.rp_id,
+                "origin": self.origin, "purpose": purpose}
+
+    def _consume_challenge(self, value: str, purpose: str,
+                           pending_id: str = "") -> None:
+        with self.lock:
+            item = self.challenges.pop(value, None)
+        if item is None or item["expires"] < time.time():
+            raise webauthn.WebAuthnError("unknown or expired challenge")
+        if item["purpose"] != purpose:
+            raise webauthn.WebAuthnError("challenge was issued for %r"
+                                         % item["purpose"])
+        if pending_id and item["id"] and item["id"] != pending_id:
+            raise webauthn.WebAuthnError("challenge belongs to another request")
+
+    def register_passkey(self, payload: dict) -> dict:
+        challenge = str(payload.get("challenge") or "")
+        self._consume_challenge(challenge, "register")
+        record = webauthn.register(str(payload.get("attestation") or ""),
+                                   str(payload.get("client_data") or ""),
+                                   challenge, self.rp_id, self.origin)
+        record.update({"label": str(payload.get("label") or "")[:80],
+                       "created": int(time.time())})
+        with self.lock:
+            self.passkeys[record["credential_id"]] = record
+            self._save_passkeys()
+        return {"ok": True, "credential_id": record["credential_id"],
+                "cose": record["cose"], "count": len(self.passkeys)}
+
+    def approve_with_passkey(self, payload: dict) -> dict:
+        pending_id = str(payload.get("id") or "")
+        credential_id = str(payload.get("credential_id") or "")
+        credential = self.passkeys.get(credential_id)
+        if credential is None:
+            raise webauthn.WebAuthnError("unknown credential")
+        challenge = str(payload.get("challenge") or "")
+        self._consume_challenge(challenge, "approve", pending_id)
+        result = webauthn.assert_valid(
+            credential, str(payload.get("auth_data") or ""),
+            str(payload.get("signature") or ""),
+            str(payload.get("client_data") or ""), challenge,
+            self.rp_id, self.origin)
+        with self.lock:
+            credential["sign_count"] = result["sign_count"]
+            credential["last_used"] = int(time.time())
+            self._save_passkeys()
+        approved = self.approve(pending_id)
+        approved["passkey"] = {"credential_id": credential_id,
+                               "user_verified": result["uv"],
+                               "sign_count": result["sign_count"]}
+        return approved
 
     # ------------------------------------------------------------------ forms
     def form_token(self, pending_id: str) -> str:
@@ -196,7 +287,7 @@ code{background:#0b0d12;padding:2px 6px;border-radius:5px;font-size:13px}
 """
 
 
-def _page(rows: list[dict]) -> str:
+def _page(rows: list[dict], passkeys: int = 0) -> str:
     if not rows:
         body = ('<p class="empty">Nema zahtjeva na čekanju. Stranica se sama '
                 'osvježava svakih 5 s.</p>')
@@ -216,7 +307,8 @@ def _page(rows: list[dict]) -> str:
     <input type="hidden" name="id" value="{id}">
     <input type="hidden" name="token" value="{token}">
     <div class="row">
-      <button class="ok" type="submit">Odobri</button>
+      <button class="ok" type="submit"
+              onclick="return approveIfPasskey(event,'{id}')">Odobri</button>
       <button class="no" type="submit" name="decision" value="reject"
               formaction="/reject">Odbij</button>
     </div>
@@ -243,10 +335,72 @@ def _page(rows: list[dict]) -> str:
   <p class="note">Potpis ide sa ključem na <em>ovom</em> hostu preko <code>ssh-keygen</code>
   (radi i sa <code>sk-</code> hardverskim ključem). Ovo nije WebAuthn/passkey.</p>
   %s
+  <p id="register-hint" class="note" style="display:none">
+     Nema registrovanog passkey-a. <button onclick="registerPasskey()">Registruj passkey</button>
+     (potpis tada ide sa uređaja, ne sa fajla na hostu).</p>
   <p class="note">Ova stranica poslužuje samo <code>127.0.0.1</code>.</p>
+  <div id="pk"></div>
 </div>
-<script>setTimeout(function(){location.reload()},5000)</script>
-</html>""" % (STYLE, body)
+<script>
+if (!%d) { document.addEventListener('DOMContentLoaded', function(){
+  var el = document.getElementById('register-hint'); if (el) el.style.display='block'; }); }
+function approveIfPasskey(ev, id){
+  if (!PASSKEYS) return true;          // no passkey: let the form submit
+  ev.preventDefault(); approveWithPasskey(id); return false;
+}
+const B64 = {
+  enc: b => btoa(String.fromCharCode.apply(null, new Uint8Array(b)))
+        .replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,''),
+  dec: s => Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),
+        function(c){ return c.charCodeAt(0); })
+};
+const PASSKEYS = %d;
+async function post(url, obj){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                              body: JSON.stringify(obj)});
+  return {status: r.status, body: await r.json()};
+}
+async function registerPasskey(){
+  const c = await (await fetch('/passkey/challenge?purpose=register')).json();
+  const cred = await navigator.credentials.create({publicKey:{
+    challenge: B64.dec(c.challenge),
+    rp: {id: c.rp_id, name: 'Mandate'},
+    user: {id: crypto.getRandomValues(new Uint8Array(16)), name: 'approver',
+           displayName: 'Mandate approver'},
+    pubKeyCredParams: [{type:'public-key', alg:-7}, {type:'public-key', alg:-8}],
+    authenticatorSelection: {userVerification:'required', residentKey:'preferred'},
+    timeout: 60000, attestation: 'none'}});
+  const att = cred.response.attestationObject;
+  const out = await post('/passkey/register', {
+    challenge: c.challenge,
+    attestation: B64.enc(att),
+    client_data: B64.enc(cred.response.clientDataJSON),
+    label: (navigator.userAgentData && navigator.userAgentData.platform) || 'passkey'});
+  document.getElementById('pk').textContent = out.status === 200
+    ? 'Passkey registrovan. Osvježi stranicu.' : ('Greška: ' + JSON.stringify(out.body));
+  setTimeout(() => location.reload(), 1200);
+}
+async function approveWithPasskey(id){
+  const c = await (await fetch('/passkey/challenge?purpose=approve&id=' + id)).json();
+  const assertion = await navigator.credentials.get({publicKey:{
+    challenge: B64.dec(c.challenge), rpId: c.rp_id, userVerification: 'required',
+    timeout: 60000}});
+  const out = await post('/approve', {
+    id: id, challenge: c.challenge,
+    credential_id: B64.enc(assertion.rawId),
+    auth_data: B64.enc(assertion.response.authenticatorData),
+    signature: B64.enc(assertion.response.signature),
+    client_data: B64.enc(assertion.response.clientDataJSON)});
+  document.getElementById('pk').textContent = out.status === 200
+    ? 'Odobreno.' : ('Odbijeno: ' + (out.body.message || out.body.error));
+  setTimeout(() => location.reload(), 1200);
+}
+if (!window.PublicKeyCredential) {
+  document.getElementById('pk').textContent =
+    'Ovaj browser ne podržava passkey; koristi dugmad ispod (ključ sa hosta).';
+}
+</script>
+</html>""" % (STYLE, body, passkeys, passkeys)
 
 
 def make_handler(page: ApprovalPage):
@@ -288,7 +442,15 @@ def make_handler(page: ApprovalPage):
                 self._json(401, {"ok": False, "error": "unauthorized"})
                 return
             if path in ("/", "/pending"):
-                self._html(200, _page(page.list_pending()))
+                self._html(200, _page(page.list_pending(), len(page.passkeys)))
+                return
+            if path == "/passkey/challenge":
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                purpose = (query.get("purpose") or ["approve"])[0]
+                if purpose not in ("register", "approve"):
+                    self._json(400, {"ok": False, "error": "bad purpose"})
+                    return
+                self._json(200, page.challenge(purpose, (query.get("id") or [""])[0]))
                 return
             if path == "/health":
                 self._json(200, {"ok": True, "approver": page.approver_name,
@@ -308,6 +470,16 @@ def make_handler(page: ApprovalPage):
                     self._json(413, {"ok": False, "error": "payload_too_large"})
                     return
                 raw = self.rfile.read(length) if length else b"{}"
+                if path == "/passkey/register":
+                    if not self._authorized():
+                        self._json(401, {"ok": False, "error": "unauthorized"})
+                        return
+                    self._json(200, page.register_passkey(json.loads(raw.decode())))
+                    return
+                if path == "/approve" and "json" in str(
+                        self.headers.get("Content-Type", "")):
+                    self._json(200, page.approve_with_passkey(json.loads(raw.decode())))
+                    return
                 if path == "/request":
                     payload = json.loads(raw.decode())
                     result = page.submit(payload.get("intent") or {},
@@ -322,12 +494,21 @@ def make_handler(page: ApprovalPage):
                     self._json(403, {"ok": False, "error": "bad form token"})
                     return
                 if path == "/approve":
+                    if page.passkeys or page.require_passkey:
+                        self._json(403, {"ok": False, "error": "passkey_required",
+                                         "message": "a passkey is registered on this "
+                                                    "host; a form button cannot "
+                                                    "replace it"})
+                        return
                     self._json(200, page.approve(pending_id))
                 elif path == "/reject":
                     reason = (form.get("reason") or [""])[0]
                     self._json(200, page.reject(pending_id, reason))
                 else:
                     self._json(404, {"error": "not found"})
+            except webauthn.WebAuthnError as exc:
+                self._json(403, {"ok": False, "error": "webauthn",
+                                 "message": str(exc)})
             except core.MandateError as exc:
                 self._json(409, {"ok": False, "error": type(exc).__name__,
                                  "message": str(exc)})
@@ -341,12 +522,15 @@ def make_handler(page: ApprovalPage):
 def serve(key_path: str, approver_name: str, host: str = "127.0.0.1",
           port: int = 8898, audience: str = "", ttl: int = 900,
           wait_s: float = 300, token: str = "", ledger: str = "",
-          allow_remote: bool = False) -> ThreadingHTTPServer:
+          allow_remote: bool = False, passkeys_path: str = "",
+          rp_id: str = "127.0.0.1", origin: str = "",
+          require_passkey: bool = False) -> ThreadingHTTPServer:
     if host not in ("127.0.0.1", "localhost", "::1") and not allow_remote:
         raise SystemExit("refusing to bind %s: the approval page is loopback-only "
                          "unless --allow-remote is given" % host)
     page = ApprovalPage(key_path, approver_name, audience, ttl, wait_s, token,
-                        ledger)
+                        ledger, passkeys_path=passkeys_path, rp_id=rp_id,
+                        origin=origin, require_passkey=require_passkey)
     server = ThreadingHTTPServer((host, int(port)), make_handler(page))
     server.daemon_threads = True
     server.page = page          # type: ignore[attr-defined]

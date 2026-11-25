@@ -264,7 +264,12 @@ def _cmd_approver(args) -> int:
             args.key, args.approver, args.host, args.port,
             audience=args.audience, ttl=args.ttl, wait_s=args.wait,
             token=args.token, ledger=getattr(args, "ledger", "") or "",
-            allow_remote=getattr(args, "allow_remote", False))
+            allow_remote=getattr(args, "allow_remote", False),
+            passkeys_path=getattr(args, "passkeys", "") or "",
+            rp_id=getattr(args, "rp_id", "127.0.0.1"),
+            origin=getattr(args, "origin", "") or
+                   "http://127.0.0.1:%d" % args.port,
+            require_passkey=getattr(args, "require_passkey", False))
         host, port = server.server_address[:2]
         print("mandate approval page on http://%s:%s (approver=%s) - open it in a "
               "browser on this host" % (host, port, args.approver), flush=True)
@@ -718,6 +723,10 @@ def main(argv=None) -> int:
     p_as.add_argument("--wait", type=float, default=300,
                       help="seconds a pending request waits for a human")
     p_as.add_argument("--ledger", default="", help="append approval decisions here")
+    p_as.add_argument("--passkeys", default="", help="passkey registry (JSON, 0600)")
+    p_as.add_argument("--rp-id", dest="rp_id", default="127.0.0.1")
+    p_as.add_argument("--origin", default="", help="browser origin, e.g. http://127.0.0.1:8898")
+    p_as.add_argument("--require-passkey", dest="require_passkey", action="store_true")
     p_as.add_argument("--telegram-token-env", default="TELEGRAM_BOT_TOKEN")
     p_as.add_argument("--rate-limit-per-min", type=float,
                       default=float(os.environ.get("MANDATE_RATE_PER_MIN", "0")))

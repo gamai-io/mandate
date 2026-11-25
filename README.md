@@ -239,6 +239,21 @@ mandate approver serve --page --key ~/.ssh/approver --approver "Amina H." \
 # then open http://127.0.0.1:8898 on that machine
 ```
 
+**With a passkey** (WebAuthn), the signature comes from the device, not a file:
+
+```bash
+mandate approver serve --page --passkeys ~/.mandate/passkeys.json \
+    --rp-id 127.0.0.1 --require-passkey --key ~/.ssh/approver --approver "Amina H."
+```
+
+The server verifies the assertion itself — `clientDataJSON` (type, challenge,
+origin), `rpIdHash`, the signature over `authData || sha256(clientData)`, and a
+signature counter that must advance. `ES256` and `EdDSA` are both accepted;
+attestation is `none` only, so we register the key without judging the hardware.
+Once a passkey exists, a form button **cannot** approve: the request is refused.
+The browser JavaScript is not covered by CI — the verification it calls is
+(12 WebAuthn tests plus 4 end-to-end ceremony tests with a software authenticator).
+
 The page shows the **rendered effect** — amount, supplier, agent, broker — and
 the button signs that exact snapshot. If the request changes after it was shown,
 approval is refused (`render_hash` no longer matches). Every decision is appended
@@ -805,7 +820,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.47.0** — canonical commitment, Ed25519
+**v0.48.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

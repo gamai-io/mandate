@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.48.0 — 2026-11-25
+- **Passkey approval.** `mandate/webauthn.py` verifies WebAuthn assertions with
+  the standard library: `ES256` (P-256) and `EdDSA`, `clientDataJSON` type /
+  challenge / origin, `rpIdHash`, the signature over `authData || sha256(clientData)`,
+  and a monotonic signature counter (a cloned authenticator is refused). Minimal
+  CBOR decoder included; attestation is accepted as `none` only, stated as such.
+- `mandate approver serve --page --passkeys FILE [--require-passkey]`:
+  registration and assertion endpoints, challenge store with 120 s TTL, registry
+  written `0600`, and a hard rule that a form button cannot approve once a passkey
+  exists.
+- 12 WebAuthn tests (registration, challenge/origin/rpId, tampered signature,
+  counter rollback, zero counter, packed attestation refused) and 4 end-to-end
+  ceremony tests through the HTTP server.
+- Honest limit in the docs: the browser JavaScript is not exercised by CI; the
+  verification it calls is.
+- 312 tests.
+
 ## 0.47.0 — 2026-11-25
 - `mandate approver serve --page`: a browser page a human can actually use. It
   shows the rendered effect (amount, target, agent, broker), and the button signs
