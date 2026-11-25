@@ -134,6 +134,31 @@ def decide(policy: dict, host: str, port: int) -> dict:
     return {"allow": False, "code": "not_allowlisted", "ips": ips}
 
 
+def guard(url: str, policy: dict | None, what: str = "outbound call") -> dict:
+    """Check a destination before connecting. Denied is an exception, not a warning.
+
+    Called by the adapters on every request, not only at construction, because a
+    hostname can resolve differently the second time (DNS rebinding).
+    """
+    from urllib.parse import urlsplit
+    pol = policy if isinstance(policy, dict) else default_policy()
+    parts = urlsplit(str(url or ""))
+    host = parts.hostname or ""
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    if not host:
+        raise ValueError("%s has no host" % what)
+    decision = decide(pol, host, port)
+    if decision.get("allow") and not pol.get("allow_metadata"):
+        ips = decision.get("ips") or ([decision["ip"]] if decision.get("ip") else [])
+        if any(str(ip) in METADATA_HOSTS for ip in ips):
+            raise ValueError("egress denied for %s (%s): metadata address"
+                             % (what, host))
+    if not decision.get("allow"):
+        raise ValueError("egress denied for %s (%s): %s"
+                         % (what, host, decision.get("code")))
+    return decision
+
+
 def _record(policy: dict, ledger_path: str | None, body: dict) -> None:
     if ledger_path:
         append_receipt(ledger_path, {"v": 1, "type": "control", **body})

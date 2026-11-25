@@ -12,7 +12,7 @@ import os
 import urllib.error
 import urllib.request
 
-from .. import core
+from .. import core, egress
 from ..net import require_http
 
 
@@ -25,6 +25,14 @@ class Publisher:
         self.cfg = cfg or {}
         self.url = require_http(str(self.cfg.get("url") or ""), "registry url")
         self.token = os.environ.get(str(self.cfg.get("token_env") or ""), "")
+        self.egress = self.cfg.get("egress") or None
+
+    def _guard(self) -> None:
+        if self.egress is not None:
+            try:
+                egress.guard(self.url, self.egress, "package publish")
+            except ValueError as exc:
+                raise PublishError(str(exc)) from exc
 
     def _headers(self, idem_key: str) -> dict:
         headers = {"Content-Type": "application/json",
@@ -34,6 +42,7 @@ class Publisher:
         return headers
 
     def lookup(self, idem_key: str) -> dict | None:
+        self._guard()
         request = urllib.request.Request(
             self.url.rstrip("/") + "/" + str(idem_key), headers=self._headers(idem_key),
             method="GET")
@@ -44,6 +53,8 @@ class Publisher:
             if exc.code == 404:
                 return None
             raise PublishError("registry lookup http %s" % exc.code) from exc
+        except OSError as exc:
+            raise PublishError("registry unreachable: %s" % str(exc)[:120]) from exc
 
     def execute(self, intent: dict, idem_key: str) -> dict:
         effect = intent.get("effect") or {}
@@ -51,6 +62,7 @@ class Publisher:
         artefact = str(params.get("artefact") or "")
         if not artefact:
             raise PublishError("package.publish needs params.artefact")
+        self._guard()
         existing = self.lookup(idem_key)
         if existing:
             return {"ok": True, "idem_key": idem_key, "recovered": True,

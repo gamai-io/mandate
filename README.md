@@ -292,6 +292,19 @@ parameters, and records the row count. `package.publish` sends one artefact with
 idempotency key and the registry token from the broker's environment — the agent
 never holds it.
 
+Both go through the **egress gate** when the adapter has a policy, so a publish
+cannot leave for a destination nobody allowed:
+
+```json
+"publish": {"url": "https://registry.internal", "token_env": "REGISTRY_TOKEN",
+            "egress": {"version": 1, "default": "deny",
+                       "allow": ["registry.internal:443"]}}
+```
+
+The check runs on **every request**, not at startup, because a hostname can resolve
+differently the second time. A metadata address is refused even when someone
+allowlists it, unless the policy says `allow_metadata` explicitly.
+
 ## A tool approval is a schema hash, not a name
 
 `erp.read` today is not `erp.read` tomorrow — that is the Deadbugz shape. So a
@@ -949,7 +962,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.59.0** — canonical commitment, Ed25519
+**v0.60.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

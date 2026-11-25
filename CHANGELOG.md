@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.60.0 — 2026-11-25
+- **The egress gate is wired into the outbound adapters.** `payment` and
+  `package.publish` accept an `egress` policy and call `egress.guard` on every
+  request, so a publish or a charge cannot leave for a destination that is not
+  allowlisted. The metadata guard cannot be defeated by allowlisting the address
+  (only `allow_metadata: true` can), and a payment-recovery path no longer swallows
+  an egress refusal as "no charge yet".
+- 7 tests (loopback needs an explicit entry, wrong port refused, metadata refused
+  when named, publisher and payment adapter refusals, adapter without a policy);
+  393 pass, 3 documented skips.
+
 ## 0.59.0 — 2026-11-25
 - **`sql.write` and `package.publish` are broker-owned effects.** One INSERT or
   UPDATE per effect (no DDL, no DELETE), bound parameters, row count in the result;

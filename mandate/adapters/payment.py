@@ -8,7 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .. import core
+from .. import core, egress
 from ..net import require_http
 
 
@@ -70,6 +70,14 @@ class HttpProvider:
     def __init__(self, cfg: dict):
         self.url = require_http(str(cfg.get("url") or ""), "payment provider url")
         self.token = os.environ.get(str(cfg.get("token_env") or ""), "")
+        self.egress = cfg.get("egress") or None
+
+    def _guard(self) -> None:
+        if self.egress is not None:
+            try:
+                egress.guard(self.url, self.egress, "payment provider")
+            except ValueError as exc:
+                raise PaymentError(str(exc)) from exc
 
     def _headers(self) -> dict:
         headers = {"Content-Type": "application/json"}
@@ -78,6 +86,7 @@ class HttpProvider:
         return headers
 
     def lookup(self, idem_key):
+        self._guard()
         request = urllib.request.Request(
             self.url.rstrip("/") + "/" + urllib.parse.quote(str(idem_key)),
             headers=self._headers(), method="GET")
@@ -90,6 +99,7 @@ class HttpProvider:
             raise PaymentError("payment lookup http %s" % exc.code) from exc
 
     def charge(self, idem_key, target, amount, currency, reference):
+        self._guard()
         payload = json.dumps({
             "idempotency_key": str(idem_key), "target": str(target),
             "amount": float(amount), "currency": str(currency),
@@ -158,6 +168,8 @@ class PaymentAdapter:
         """
         try:
             existing = self.provider.lookup(idem_key)
+        except PaymentError:
+            raise            # an egress refusal must not look like "no charge yet"
         except Exception:
             return None
         if not existing:
