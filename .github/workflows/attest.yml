@@ -7,6 +7,8 @@ name: attest
 on:
   release:
     types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -36,7 +38,7 @@ jobs:
             dist/*.tar.gz
       - name: Upload SBOM next to the artifacts
         run: |
-          python -m gama_mandate.sbom 2>/dev/null || python -c "import mandate, json; from mandate import report; report.sbom(mandate.__version__, 'dist/sbom.json')"
+          python -c "import mandate; from mandate import report; report.sbom(mandate.__version__, 'dist/sbom.json')"
       - uses: actions/upload-artifact@v4
         with:
           name: dist-with-provenance
