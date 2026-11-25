@@ -29,7 +29,9 @@ RULES = [
     (HIGH, "google api key", re.compile(r"\bAIza[0-9A-Za-z_-]{30,}")),
     (HIGH, "slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
     (HIGH, "assigned secret literal",
-     re.compile(r"(?i)\b(api_key|apikey|secret|password|passwd|token)\b\s*[:=]\s*[\"'][^\"'\s]{12,}[\"']")),
+     # a name is not a value: env:PAY_TOKEN, $PAY_TOKEN and "token_env" are fine
+     re.compile(r"(?i)\b(api_key|apikey|secret|password|passwd|token)\b\s*[:=]\s*"
+                r"[\"'](?!env:|\$)[^\"'\s]{12,}[\"']")),
     (HIGH, "internal absolute path", re.compile(r"/(root|home/[a-z0-9._-]+)/")),
     (HIGH, "internal host name",
      re.compile(r"(?i)\b(contabo|oracle-vps|linux3|vmlab|dispecer|podrum|kuca|vastvm)\b")),
