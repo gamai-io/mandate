@@ -93,8 +93,13 @@ class Warden(unittest.TestCase):
         self.assertIsNone(warden._stat(self.proc.pid))
 
     def test_unknown_pid_is_an_error(self) -> None:
+        # 999_999 could be reused on a busy host; pick something outside the
+        # default pid range instead of relying on a specific number being free.
+        unknown = 2 ** 22 + 4242
+        if os.path.exists("/proc/%d" % unknown):
+            self.skipTest("pid %d exists on this host" % unknown)
         with self.assertRaises(ValueError):
-            warden.stop(999_999, by_pgid=False)
+            warden.stop(unknown, by_pgid=False)
 
     def test_pids_in_pgid_finds_the_child(self) -> None:
         self.assertIn(self.proc.pid, warden.pids_in_pgid(self.proc.pid))

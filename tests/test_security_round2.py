@@ -38,7 +38,7 @@ class CrossLedgerNonce(unittest.TestCase):
         grant_core = core.build_grant_core(core.intent_commitment(self.intent),
                                           "approver", ttl_s=600,
                                           render_hash=core.render_hash(self.intent),
-                                          agent="bank-agent", audience="local-broker")
+                                          agent="bank-agent", audience="")
         self.grant = core.make_grant(grant_core, self.approver)
 
     def tearDown(self) -> None:
@@ -114,7 +114,7 @@ class SignedReceipts(unittest.TestCase):
         grant_core = core.build_grant_core(core.intent_commitment(self.intent),
                                           "approver", ttl_s=600,
                                           render_hash=core.render_hash(self.intent),
-                                          agent="bank-agent", audience="local-broker")
+                                          agent="bank-agent", audience="")
         self.grant = core.make_grant(grant_core, self.approver)
 
     def tearDown(self) -> None:

@@ -49,7 +49,7 @@ class Flow(unittest.TestCase):
             "provenance": [{"type": "data_ref", "source": "erp:x"}]})
         gc = build_grant_core(intent_commitment(self.intent), "approver", ttl_s=600,
                               render_hash=render_hash(self.intent),
-                              agent="bank-agent", audience="local-broker")
+                              agent="bank-agent", audience="")
         self.grant = make_grant(gc, self.approver)
 
     def tearDown(self) -> None:

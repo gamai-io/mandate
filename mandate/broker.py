@@ -188,7 +188,12 @@ class Broker:
             from .governance import check as governance_check
             from .governance import load_limits
             ledger = getattr(self, "ledger", None) or getattr(self, "ledger_path", None)
-            gov = governance_check(ledger, load_limits(getattr(self, "policy_path", None)))
+            amount = intent.get("effect", {}).get("amount") or {}
+            pending = {"value": float(amount.get("value") or 0),
+                       "currency": str(amount.get("currency") or "")}
+            gov = governance_check(ledger,
+                                   load_limits(getattr(self, "policy_path", None)),
+                                   pending=pending)
             if not gov["allow"]:
                 raise core.PolicyDenied("governance: %s" % gov["code"])
         except core.MandateError:
@@ -235,6 +240,28 @@ class Broker:
             raise ReplayBusy("execution in progress")
         if status == "done":
             return self._duplicate(nonce)
+        if status == "retry":
+            # A previous worker held the lease and vanished. Never re-run an
+            # effect blindly: ask the provider whether it already happened.
+            recovered = None
+            if kind == "payment.send" and self.payment is not None:
+                recovered = self.payment.recover(nonce)
+            if recovered is None:
+                raise ReplayBusy(
+                    "a previous attempt did not finish; whether the effect "
+                    "happened cannot be proven, so it is not repeated")
+            self.journal.claim(nonce, self.broker_name)
+            self.journal.mark_executed(nonce, core.jcs(recovered),
+                                       external_ref=recovered.get("idem_key"))
+            receipt, entry = self._finalize(
+                nonce, intent, grant_core, verified["commitment"], recovered,
+                core.sha256(core.jcs(recovered)))
+            return {"ok": True, "effect": kind, "receipt": receipt,
+                    "result": recovered, "result_entry": entry, "recovered": True}
+        if status == "new":
+            # one-shot across deployments, not only inside this journal
+            if not core.claim_nonce_db(nonce, self.ledger):
+                raise core.GrantReplayed("grant already used (nonce store)")
         if not self.journal.claim(nonce, self.broker_name):
             row = self.journal.get(nonce) or {}
             if row.get("state") in ("executed", "receipted"):

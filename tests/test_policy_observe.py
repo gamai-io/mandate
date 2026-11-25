@@ -52,7 +52,7 @@ class Base(unittest.TestCase):
     def grant(self, policy: dict) -> dict:
         core = build_grant_core(intent_commitment(self.intent), "approver", ttl_s=600,
                                 render_hash=render_hash(self.intent), agent="bank-agent",
-                                audience="local-broker",
+                                audience="",
                                 policy_fingerprint=policy_digest(policy))
         return make_grant(core, self.key)
 
@@ -101,7 +101,7 @@ class Revert(Base):
                                               if k != "revert"}})
         core = build_grant_core(intent_commitment(intent), "approver", ttl_s=600,
                                 render_hash=render_hash(intent), agent="bank-agent",
-                                audience="local-broker",
+                                audience="",
                                 policy_fingerprint=policy_digest(policy))
         grant = make_grant(core, self.key)
         with self.assertRaises(MandateError):

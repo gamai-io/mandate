@@ -174,6 +174,8 @@ def ledger_head(path: str) -> str:
 
 
 def request_token(head_hex: str, tsa: str = DEFAULT_TSA, timeout: int = 40) -> bytes:
+    from .net import require_http
+    tsa = require_http(tsa, "timestamp authority")
     req = build_request(head_hex)
     r = urllib.request.Request(tsa, data=req,
                                headers={"Content-Type": "application/timestamp-query"})

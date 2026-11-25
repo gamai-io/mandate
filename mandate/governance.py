@@ -16,7 +16,7 @@ import os
 import time
 from typing import Any
 
-from .core import append_receipt, read_ledger
+from .core import MandateError, append_receipt, read_ledger
 
 CONTROL_TYPE = "control"
 
@@ -36,8 +36,9 @@ def load_limits(policy_path: str | None) -> dict:
         return limits
     try:
         data = json.load(open(policy_path, encoding="utf-8"))
-    except (OSError, ValueError):
-        return limits
+    except (OSError, ValueError) as exc:
+        # a limits file we cannot read must not mean "no limits"
+        raise MandateError("limits unreadable in %s: %s" % (policy_path, exc)) from exc
     block = (data or {}).get("limits") or {}
     if isinstance(block, dict):
         for key in DEFAULTS:
@@ -100,7 +101,10 @@ def _amount(body: dict) -> tuple[float, str]:
     return 0.0, ""
 
 
-def check(ledger_path: str, limits: dict, now: float | None = None) -> dict:
+def check(ledger_path: str, limits: dict, now: float | None = None,
+          pending: dict | None = None) -> dict:
+    """`pending` is the effect about to run, {value, currency}; the cap must
+    include it, otherwise one large payment walks through a small limit."""
     """Return {"allow": bool, "code": str, "detail": {...}} for the next effect."""
     now = time.time() if now is None else now
     control = last_control(ledger_path)
@@ -127,9 +131,15 @@ def check(ledger_path: str, limits: dict, now: float | None = None) -> dict:
                 return {"allow": False, "code": "limit_currency",
                         "detail": {"seen": cur, "expected": currency}}
             total += value
-        if total >= max_amount:
+        pending_value = float((pending or {}).get("value") or 0)
+        pending_currency = str((pending or {}).get("currency") or currency or "")
+        if pending_currency and currency and pending_currency != currency:
+            return {"allow": False, "code": "limit_currency",
+                    "detail": {"pending": pending_currency, "expected": currency}}
+        if total + pending_value > max_amount:
             return {"allow": False, "code": "limit_amount",
-                    "detail": {"used": total, "max": max_amount, "currency": currency}}
+                    "detail": {"used": total, "pending": pending_value,
+                               "max": max_amount, "currency": currency}}
 
     max_total = float(limits.get("max_total_seconds") or 0)
     if max_total and receipts:

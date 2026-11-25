@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.52.0 — 2026-11-25
+Security pass after an external review. Breaking where the old behaviour was unsafe:
+- **Audience is enforced.** A grant bound to an audience can no longer be redeemed
+  by a caller that does not name it; previously the check was skipped entirely
+  when `--audience` was omitted. `mandate redeem` on a bound grant now needs
+  `--audience`.
+- **Crash recovery never charges twice.** When a lease expires, the broker asks the
+  payment provider whether the effect already happened and finalises that result;
+  for effects without an idempotency key it refuses to repeat and says why.
+- **Single use crosses deployments.** The broker claims the grant nonce in the
+  shared nonce store, not only in its own journal.
+- **A truncated or edited ledger is refused**, not silently repaired: appending to
+  a file whose head does not match its tail (or whose last entry no longer matches
+  its own hash) raises instead of rewriting `.head`.
+- **One approval, one grant**: the approval page refuses a second POST for the
+  same request, and requires user verification (UV), so a touch-only passkey does
+  not approve a payment.
+- **Limits include the pending effect**, and an unreadable limits file is a refusal
+  rather than "no limits".
+- `mandate restore` rejects archive members that escape the target directory or are
+  links/devices; outbound URLs must be http(s) with a host.
+- 354 tests.
+
 ## 0.51.2 — 2026-11-25
 - **Append is no longer quadratic.** `_append_locked` read the entire ledger on
   every write, so the n-th receipt cost O(n). It now reads only the last line and

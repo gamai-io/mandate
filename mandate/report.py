@@ -20,7 +20,7 @@ import time
 from collections import defaultdict
 
 from . import sign
-from .core import append_receipt, read_ledger
+from .core import MandateError, append_receipt, read_ledger
 from .jcs import canonicalize
 
 
@@ -287,7 +287,16 @@ def restore(archive_path: str, out_dir: str) -> dict:
     manifest = json.load(open(manifest_path, encoding="utf-8")) if os.path.exists(manifest_path) else {}
     os.makedirs(out_dir, exist_ok=True)
     with tarfile.open(archive_path, "r:gz") as tf:
-        tf.extractall(out_dir)
+        members = []
+        for member in tf.getmembers():
+            name = member.name.replace("\\", "/")
+            if os.path.isabs(name) or ".." in name.split("/"):
+                raise MandateError("archive member escapes the target: %r" % member.name)
+            if member.issym() or member.islnk() or member.isdev():
+                raise MandateError("archive member is a link or device: %r"
+                                   % member.name)
+            members.append(member)
+        tf.extractall(out_dir, members=members)
     problems = []
     for name, want in (manifest.get("members") or {}).items():
         found = None

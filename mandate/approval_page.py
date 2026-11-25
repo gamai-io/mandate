@@ -59,7 +59,8 @@ class ApprovalPage:
                  ttl: int = 900, wait_s: float = 300, token: str = "",
                  ledger: str = "", signers: str = "",
                  passkeys_path: str = "", rp_id: str = "127.0.0.1",
-                 origin: str = "", require_passkey: bool = False):
+                 origin: str = "", require_passkey: bool = False,
+                 require_uv: bool = True):
         self.key_path = key_path
         self.approver_name = approver_name
         self.audience = audience
@@ -75,6 +76,7 @@ class ApprovalPage:
         self.rp_id = rp_id or "127.0.0.1"
         self.origin = origin
         self.require_passkey = require_passkey
+        self.require_uv = require_uv
         self.passkeys: dict[str, dict] = self._load_passkeys()
         self.challenges: dict[str, dict] = {}
 
@@ -150,6 +152,10 @@ class ApprovalPage:
             str(payload.get("signature") or ""),
             str(payload.get("client_data") or ""), challenge,
             self.rp_id, self.origin)
+        if self.require_uv and not result.get("uv"):
+            raise webauthn.WebAuthnError(
+                "the authenticator did not perform user verification; a touch "
+                "alone is not an approval")
         with self.lock:
             credential["sign_count"] = result["sign_count"]
             credential["last_used"] = int(time.time())
@@ -212,11 +218,16 @@ class ApprovalPage:
     def approve(self, pending_id: str) -> dict:
         with self.lock:
             item = self.pending.get(pending_id)
-        if item is None:
-            raise core.GrantInvalid("no such pending request")
+            if item is None:
+                raise core.GrantInvalid("no such pending request")
+            if item.decision is not None:
+                raise core.GrantInvalid("this request was already decided (%s)"
+                                        % item.decision)
+            item.decision = "approving"
         # the snapshot is what gets signed; if it no longer renders the same, stop
         recomputed = core.render_hash(item.intent)
         if recomputed != item.proposal["render_hash"]:
+            item.decision = None
             item.error = "the request changed after it was displayed"
             item.event.set()
             raise core.CommitmentMismatch(item.error)

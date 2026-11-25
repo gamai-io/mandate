@@ -54,7 +54,9 @@ def claim_local(nonce: str, ledger_path: str | None = None) -> bool:
 
 
 def claim_remote(nonce: str) -> bool:
-    url = os.environ.get(URL_ENV, "").rstrip("/")
+    from .net import require_http
+    url = require_http(os.environ.get(URL_ENV, "").rstrip("/"),
+                       "MANDATE_NONCE_URL").rstrip("/")
     token = os.environ.get(TOKEN_ENV, "")
     body = json.dumps({"nonce": str(nonce)}).encode()
     req = urllib.request.Request(url + "/claim", data=body, method="POST",

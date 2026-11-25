@@ -368,6 +368,9 @@ def _tail_entry(path: str) -> dict | None:
         return None
     if not isinstance(entry, dict) or "body" not in entry or "hash" not in entry:
         return None
+    if sha256(jcs(entry["body"])) != entry["hash"]:
+        raise MandateError("the last ledger entry does not match its own hash: "
+                           "the file was edited; refusing to append")
     try:
         head = open(path + ".head", encoding="utf-8").read().strip()
     except OSError:
@@ -381,6 +384,21 @@ def _append_locked(path: str, body: dict) -> dict:
         prev = tail["hash"]
     else:
         entries = read_ledger(path)
+        if entries:
+            last = entries[-1]
+            if sha256(jcs(last.get("body") or {})) != last.get("hash"):
+                raise MandateError("the last ledger entry does not match its own "
+                                   "hash: the file was edited; refusing to append")
+        head_path = path + ".head"
+        if entries and os.path.exists(head_path):
+            try:
+                head = open(head_path, encoding="utf-8").read().strip()
+            except OSError:
+                head = ""
+            if head and head != entries[-1]["hash"]:
+                raise MandateError(
+                    "ledger head does not match the last entry: the file was "
+                    "truncated or tampered with; refusing to append")
         prev = entries[-1]["hash"] if entries else "GENESIS"
     body = dict(body, prev=prev)
     entry = {"body": body, "hash": sha256(jcs(body))}
@@ -489,8 +507,11 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
     bound_agent = str(grant_core.get("agent") or "")
     if bound_agent and bound_agent != str(intent["actor"].get("agent") or ""):
         raise CommitmentMismatch("grant is bound to a different agent")
+    bound_audience = str(grant_core.get("audience") or "")
+    if bound_audience and audience is None:
+        raise GrantInvalid("grant is bound to audience %r; this caller did not "
+                           "identify itself" % bound_audience)
     if audience is not None:
-        bound_audience = str(grant_core.get("audience") or "")
         if require_audience and not bound_audience:
             raise GrantInvalid("grant is not bound to a broker audience")
         if bound_audience and bound_audience != str(audience):

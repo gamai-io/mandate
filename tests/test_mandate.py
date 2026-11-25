@@ -55,7 +55,7 @@ class MandateTests(unittest.TestCase):
         self.td.cleanup()
 
     def _grant(self, intent, approver="approver", ttl=900, key=None,
-               render_hash=None, agent=None, audience="gama-broker"):
+               render_hash=None, agent=None, audience=""):
         proposal = core.propose(intent)
         grant_core = core.build_grant_core(
             proposal["commitment"], approver, ttl_s=ttl,
@@ -405,7 +405,7 @@ class MandateTests(unittest.TestCase):
 
     def test_broker_executes_once(self):
         intent = intent_factory()
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         port = self._start_broker()
         status, body = self._post(port, intent, grant)
         self.assertEqual(status, 200, body)
@@ -456,7 +456,7 @@ class MandateTests(unittest.TestCase):
         erp = self._make_erp()
         intent = intent_factory()
         intent["effect"]["target"] = "Beta d.o.o."
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         port = self._start_broker(erp=erp)
         status, _body = self._post(port, intent, grant)
         self.assertEqual(status, 409)
@@ -497,7 +497,7 @@ class MandateTests(unittest.TestCase):
         intent = intent_factory(effect={
             "kind": "message.send", "target": "customer@example.com",
             "params": {"subject": "Ponuda", "body": "Dobar dan"}})
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         outbox = os.path.join(self.dir, "outbox-smtp")
         port = self._start_broker(smtp={"mode": "dry_run", "outbox": outbox})
         status, body = self._post(port, intent, grant)
@@ -515,7 +515,7 @@ class MandateTests(unittest.TestCase):
                 broker_key + ".pub").read_text(encoding="utf-8").strip(),
             encoding="utf-8")
         intent = intent_factory()
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         port = self._start_broker(receipt_key=broker_key,
                                   broker_name="gama-broker")
         status, body = self._post(port, intent, grant)
@@ -549,7 +549,7 @@ class MandateTests(unittest.TestCase):
     def test_recovery_after_effect_before_receipt(self):
         db = self._target_db()
         intent = intent_factory()
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         b = self._sql_broker(db, lease_s=0)
         with mock.patch.object(b.journal, "mark_executed",
                                side_effect=RuntimeError("crash")):
@@ -587,7 +587,7 @@ class MandateTests(unittest.TestCase):
 
     def test_writer_failure_marks_failed(self):
         intent = intent_factory()
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         b = self._sql_broker(self._target_db())
         with mock.patch.object(b.writer, "execute",
                                side_effect=RuntimeError("boom")):
@@ -608,7 +608,7 @@ class MandateTests(unittest.TestCase):
     def test_concurrent_execute_single_effect(self):
         db = self._target_db()
         intent = intent_factory()
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         b = self._sql_broker(db, lease_s=30)
         results, errors = [], []
 
@@ -641,7 +641,7 @@ class MandateTests(unittest.TestCase):
 
     def test_broker_token_required(self):
         intent = intent_factory()
-        grant = self._grant(intent)
+        grant = self._grant(intent, audience="gama-broker")
         port = self._start_broker(token="dummy-broker-token")
         status, body = self._post(port, intent, grant)
         self.assertEqual(status, 401, body)

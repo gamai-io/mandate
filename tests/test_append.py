@@ -35,7 +35,8 @@ class Append(unittest.TestCase):
         self.assertLess(large, 4 * small + 5.0,
                         "append looks quadratic: %.1fs vs %.1fs" % (large, small))
 
-    def test_a_tampered_tail_falls_back_to_a_full_read(self) -> None:
+    def test_a_tampered_tail_is_refused_not_repaired(self) -> None:
+        """Silently rewriting .head after a bad tail would hide deleted entries."""
         with tempfile.TemporaryDirectory() as td:
             ledger = os.path.join(td, "ledger.jsonl")
             core.append_receipt(ledger, body("n1"))
@@ -45,8 +46,18 @@ class Append(unittest.TestCase):
             last["body"]["decision"] = "allowed"          # hash no longer matches
             lines[-1] = json.dumps(last, sort_keys=True)
             open(ledger, "w", encoding="utf-8").write("\n".join(lines) + "\n")
-            core.append_receipt(ledger, body("n3"))
-            self.assertFalse(core.verify_chain(ledger, anchor=False))
+            with self.assertRaises(core.MandateError):
+                core.append_receipt(ledger, body("n3"))
+
+    def test_a_truncated_ledger_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "ledger.jsonl")
+            for i in range(5):
+                core.append_receipt(ledger, body("n%d" % i))
+            lines = open(ledger, encoding="utf-8").read().strip().splitlines()
+            open(ledger, "w", encoding="utf-8").write("\n".join(lines[:3]) + "\n")
+            with self.assertRaises(core.MandateError):
+                core.append_receipt(ledger, body("n6"))
 
     def test_a_missing_head_falls_back_to_a_full_read(self) -> None:
         with tempfile.TemporaryDirectory() as td:

@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 
 from .. import core
+from ..net import require_http
 
 
 class PaymentError(core.MandateError):
@@ -67,7 +68,7 @@ class HttpProvider:
     expose a lookup by idempotency key."""
 
     def __init__(self, cfg: dict):
-        self.url = str(cfg.get("url") or "")
+        self.url = require_http(str(cfg.get("url") or ""), "payment provider url")
         self.token = os.environ.get(str(cfg.get("token_env") or ""), "")
 
     def _headers(self) -> dict:
@@ -147,6 +148,21 @@ class PaymentAdapter:
 
     def has_effect(self, idem_key) -> bool:
         return self.provider.lookup(idem_key) is not None
+
+    def recover(self, idem_key: str) -> dict | None:
+        """Return the charge if this key already hit the provider, else None.
+
+        Used when a broker restarted mid-effect: the journal says "executing", the
+        lease expired, and we must not charge twice. The provider is the only
+        source that knows.
+        """
+        try:
+            existing = self.provider.lookup(idem_key)
+        except Exception:
+            return None
+        if not existing:
+            return None
+        return self._charge_result(idem_key, existing, recovered=True)
 
     def custody(self) -> dict:
         """What the broker holds, named but never printed.

@@ -43,6 +43,8 @@ def _read(path: str, offset: int) -> tuple[list[dict], int]:
 
 
 def _post(url: str, token: str, payload: list[dict], timeout: int = 20) -> None:
+    from .net import require_http
+    url = require_http(url, "SIEM endpoint")
     body = "\n".join(json.dumps({"event": rec.get("body", rec),
                                  "sourcetype": "mandate",
                                  "time": rec.get("body", {}).get("ts")}, sort_keys=True)
