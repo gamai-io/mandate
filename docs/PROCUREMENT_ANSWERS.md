@@ -110,3 +110,13 @@ Usora, Bosnia and Herzegovina.
 - **Honest limit**: it is a second implementation by the same author, not an
   independent third party. An external implementation or a funded review is still
   open, and `CLAIMS.md` lists it as unproven.
+
+### Release provenance (PEP 740)
+
+The release workflow publishes with `attestations: true` **when** the repository
+variable `PYPI_OIDC=true` is set, which requires a PyPI trusted publisher entry
+for this repository. Until that entry exists the release uses a project-scoped
+API token, and PyPI records **no** provenance for the artefact. That is a real
+gap: a project that sells verifiability should publish verifiably. The fix is one
+publisher entry plus one repository variable; it is listed here rather than
+described as done.
