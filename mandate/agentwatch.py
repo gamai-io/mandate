@@ -31,7 +31,6 @@ Levels: >=6 high, >=3 medium, else low. A finding is written to the ledger as a
 from __future__ import annotations
 
 import json
-import os
 import time
 from collections import defaultdict
 
