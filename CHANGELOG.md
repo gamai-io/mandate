@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.49.1 — 2026-11-25
+- CI installs `cryptography` (test-only): the WebAuthn tests import it to emulate
+  an authenticator, so 0.49.0 passed locally and failed in CI at import. The code
+  is unchanged; this release exists so the published version has a green run.
+
 ## 0.49.0 — 2026-11-25
 - **Per-agent broker tokens.** `mandate-broker agent add|list|revoke` manages a
   store that keeps only SHA-256 of each token (written `0600`, token shown once).
