@@ -5,6 +5,9 @@ import smtplib
 import time
 from email.message import EmailMessage
 
+from .. import egress
+from ..core import MandateError
+
 
 class SmtpSender:
     """Effect handler for message.send.
@@ -39,6 +42,13 @@ class SmtpSender:
             return {"ok": True, "dry_run": True, "path": path,
                     "to": str(msg["To"])}
         host = str(self.cfg.get("host") or "")
+        policy = self.cfg.get("egress")
+        if policy is not None and host:
+            port = int(self.cfg.get("port") or 587)
+            try:
+                egress.guard("smtp://%s:%d" % (host, port), policy, "smtp send")
+            except ValueError as exc:
+                raise MandateError(str(exc)) from exc
         if not host:
             return {"ok": False, "error": "smtp host not configured"}
         port = int(self.cfg.get("port") or 587)

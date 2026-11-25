@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.61.0 — 2026-11-25
+- **SMTP send goes through the egress gate** like payment and publish, so a live
+  mail cannot leave for a host nobody allowed.
+- **`tests/test_egress_coverage.py`**: a source-level check that every adapter which
+  opens a connection (urlopen, smtplib, raw socket) calls `egress.guard`. It fails
+  when a future adapter is added without one, which a behavioural test cannot catch.
+- **Incident suite extended**: the Mythos publish (no grant, default deny), the
+  Opus DB-write shape (DELETE refused), and a publish to a destination outside the
+  egress policy.
+- 398 pass, 3 documented skips.
+
 ## 0.60.0 — 2026-11-25
 - **The egress gate is wired into the outbound adapters.** `payment` and
   `package.publish` accept an `egress` policy and call `egress.guard` on every

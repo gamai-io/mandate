@@ -117,6 +117,32 @@ class Incidents(Base):
         with self.assertRaises(core.GrantReplayed):
             core.redeem(item, grant, self.signers, self.ledger, policy=plain)
 
+    def test_mythos_publish_needs_a_grant_and_an_allowed_destination(self) -> None:
+        """An agent that decides to publish on its own has no grant to redeem."""
+        item = self.intent(kind="package.publish", target="pypi:requests-secure-v2",
+                           params={"artefact": "requests-secure-v2-1.0.whl"})
+        with self.assertRaises(core.PolicyDenied):      # default deny in POLICY
+            core.redeem(item, self.grant(item), self.signers, self.ledger,
+                        policy=POLICY)
+
+    def test_opus_db_write_cannot_delete(self) -> None:
+        import tempfile as _tf
+
+        from mandate.adapters.sqlwrite import SqlWriteError, SqlWriter
+        with _tf.TemporaryDirectory() as td:
+            writer = SqlWriter({"db": os.path.join(td, "db.sqlite")})
+            item = self.intent(kind="sql.write", target="invoices",
+                               params={"sql": "DELETE FROM invoices", "args": {}})
+            with self.assertRaises(SqlWriteError):
+                writer.execute(item, "idem-1")
+
+    def test_a_publish_outside_the_egress_policy_is_refused(self) -> None:
+        from mandate import egress
+        with self.assertRaises(ValueError):
+            egress.guard("https://attacker.example/drop",
+                         {"version": 1, "default": "deny", "allow": []},
+                         "package publish")
+
     @unittest.skip("not covered: sandbox escape and host-level code execution "
                    "(Hugging Face 41 dataset workers, OpenAI Artifactory) happen "
                    "outside any authorisation path; that is a hypervisor and "
