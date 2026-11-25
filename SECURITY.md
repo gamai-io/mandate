@@ -6,7 +6,7 @@ Only the latest released version receives security fixes.
 
 | Version | Supported |
 |---------|-----------|
-| 0.63.x  | yes       |
+| 0.64.x  | yes       |
 | < 0.49  | no        |
 
 The current version is read from `pyproject.toml`; `python3 tools/claims.py --check`

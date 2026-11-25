@@ -50,10 +50,27 @@ Run it yourself:
 python3 tools/bench_ledger.py --count 10000
 ```
 
-## One number that is not reproducible here
+## MicroVM: boot, isolation and pause, reproducible
 
-The Firecracker pause figure (17.2 ms, guest stopped) was measured once on
-`crusoe-cpu1`, the only host we have with `/dev/kvm`; `gama-lab-fra` has no KVM, so
-CI cannot re-run it. Treat it as a single-site measurement, not a benchmark, and
-ask for a re-run on your own hypervisor.
+```bash
+./tools/firecracker_demo.sh
+```
+
+Measured on `crusoe-cpu1` (the only host here with `/dev/kvm`), Firecracker 1.17.0,
+1 vCPU, 256 MiB, read-only rootfs, **no network device configured**:
+
+| step | result |
+|---|---|
+boot until the first kernel line on the serial console | **125 ms** |
+network devices configured | **0** (and no tap device on the host) |
+`PATCH /vm {"state":"Paused"}` → state `Paused` | **7 ms**, HTTP 204 |
+`PATCH /vm {"state":"Resumed"}` → state `Running` | **6 ms**, HTTP 204 |
+
+The earlier figure in this file (17.2 ms to halt) came from `mandate warden`, which
+stops the VM and then *verifies* the state through the API before reporting; the
+numbers above are the bare API round-trip. Both are single-host measurements: a
+bank should re-run the script on its own hypervisor rather than trust ours.
+
+CI cannot run this (no `/dev/kvm` in the runners); `mandate sandbox check` is the
+part that runs everywhere and proves egress isolation with bubblewrap.
 

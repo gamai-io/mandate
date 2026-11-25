@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.64.0 — 2026-11-25
+- **`tools/firecracker_demo.sh`**: boots a microVM with no network device, measures
+  boot to the first serial line, then pauses and resumes through the API and checks
+  the state each time. Measured on `crusoe-cpu1` (KVM): **125 ms** boot, **7 ms**
+  pause, **6 ms** resume, 0 network devices.
+- `docs/PERFORMANCE.md` replaces the one-off 17.2 ms note with that reproducible
+  script and explains why the two numbers differ (API round-trip vs warden's
+  stop-and-verify).
+- `tools/` is now included in the sdist, so the script ships with the package.
+
 ## 0.63.0 — 2026-11-25
 - **`mandate config`**: pins the files an agent trusts before it acts (`.mcp.json`,
   `settings.json`, `CLAUDE.md`, `AGENTS.md`, MCP lists, skill files) by hash, checks
