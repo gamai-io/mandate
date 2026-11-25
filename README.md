@@ -222,6 +222,23 @@ write access to that cgroup; quarantine is per-uid, not per-process; neither is 
 hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
 Firecracker; "safe state" remains the bank's definition, not ours (row 5).
 
+## Review the policy like code
+
+```bash
+mandate policy lint                      # default must be deny, risk known, purpose written
+mandate policy explain --effect payment.send --amount 500 --currency BAM
+mandate policy diff --against policy.last-month.json
+mandate observe-summary --ledger ledger.jsonl
+```
+
+`lint` blocks on a missing `default: deny`, an unknown `risk`, a negative
+`max_auto`, or `require_revert` naming an effect that does not exist; it warns
+when a rule has no `purpose` (an approver cannot tell why it may run without a
+human) and when `max_auto` is set on `risk: low`, where it does nothing.
+`explain` answers one question for one amount. `diff` names what got stricter,
+so an approver reads a change, not a file. `observe-summary` reports which
+observations were never executed.
+
 ## Policy digest, observe mode, revert
 
 Approval binds the policy it was granted under; a changed policy invalidates old

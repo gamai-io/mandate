@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import agentwatch, anchor, core, detect, egress, governance, sign, svid, warden
+from . import agentwatch, anchor, core, detect, egress, governance, policy_tools, sign, svid, warden
 from . import report as audit_report
 from . import ship as ship_mod
 
@@ -585,7 +585,19 @@ def main(argv=None) -> int:
     p_exec.add_argument("--grant", required=True)
     p_exec.add_argument("--allow-remote", action="store_true")
 
-    sub.add_parser("policy")
+    p_policy = sub.add_parser("policy")
+    p_policy.add_argument("action", nargs="?", default="show",
+                          choices=("show", "lint", "explain", "diff"))
+    p_policy.add_argument("--policy", default=argparse.SUPPRESS)
+    p_policy.add_argument("--against", default=None, help="previous policy for diff")
+    p_policy.add_argument("--effect", default=None, help="effect kind for explain")
+    p_policy.add_argument("--amount", type=float, default=None)
+    p_policy.add_argument("--currency", default=None)
+
+    p_obs = sub.add_parser("observe-summary")
+    p_obs.add_argument("--ledger", default="ledger.jsonl")
+    p_obs.add_argument("--out", default=None)
+
     sub.add_parser("version")
 
     p_init = sub.add_parser("init")
@@ -1300,7 +1312,34 @@ def main(argv=None) -> int:
             return 0
 
         if args.cmd == "policy":
-            _emit(core.load_policy(args.policy), None)
+            policy = core.load_policy(args.policy)
+            action = getattr(args, "action", "show")
+            if action == "show":
+                _emit(policy, None)
+                return 0
+            if action == "lint":
+                res = policy_tools.lint(policy)
+                _emit(res, None)
+                return 0 if res["ok"] else 1
+            if action == "explain":
+                if not args.effect:
+                    _emit({"error": "Usage", "message": "policy explain --effect KIND"}, None)
+                    return 2
+                _emit(policy_tools.explain(policy, args.effect, args.amount), None)
+                return 0
+            if not args.against:
+                _emit({"error": "Usage", "message": "policy diff --against OLD.json"}, None)
+                return 2
+            old = core.load_policy(args.against)
+            _emit(policy_tools.diff(old, policy), None)
+            return 0
+
+        if args.cmd == "observe-summary":
+            res = audit_report.observe_summary(args.ledger)
+            if args.out:
+                with open(args.out, "w", encoding="utf-8") as fh:
+                    json.dump(res, fh, indent=1, sort_keys=True)
+            _emit(res, None)
             return 0
 
         if args.cmd == "version":

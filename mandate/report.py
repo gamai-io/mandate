@@ -344,3 +344,45 @@ def sbom(app_version: str = "", out_path: str = "sbom.json") -> dict:
         json.dump(doc, fh, indent=1, sort_keys=True)
     return {"path": out_path, "component": "gama-mandate", "dependencies": 0,
             "files": len(files)}
+
+
+def observe_summary(ledger_path: str) -> dict:
+    """What would have run: observe-mode receipts against real executions.
+
+    Observation is free and does not spend a grant, so the same grant may appear
+    as observed and later as executed. The useful number for a risk committee is
+    how often the observe mode would have allowed something nobody then executed.
+    """
+    by_kind: dict[str, dict[str, int]] = defaultdict(lambda: {"observe": 0, "executed": 0,
+                                                              "other": 0})
+    observed: dict[str, dict] = {}
+    executed: set[str] = set()
+    for body in _receipts(_entries(ledger_path)):
+        kind = str(((body.get("intent") or {}).get("effect") or {}).get("kind") or "?")
+        decision = str(body.get("decision") or "")
+        nonce = str(body.get("grant_nonce") or "")
+        if decision == "observe" or body.get("binding") is False:
+            by_kind[kind]["observe"] += 1
+            if nonce and nonce not in observed:
+                observed[nonce] = {"kind": kind, "ts": body.get("ts"),
+                                   "amount": ((body.get("intent") or {}).get("effect")
+                                              or {}).get("amount"),
+                                   "agent": body.get("agent")}
+        elif decision in ("", "executed", "allowed"):
+            by_kind[kind]["executed"] += 1
+            if nonce:
+                executed.add(nonce)
+        else:
+            by_kind[kind]["other"] += 1
+    unexecuted = {nonce: item for nonce, item in observed.items() if nonce not in executed}
+    total_observe = sum(v["observe"] for v in by_kind.values())
+    total_executed = sum(v["executed"] for v in by_kind.values())
+    return {
+        "ledger": ledger_path,
+        "observations": total_observe,
+        "executions": total_executed,
+        "by_kind": dict(sorted(by_kind.items())),
+        "observed_not_executed": unexecuted,
+        "note": ("observation does not spend a grant; a grant seen only as observed was "
+                 "never executed in this ledger"),
+    }
