@@ -49,6 +49,8 @@ class Broker:
         self.smtp = SmtpSender(smtp) if smtp else None
         self.erp = ErpChecker(erp) if erp else None
         self.payment = PaymentAdapter(payment) if payment else None
+        self.payment_cfg = dict(payment or {})
+        self.smtp_cfg = dict(smtp or {})
         self.require_audience = require_audience
         self.revoked_path = revoked_path
         self.token = token
@@ -244,6 +246,14 @@ class Broker:
         return {"ok": True, "effect": kind, "receipt": receipt,
                 "result": result, "result_entry": entry}
 
+    def custody(self) -> dict:
+        """Named secrets the broker holds. Presence only, never the value."""
+        payment = self.payment.custody() if self.payment is not None else None
+        smtp_env = str(self.smtp_cfg.get("password_env") or "") or None
+        return {"broker": self.broker_name, "payment": payment,
+                "smtp": {"secret": ("env:" + smtp_env) if smtp_env else None,
+                         "present": bool(smtp_env and os.environ.get(smtp_env))}}
+
     def status(self) -> dict:
         return {"ok": True, "broker": self.broker_name,
                 "policy": self.policy_path, "effects": sorted(self.policy["effects"]),
@@ -251,6 +261,7 @@ class Broker:
                 "receipt_key": bool(self.receipt_key and os.path.exists(self.receipt_key)),
                 "smtp": bool(self.smtp), "erp": bool(self.erp),
                 "payment": bool(self.payment),
+                "custody": self.custody(),
                 "writer": self.writer.mode, "auth": bool(self.token),
                 "journal": self.journal.counts()}
 

@@ -47,11 +47,12 @@ jobs:
         with:
           name: dist
           path: dist
-      - name: Publish (OIDC trusted publishing)
+      - name: Publish (OIDC trusted publishing + PEP 740 attestations)
         if: vars.PYPI_OIDC == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+          attestations: true
       - name: Publish (API token)
         if: vars.PYPI_OIDC != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1

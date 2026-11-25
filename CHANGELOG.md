@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.46.0 — 2026-11-25
+- **Credential custody is now a tested claim, not a design note.**
+  `tests/test_broker_custody.py` runs three processes (fake provider, broker,
+  agent): the agent has no provider token, the effect still executes, the provider
+  refuses the agent's direct call (401), an unauthenticated `/execute` is 401, and
+  the same grant charges once.
+- `Broker.custody()` / `/health` report held secrets **by name only**
+  (`env:PAY_TOKEN`, `present: true`), never the value.
+- `packaging/mandate-broker.service`: own user, `ProtectSystem=strict`,
+  `ProtectHome`, `PrivateTmp`, `RestrictAddressFamilies`, `MemoryDenyWriteExecute`,
+  `0400` environment file.
+- `docs/BROKER.md`: the containment claim, the checks to run, what the boundary
+  does not buy (host compromise, one shared broker token, no mTLS).
+- `docs/AP2_VS_MANDATE.md`: protocols (AP2, TAP, Agent Pay, ACP, x402) authorise
+  on the network; this records that a named person in *this* bank approved *this*
+  amount. Includes the three things interoperability would need, none of them built.
+- Release publishes with PEP 740 attestations (PyPI provenance) when OIDC is on.
+- README opens with **One thing**, so the scope is not a discovery.
+- 290 tests.
+
 ## 0.45.0 — 2026-11-25
 - `spec/verify_offline.py`: a verifier that imports no project code and never
   calls `ssh-keygen`. Standard library only — JCS (RFC 8785), SSHSIG and Ed25519

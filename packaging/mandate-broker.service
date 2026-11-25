@@ -1,0 +1,36 @@
+# The only process that holds effect credentials.
+# It runs as its own user, in its own filesystem view, and the agent never shares
+# this environment. Install: cp packaging/mandate-broker.service /etc/systemd/system/
+[Unit]
+Description=Mandate effect broker
+After=network.target
+ConditionPathExists=/opt/mandate/broker/config.json
+
+[Service]
+Type=simple
+User=mandate-broker
+Group=mandate-broker
+WorkingDirectory=/opt/mandate
+# Secrets come from an EnvironmentFile readable only by this user (0400):
+#   PAY_TOKEN=...
+#   MANDATE_BROKER_TOKEN=...        # what the agent presents
+#   MANDATE_SMTP_PASSWORD=...
+EnvironmentFile=/etc/mandate/broker.env
+ExecStart=/usr/local/bin/mandate broker --config /opt/mandate/broker/config.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/mandate /opt/mandate/effects /opt/mandate/outbox
+
+[Install]
+WantedBy=multi-user.target

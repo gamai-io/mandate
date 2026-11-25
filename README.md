@@ -16,6 +16,15 @@ produces a hash-chained **Receipt**. Anyone can verify the whole chain offline.
 > Approval workflows are ephemeral events. A Mandate is a durable, portable,
 > cryptographically bound artifact — a commit, not a log line.
 
+## One thing
+
+Mandate does one thing: a named human signs a specific business effect, the effect
+can happen **once**, and the receipt verifies offline years later. Everything else
+in this repository — broker, warden, egress, detection, MCP, bench — exists to
+serve that same hash chain. If a feature does not produce or protect a receipt, it
+is not the product; it is an add-on, and the docs say which is which.
+
+
 ## Why it is not another approval gate
 
 | Approval gate | Mandate |
@@ -781,7 +790,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.45.0** — canonical commitment, Ed25519
+**v0.46.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

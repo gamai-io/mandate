@@ -148,6 +148,21 @@ class PaymentAdapter:
     def has_effect(self, idem_key) -> bool:
         return self.provider.lookup(idem_key) is not None
 
+    def custody(self) -> dict:
+        """What the broker holds, named but never printed.
+
+        A secret in the agent's environment defeats the whole point of a broker,
+        so the broker reports presence, not value, and `mandate doctor` warns when
+        the same environment can see it.
+        """
+        if self.mode != "http":
+            return {"provider": self.mode, "secret": None,
+                    "note": "sandbox provider needs no credential"}
+        env_name = str(self.cfg.get("token_env") or "")
+        token = os.environ.get(env_name, "") if env_name else ""
+        return {"provider": "http", "secret": ("env:" + env_name) if env_name else None,
+                "present": bool(token), "url": str(self.cfg.get("url") or "")}
+
     def result_for(self, idem_key):
         row = self.provider.lookup(idem_key)
         return self._charge_result(idem_key, row, recovered=True) if row else None
