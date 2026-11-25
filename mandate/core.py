@@ -606,15 +606,20 @@ def enforce_new_payee(intent: dict, policy: dict, ledger_path: str) -> None:
     effect = intent.get("effect") or {}
     spec = ((policy or {}).get("effects") or {}).get(str(effect.get("kind") or "")) or {}
     mode = str(spec.get("new_payee") or "allow").lower()
-    if mode == "allow":
+    grace_h = float(spec.get("new_payee_grace_h") or 0)
+    if mode == "allow" and not grace_h:
         return
     target = str(effect.get("target") or "")
     if not target:
         return
     history = _report.payee_history(ledger_path, target, str(effect.get("kind") or ""))
-    if history["first_time"]:
-        raise PolicyDenied("first-time payee %r: policy says new_payee=%s"
-                           % (target, mode))
+    fresh = history["first_time"]
+    if not fresh and grace_h and history.get("first_ts"):
+        fresh = (time.time() - float(history["first_ts"])) < grace_h * 3600
+    if fresh and mode in ("ask", "deny"):
+        raise PolicyDenied(
+            "payee %r is new or inside the %gh cooling period: policy says "
+            "new_payee=%s" % (target, grace_h, mode))
 
 
 def redeem(intent: dict, grant_obj: dict, signers_path: str,
@@ -631,6 +636,8 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
         audience, require_audience, revoked_path)
     intent = verified["intent"]
     grant_core = verified["grant"]
+    enforce_new_payee(intent, policy if isinstance(policy, dict) else load_policy(),
+                      ledger_path)
     nonce = str(grant_core.get("nonce") or "")
     receipt = build_receipt(intent, grant_core, verified["commitment"],
                             sha256(jcs(intent)), ts=verified["moment"],

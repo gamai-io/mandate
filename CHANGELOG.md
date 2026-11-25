@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.57.0 — 2026-11-25
+- **Cooling window on a payee**: `new_payee_grace_h` treats a beneficiary whose
+  first payment is newer than N hours as new, so "paid once two days ago by the
+  poisoned instruction" does not open the door.
+- **`new_payee` is enforced inside `redeem`**, not only in the CLI and the broker,
+  so a library user cannot skip it.
+- **`tests/test_incidents.py`**: the recorded incidents replayed against the code
+  (Zscaler injected payee, Lakera poisoned payee, Opus 4.7 wrong target, Deadbugz
+  metadata swap, unknown effect kind, replayed grant) plus three explicit skips for
+  what this does not cover (sandbox escape, config worms, memory poisoning).
+- 379 tests (376 pass, 3 documented skips).
+
 ## 0.56.0 — 2026-11-25
 - **`new_payee` policy rule.** `effects.<kind>.new_payee` = `allow` (default),
   `ask` or `deny`. The broker and `mandate redeem` refuse a beneficiary with no

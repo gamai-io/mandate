@@ -285,8 +285,19 @@ chain then proves the fraud was authorised. A policy can refuse that shape:
 ```
 
 `mandate` refuses a beneficiary with no prior payment in the ledger
-(`report.payee_history`), for the broker and for `mandate redeem` alike. It does not
-stop the poisoning; it forces a human to answer "have we paid this supplier before?"
+(`report.payee_history`), for the broker and for `mandate redeem` alike. A cooling
+window widens "new" to "first paid less than N hours ago":
+
+```json
+"payment.send": {"risk": "high", "new_payee": "deny", "new_payee_grace_h": 24}
+```
+
+It does not stop the poisoning; it forces a human to answer "have we paid this
+supplier before, and for how long?"
+
+`tests/test_incidents.py` replays the recorded incidents against the code — the
+Hugging Face sandbox escape, the Shai-Hulud config worms and memory poisoning are
+**skipped with a reason**, so the list of what this does not cover is executable.
 
 ## Containment that expires
 
@@ -905,7 +916,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.56.0** — canonical commitment, Ed25519
+**v0.57.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
