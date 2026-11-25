@@ -57,7 +57,12 @@ def expand(paths: list[str], directories: list[str] | None = None) -> list[str]:
     return unique
 
 
-def lock(paths: list[str], store: str, directories: list[str] | None = None) -> dict:
+def _file_digest(path: str) -> str:
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+def lock(paths: list[str], store: str, directories: list[str] | None = None,
+         ledger: str | None = None) -> dict:
     files = {}
     for path in expand(paths, directories):
         files[path] = {"sha256": _digest(path), "size": os.path.getsize(path)}
@@ -71,6 +76,11 @@ def lock(paths: list[str], store: str, directories: list[str] | None = None) -> 
     with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1, sort_keys=True)
     os.replace(tmp, store)
+    if ledger:          # pin the lock file itself, so editing it is detectable
+        core.append_receipt(ledger, {"v": 1, "type": "control",
+                                     "action": "config_lock",
+                                     "store_sha256": _file_digest(store),
+                                     "files": len(files), "ts": int(time.time())})
     return {"store": store, "files": len(files), "paths": sorted(files)}
 
 
@@ -87,8 +97,24 @@ def load(store: str) -> dict:
     return data
 
 
+def locked_digest(ledger: str) -> str:
+    """The store digest recorded when the lock was taken, or ""."""
+    if not ledger or not os.path.exists(ledger):
+        return ""
+    digest = ""
+    for entry in core.read_ledger(ledger):
+        body = entry.get("body") or {}
+        if body.get("action") == "config_lock":
+            digest = str(body.get("store_sha256") or "")
+    return digest
+
+
 def check(store: str, ledger: str | None = None) -> dict:
     data = load(store)
+    recorded = locked_digest(ledger) if ledger else ""
+    if recorded and recorded != _file_digest(store):
+        raise ConfigError("the lock file itself changed since it was recorded in "
+                          "the ledger; re-lock after checking why")
     drift, missing, ok = [], [], 0
     for path, entry in sorted((data.get("files") or {}).items()):
         if not os.path.isfile(path):

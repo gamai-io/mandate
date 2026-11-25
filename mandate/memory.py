@@ -136,6 +136,11 @@ def scope_covers(scope: list[str], kind: str, target: str) -> bool:
     return False
 
 
+def chain_intact(store_path: str) -> bool:
+    """A store whose chain is broken has had records removed, not just updated."""
+    return core.verify_chain(store_path, anchor=True)
+
+
 def check_provenance(intent: dict, store_path: str, signers_path: str,
                      now: float | None = None) -> list[str]:
     """Refuse an intent that leans on an instruction nobody signed correctly."""
@@ -145,6 +150,9 @@ def check_provenance(intent: dict, store_path: str, signers_path: str,
         return []
     effect = intent.get("effect") or {}
     kind, target = str(effect.get("kind") or ""), str(effect.get("target") or "")
+    if not chain_intact(store_path):
+        raise MemoryError("the instruction store's hash chain is broken: records "
+                          "were removed or edited")
     checked = []
     for entry in cited:
         instruction_id = str(entry.get("source") or "")

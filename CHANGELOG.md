@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.65.0 — 2026-11-25
+Hardening after a red-team pass over the new surface:
+- **The instruction store is checked as a chain.** `check_provenance` refuses when
+  the store's hash chain is broken (a removed record is not a revoked one), and
+  `.head` makes truncation detectable.
+- **The config lock pins itself.** `config lock --ledger` records the lock file's
+  digest; `config check --ledger` refuses when the lock file changed, so editing
+  both the config and the lock no longer passes.
+- **Early containment release must be signed.** `mandate contain --release PID
+  --approver --key`; `sweep` ignores an unsigned release record, which otherwise
+  would suppress the deadline and leave a process stopped for ever.
+- 7 new tests; 427 pass, 4 documented skips.
+
 ## 0.64.1 — 2026-11-25
 - The pre-publish scanner no longer flags itself when `tools/` ships in the sdist:
   the internal host and customer names are assembled at runtime, and the scanner

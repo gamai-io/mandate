@@ -116,3 +116,25 @@ class Provenance(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoreIntegrity(Base):
+    def test_a_truncated_store_is_detected(self) -> None:
+        memory.add(self.store, "pay Acme", ["payment.send:Acme"], "alice", self.key)
+        second = memory.add(self.store, "pay Beta", ["payment.send:Beta"],
+                            "alice", self.key)
+        lines = open(self.store, encoding="utf-8").read().strip().splitlines()
+        open(self.store, "w").write(lines[0] + "\n")      # drop the later records
+        self.assertFalse(memory.chain_intact(self.store))
+        self.assertIsNone(memory.get(self.store, second["id"]))
+
+    def test_a_citation_into_a_truncated_store_is_refused(self) -> None:
+        memory.add(self.store, "pay Acme", ["payment.send:Acme"], "alice", self.key)
+        second = memory.add(self.store, "pay Beta", ["payment.send:Beta"],
+                            "alice", self.key)
+        lines = open(self.store, encoding="utf-8").read().strip().splitlines()
+        open(self.store, "w").write(lines[0] + "\n")
+        cited = self.intent([{"type": "instruction", "source": second["id"]}],
+                            target="Beta")
+        with self.assertRaises(memory.MemoryError):
+            memory.check_provenance(cited, self.store, self.signers)

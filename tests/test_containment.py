@@ -83,3 +83,41 @@ class Containment(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EarlyRelease(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = self.tmp.name
+        self.ledger = os.path.join(self.dir, "ledger.jsonl")
+        self.key = os.path.join(self.dir, "approver")
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", self.key],
+                       check=True)
+        self.signers = os.path.join(self.dir, "allowed_signers")
+        open(self.signers, "w").write('approver namespaces="mandate" %s\n'
+                                      % open(self.key + ".pub").read().strip())
+        self.proc = subprocess.Popen(["sleep", "120"])
+        containment.contain(self.proc.pid, minutes=30, ledger_path=self.ledger)
+
+    def tearDown(self) -> None:
+        try:
+            self.proc.kill()
+        except OSError:
+            pass
+        self.proc.wait(timeout=5)
+        self.tmp.cleanup()
+
+    def test_an_unsigned_release_record_is_ignored(self) -> None:
+        core.append_receipt(self.ledger, {"v": 1, "type": "containment",
+                                          "action": "release", "pid": self.proc.pid,
+                                          "actor": "someone", "ts": 1})
+        result = containment.sweep(self.ledger, now=int(time.time()) + 10 ** 6,
+                                   signers_path=self.signers)
+        self.assertEqual(result["released"], [self.proc.pid])
+
+    def test_a_signed_release_ends_it_early(self) -> None:
+        result = containment.release(self.ledger, self.proc.pid, "approver", self.key)
+        self.assertTrue(result["ok"])
+        out = containment.sweep(self.ledger, now=int(time.time()) + 10 ** 6,
+                                signers_path=self.signers)
+        self.assertEqual(out["released"], [])

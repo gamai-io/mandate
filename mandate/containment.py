@@ -71,7 +71,32 @@ def verify_extend(entry: dict, signers_path: str, namespace: str = "mandate") ->
                        namespace)
 
 
-def sweep(ledger_path: str, now: float | None = None) -> dict:
+def release(ledger_path: str, pid: int, approver: str, key_path: str,
+            reason: str = "released by a human") -> dict:
+    """End containment early. This is a decision, so it is signed."""
+    if not approver or not key_path:
+        raise core.MandateError("releasing early needs --approver and --key")
+    decision = {"pid": int(pid), "action": "release", "approver": approver,
+                "reason": reason, "decided_at": int(time.time())}
+    signature = sign.sign(core.jcs(decision), key_path)
+    entry = core.append_receipt(ledger_path, {
+        "v": 1, "type": CONTROL, "action": "release", "pid": int(pid),
+        "reason": reason, "actor": approver, "ts": decision["decided_at"],
+        "decision": decision, "sig": signature})
+    return {"ok": True, "pid": int(pid), "entry": entry}
+
+
+def verify_release(entry: dict, signers_path: str) -> bool:
+    body = (entry or {}).get("body") or {}
+    decision = body.get("decision") or {}
+    if body.get("action") != "release" or not decision:
+        return False
+    return sign.verify(core.jcs(decision), str(decision.get("approver") or ""),
+                       str(body.get("sig") or ""), signers_path, "mandate")
+
+
+def sweep(ledger_path: str, now: float | None = None,
+          signers_path: str = "") -> dict:
     """Release everything whose deadline passed, and record that it was released."""
     moment = time.time() if now is None else float(now)
     entries = core.read_ledger(ledger_path) if ledger_path else []
@@ -84,7 +109,12 @@ def sweep(ledger_path: str, now: float | None = None) -> dict:
         if body.get("action") in ("contain", "extend"):
             state[pid] = body
         elif body.get("action") == "release":
-            state.pop(pid, None)
+            # an unsigned release from anywhere is ignored: it would otherwise stop
+            # the deadline from ever firing and leave the process stopped forever
+            if body.get("actor") == "containment-sweep":
+                state.pop(pid, None)
+            elif signers_path and verify_release(entry, signers_path):
+                state.pop(pid, None)
     released = []
     for pid, body in state.items():
         if int(body.get("until") or 0) <= moment:

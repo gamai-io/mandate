@@ -67,3 +67,32 @@ class Config(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LockTamper(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = self.tmp.name
+        self.settings = os.path.join(self.dir, "settings.json")
+        open(self.settings, "w").write('{"model": "x"}')
+        self.store = os.path.join(self.dir, "configs.json")
+        self.ledger = os.path.join(self.dir, "ledger.jsonl")
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_locking_can_record_the_lock_file_itself(self) -> None:
+        configwatch.lock([self.settings], self.store, None, self.ledger)
+        self.assertTrue(configwatch.locked_digest(self.ledger))
+
+    def test_editing_the_lock_file_is_detected(self) -> None:
+        configwatch.lock([self.settings], self.store, None, self.ledger)
+        data = __import__("json").load(open(self.store))
+        data["files"] = {}          # pretend nothing is watched
+        __import__("json").dump(data, open(self.store, "w"))
+        with self.assertRaises(configwatch.ConfigError):
+            configwatch.check(self.store, self.ledger)
+
+    def test_a_clean_check_still_passes(self) -> None:
+        configwatch.lock([self.settings], self.store, None, self.ledger)
+        self.assertTrue(configwatch.check(self.store, self.ledger)["ok"])

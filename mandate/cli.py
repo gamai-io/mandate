@@ -672,6 +672,9 @@ def main(argv=None) -> int:
     p_cont.add_argument("--extend", type=int, default=None, metavar="PID")
     p_cont.add_argument("--approver", default="")
     p_cont.add_argument("--key", default=None)
+    p_cont.add_argument("--release", type=int, default=None, metavar="PID")
+    p_cont.add_argument("--signers", default=os.environ.get("MANDATE_SIGNERS",
+                                                           "trust/allowed_signers"))
     p_cont.add_argument("--sweep", action="store_true")
 
     p_dec = sub.add_parser("decisions")
@@ -1442,7 +1445,8 @@ def main(argv=None) -> int:
         if args.cmd == "config":
             from . import configwatch
             if args.action == "lock":
-                _emit(configwatch.lock(args.path or [], args.store, args.dir), None)
+                _emit(configwatch.lock(args.path or [], args.store, args.dir,
+                                       args.ledger), None)
                 return 0
             if args.action == "list":
                 _emit(configwatch.load(args.store), None)
@@ -1500,7 +1504,12 @@ def main(argv=None) -> int:
 
         if args.cmd == "contain":
             if args.sweep:
-                _emit(containment.sweep(args.ledger), None)
+                _emit(containment.sweep(args.ledger, signers_path=args.signers), None)
+                return 0
+            if args.release is not None:
+                _emit(containment.release(args.ledger, args.release, args.approver,
+                                          args.key or "", args.reason or "released"),
+                      None)
                 return 0
             if args.extend is not None:
                 res = containment.extend(args.ledger, args.extend, args.minutes,
