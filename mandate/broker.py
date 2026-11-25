@@ -40,7 +40,8 @@ class Broker:
                  journal_db: str | None = None, lease_s: float = 60,
                  recover_on_start: bool = True, token: str = "",
                  rate_per_min: float = 0, rate_burst: float = 0,
-                 agents_path: str = "", tls_client_ca: str = ""):
+                 agents_path: str = "", tls_client_ca: str = "",
+                 tools_path: str = ""):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -59,6 +60,7 @@ class Broker:
         self.token = token
         self.agents_path = agents_path
         self.tls_client_ca = tls_client_ca
+        self.tools_path = tools_path
         self.metrics = Registry("mandate_broker")
         self.limiter = (RateLimiter(rate_per_min, rate_burst)
                         if rate_per_min and float(rate_per_min) > 0 else None)
@@ -207,6 +209,9 @@ class Broker:
         if not grant_obj:
             raise core.GrantInvalid("a signed grant is required")
         core.enforce_new_payee(intent, self.policy, self.ledger)
+        if self.tools_path:
+            from . import tools as tool_registry
+            tool_registry.enforce(intent, self.tools_path)
         if self.erp is not None:
             pre = self.erp.check(intent)
             if not pre.get("ok"):
@@ -505,6 +510,8 @@ def main(argv=None) -> int:
     parser.add_argument("--client-ca", default=os.environ.get("MANDATE_CLIENT_CA", ""),
                         help="require a client certificate signed by this CA; the "
                              "certificate commonName becomes the agent identity")
+    parser.add_argument("--tools", default=os.environ.get("MANDATE_TOOLS", ""),
+                        help="JSON registry pinning tool schema hashes")
     parser.add_argument("--agents", default=os.environ.get("MANDATE_AGENTS", ""),
                         help="JSON store of per-agent tokens (see 'mandate broker agent')")
     parser.add_argument("--allow-any-audience", action="store_true")
@@ -548,6 +555,7 @@ def main(argv=None) -> int:
                     lease_s=args.lease,
                     agents_path=getattr(args, "agents", "") or "",
                     tls_client_ca=getattr(args, "client_ca", "") or "",
+                    tools_path=getattr(args, "tools", "") or "",
                     recover_on_start=not args.no_recover,
                     token=args.token,
                     rate_per_min=args.rate_limit_per_min,

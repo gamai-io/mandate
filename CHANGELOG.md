@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.58.0 — 2026-11-25
+- **Tool schemas are pinned.** `mandate tool lock --name X --file schema.json`
+  records the JCS hash of the schema in a registry; the intent commits to that hash
+  (`params.schema_sha256`); `mandate tool verify` and `mandate-broker --tools`
+  re-read the file before executing and refuse on drift. This closes the Deadbugz
+  shape: a tool approved once and changed afterwards.
+- 7 tests (lock, match, changed schema, wrong approved hash, unknown tool, enforce,
+  intent without a tool); 386 collected, 383 pass, 3 documented skips.
+
 ## 0.57.0 — 2026-11-25
 - **Cooling window on a payee**: `new_payee_grace_h` treats a beneficiary whose
   first payment is newer than N hours as new, so "paid once two days ago by the

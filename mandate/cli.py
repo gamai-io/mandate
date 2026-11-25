@@ -629,6 +629,13 @@ def main(argv=None) -> int:
     p_policy.add_argument("--amount", type=float, default=None)
     p_policy.add_argument("--currency", default=None)
 
+    p_tool = sub.add_parser("tool")
+    p_tool.add_argument("action", choices=("lock", "list", "verify"))
+    p_tool.add_argument("--registry", default="tools.json")
+    p_tool.add_argument("--name", default="")
+    p_tool.add_argument("--file", default=None, help="schema file (lock)")
+    p_tool.add_argument("--intent", default=None, help="intent to verify against")
+
     p_cont = sub.add_parser("contain")
     p_cont.add_argument("--pid", type=int, default=None)
     p_cont.add_argument("--minutes", type=int, default=15)
@@ -1396,6 +1403,24 @@ def main(argv=None) -> int:
             old = core.load_policy(args.against)
             _emit(policy_tools.diff(old, policy), None)
             return 0
+
+        if args.cmd == "tool":
+            from . import tools as tool_registry
+            if args.action == "lock":
+                if not (args.name and args.file):
+                    _emit({"error": "Usage", "message": "tool lock --name X --file schema.json"}, None)
+                    return 2
+                _emit(tool_registry.lock(args.name, args.file, args.registry), None)
+                return 0
+            if args.action == "list":
+                _emit(tool_registry.load(args.registry), None)
+                return 0
+            if not args.intent:
+                _emit({"error": "Usage", "message": "tool verify --intent intent.json"}, None)
+                return 2
+            res = tool_registry.verify(_read(args.intent), args.registry)
+            _emit(res, None)
+            return 0 if res["ok"] else 1
 
         if args.cmd == "contain":
             if args.sweep:

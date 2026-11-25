@@ -274,6 +274,21 @@ certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
 
+## A tool approval is a schema hash, not a name
+
+`erp.read` today is not `erp.read` tomorrow — that is the Deadbugz shape. So a
+schema is pinned and the approval commits to the pin:
+
+```bash
+mandate tool lock --name erp.read --file schemas/erp-read.json --registry tools.json
+mandate tool verify --intent intent.json --registry tools.json   # exit 1 on drift
+mandate-broker --tools tools.json ...                            # refuses drift before executing
+```
+
+The registry keeps the JCS hash of the schema, not the schema. The broker re-reads
+the file, compares it with the registry *and* with the hash named in the approval,
+and refuses on any difference. Drift is a refusal, not a warning.
+
 ## A first-time payee is a question
 
 The incident record is blunt: memory poisoning plants a vendor instruction weeks
@@ -916,7 +931,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.57.0** — canonical commitment, Ed25519
+**v0.58.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
