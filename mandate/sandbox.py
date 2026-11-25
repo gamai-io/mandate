@@ -7,6 +7,7 @@ firecracker- wrap the command with an external launcher (e.g. a lab VM runner)
 """
 from __future__ import annotations
 
+import os
 import shlex
 
 from . import core
@@ -88,3 +89,30 @@ def build_runner(mode: str = "local", image: str = "python:3.12-slim",
             raise SandboxError("firecracker requires --sandbox-cmd-template")
         return TemplateRunner(template)
     raise SandboxError("unknown sandbox mode: %s" % mode)
+
+
+def probe(timeout: int = 10) -> dict:
+    """Say what isolation this host can actually give, and prove the parts we can.
+
+    A sandbox claim that is not run is a wish. The network check executes a real
+    connect attempt inside the namespace and expects it to fail.
+    """
+    import shutil
+    import subprocess
+    result = {"bwrap": bool(shutil.which("bwrap")),
+              "docker": bool(shutil.which("docker")),
+              "kvm": os.path.exists("/dev/kvm"),
+              "network_isolated": None, "detail": {}}
+    if result["bwrap"]:
+        try:
+            done = subprocess.run(
+                ["bwrap", "--unshare-net", "--ro-bind", "/", "/", "--dev", "/dev",
+                 "--proc", "/proc", "--", "python3", "-c",
+                 "import socket,sys;s=socket.socket();s.settimeout(2);"
+                 "sys.exit(0 if s.connect_ex(('1.1.1.1',80))==0 else 1)"],
+                capture_output=True, text=True, timeout=timeout)
+            result["network_isolated"] = done.returncode == 1
+            result["detail"]["exit"] = done.returncode
+        except (OSError, subprocess.SubprocessError) as exc:
+            result["detail"]["error"] = str(exc)[:160]
+    return result

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.63.0 — 2026-11-25
+- **`mandate config`**: pins the files an agent trusts before it acts (`.mcp.json`,
+  `settings.json`, `CLAUDE.md`, `AGENTS.md`, MCP lists, skill files) by hash, checks
+  them before startup, and records the check as a `control` entry in the ledger.
+  Exit 1 on drift or a missing file. This is the Shai-Hulud/Miasma shape.
+- **`mandate sandbox check`**: starts `bwrap --unshare-net`, attempts a real
+  connection from inside and expects it to fail; reports bwrap/docker/kvm and
+  `network_isolated` as a measured result.
+- `docs/SANDBOX_TIER.md`: three tiers, a coverage table, and what none of them does.
+- 9 new tests; 420 pass, 4 documented skips.
+
 ## 0.62.0 — 2026-11-25
 - **Signed instructions (memory provenance).** `mandate memory add` records an
   instruction with a text, a scope (`kind:target`), an approver signature and an

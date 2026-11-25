@@ -631,6 +631,18 @@ def main(argv=None) -> int:
     p_policy.add_argument("--amount", type=float, default=None)
     p_policy.add_argument("--currency", default=None)
 
+    p_sandbox = sub.add_parser("sandbox")
+    p_sandbox.add_argument("action", choices=("check",))
+
+    p_cfg = sub.add_parser("config")
+    p_cfg.add_argument("action", choices=("lock", "check", "list"))
+    p_cfg.add_argument("--path", action="append", default=None,
+                       help="file or glob to pin (repeatable)")
+    p_cfg.add_argument("--dir", action="append", default=None,
+                       help="directory whose usual agent config files are pinned")
+    p_cfg.add_argument("--store", default="configs.json")
+    p_cfg.add_argument("--ledger", default=None)
+
     p_mem = sub.add_parser("memory")
     p_mem.add_argument("action", choices=("add", "list", "verify", "revoke"))
     p_mem.add_argument("--store", default="instructions.jsonl")
@@ -1420,6 +1432,24 @@ def main(argv=None) -> int:
             old = core.load_policy(args.against)
             _emit(policy_tools.diff(old, policy), None)
             return 0
+
+        if args.cmd == "sandbox":
+            from . import sandbox as sandbox_mod
+            res = sandbox_mod.probe()
+            _emit(res, None)
+            return 0 if res.get("network_isolated") else 1
+
+        if args.cmd == "config":
+            from . import configwatch
+            if args.action == "lock":
+                _emit(configwatch.lock(args.path or [], args.store, args.dir), None)
+                return 0
+            if args.action == "list":
+                _emit(configwatch.load(args.store), None)
+                return 0
+            res = configwatch.check(args.store, args.ledger)
+            _emit(res, None)
+            return 0 if res["ok"] else 1
 
         if args.cmd == "memory":
             from . import memory as memory_store

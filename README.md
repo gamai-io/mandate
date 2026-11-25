@@ -274,6 +274,23 @@ certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
 
+## The files the agent trusts, and where it runs
+
+Two failures in the incident record are not about approvals: agents escaping a
+sandbox, and worms editing assistant config. Both have answers here:
+
+```bash
+mandate config lock --dir . --dir ~/.claude --store configs.json
+mandate config check --store configs.json --ledger ledger.jsonl   # exit 1 on drift
+mandate sandbox check                                             # proves egress isolation
+```
+
+`config` pins `.mcp.json`, `settings.json`, `CLAUDE.md`, `AGENTS.md` and skill files
+by hash and records every check in the ledger. `sandbox check` starts
+`bwrap --unshare-net`, tries to connect to the internet from inside and expects the
+attempt to fail — the claim is a result, not a setting. Tiers and limits:
+[`docs/SANDBOX_TIER.md`](docs/SANDBOX_TIER.md).
+
 ## A belief needs a signature
 
 Memory poisoning is the one failure where the receipt chain would otherwise prove a
@@ -980,7 +997,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.62.0** — canonical commitment, Ed25519
+**v0.63.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
