@@ -3,13 +3,14 @@
 #
 #   ./tools/firecracker_demo.sh [--kernel K] [--rootfs R]
 #
-# Needs /dev/kvm, the firecracker binary and a kernel. Prints one JSON object.
+# Needs /dev/kvm, the firecracker binary, a kernel and a rootfs. Set FC, KERNEL and
+# ROOTFS if they live elsewhere. Prints one JSON object.
 # The guest is started without any network device: that is the isolation claim.
 set -euo pipefail
 
 FC="${FC:-/opt/fc/release-v1.17.0-x86_64/firecracker-v1.17.0-x86_64}"
 KERNEL="${KERNEL:-/opt/fc/vmlinux.bin}"
-ROOTFS="${ROOTFS:-/home/ubuntu/fcwork/rootfs.ext4}"
+ROOTFS="${ROOTFS:-/var/lib/firecracker/rootfs.ext4}"
 MEM="${MEM:-256}"
 VCPUS="${VCPUS:-1}"
 SOCK="/tmp/fc-demo-$$.sock"

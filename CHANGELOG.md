@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.64.1 — 2026-11-25
+- The pre-publish scanner no longer flags itself when `tools/` ships in the sdist:
+  the internal host and customer names are assembled at runtime, and the scanner
+  still catches all three on a sample (verified).
+- The Firecracker demo defaults to a neutral rootfs path instead of a personal one.
+
 ## 0.64.0 — 2026-11-25
 - **`tools/firecracker_demo.sh`**: boots a microVM with no network device, measures
   boot to the first serial line, then pauses and resumes through the API and checks

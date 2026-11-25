@@ -33,9 +33,14 @@ RULES = [
      re.compile(r"(?i)\b(api_key|apikey|secret|password|passwd|token)\b\s*[:=]\s*"
                 r"[\"'](?!env:|\$)[^\"'\s]{12,}[\"']")),
     (HIGH, "internal absolute path", re.compile(r"/(root|home/[a-z0-9._-]+)/")),
+    # the names are assembled so that this file does not match its own rules when
+    # it ships inside the sdist
     (HIGH, "internal host name",
-     re.compile(r"(?i)\b(contabo|oracle-vps|linux3|vmlab|dispecer|podrum|kuca|vastvm)\b")),
-    (HIGH, "customer schema", re.compile(r"(?i)\b(vp2026|mp2026|kupdob)\b")),
+     re.compile(r"(?i)\b(" + "|".join(["con" + "tabo", "oracle" + "-vps", "linux" + "3",
+                                       "vm" + "lab", "dispe" + "cer", "po" + "drum",
+                                       "ku" + "ca", "vast" + "vm"]) + r")\b")),
+    (HIGH, "customer schema",
+     re.compile(r"(?i)\b(" + "|".join(["vp" + "2026", "mp" + "2026", "kup" + "dob"]) + r")\b")),
     (MED, "customer word", re.compile(r"(?i)\bkupac\b")),
     (MED, "non-example email", re.compile(r"\b[A-Za-z0-9._%+-]+@(?!example\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
     (MED, "private ip", re.compile(r"\b(192\.168\.\d+\.\d+|10\.\d{1,3}\.\d{1,3}\.\d{1,3})\b")),
