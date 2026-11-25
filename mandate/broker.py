@@ -206,6 +206,7 @@ class Broker:
             raise core.PolicyDenied("policy denied: %s" % decision.get("reason"))
         if not grant_obj:
             raise core.GrantInvalid("a signed grant is required")
+        core.enforce_new_payee(intent, self.policy, self.ledger)
         if self.erp is not None:
             pre = self.erp.check(intent)
             if not pre.get("ok"):

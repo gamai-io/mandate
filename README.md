@@ -274,6 +274,20 @@ certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
 
+## A first-time payee is a question
+
+The incident record is blunt: memory poisoning plants a vendor instruction weeks
+before the payment, the approver signs a payee that looks ordinary, and the receipt
+chain then proves the fraud was authorised. A policy can refuse that shape:
+
+```json
+"effects": {"payment.send": {"risk": "high", "new_payee": "deny"}}
+```
+
+`mandate` refuses a beneficiary with no prior payment in the ledger
+(`report.payee_history`), for the broker and for `mandate redeem` alike. It does not
+stop the poisoning; it forces a human to answer "have we paid this supplier before?"
+
 ## Containment that expires
 
 Stopping something is a decision; keeping it stopped is another one. So a
@@ -891,7 +905,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.55.0** — canonical commitment, Ed25519
+**v0.56.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

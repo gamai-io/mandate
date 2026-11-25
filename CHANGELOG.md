@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.0 — 2026-11-25
+- **`new_payee` policy rule.** `effects.<kind>.new_payee` = `allow` (default),
+  `ask` or `deny`. The broker and `mandate redeem` refuse a beneficiary with no
+  prior payment in the ledger (`core.enforce_new_payee`, `report.payee_history`).
+  This is the one failure mode where good cryptography makes things worse: a
+  poisoned instruction, approved by a human, produces a valid receipt for a fraud.
+- `report.payee_history` reads the rendered effect, so it works on existing ledgers.
+- 370 tests.
+
 ## 0.55.0 — 2026-11-25
 - **Containment with an expiry.** `mandate contain --pid N --minutes M` stops the
   process and records a deadline; `mandate contain --sweep` releases only what

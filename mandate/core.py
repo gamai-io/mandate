@@ -595,6 +595,28 @@ def build_receipt(intent: dict, grant_core: dict, commitment: str,
     }
 
 
+def enforce_new_payee(intent: dict, policy: dict, ledger_path: str) -> None:
+    """A policy can require that a beneficiary has been paid before.
+
+    `effects.<kind>.new_payee` accepts "allow" (default), "ask" or "deny". It is a
+    check on the past, so it needs the ledger; the broker and the CLI both call it
+    before the grant is spent.
+    """
+    from . import report as _report
+    effect = intent.get("effect") or {}
+    spec = ((policy or {}).get("effects") or {}).get(str(effect.get("kind") or "")) or {}
+    mode = str(spec.get("new_payee") or "allow").lower()
+    if mode == "allow":
+        return
+    target = str(effect.get("target") or "")
+    if not target:
+        return
+    history = _report.payee_history(ledger_path, target, str(effect.get("kind") or ""))
+    if history["first_time"]:
+        raise PolicyDenied("first-time payee %r: policy says new_payee=%s"
+                           % (target, mode))
+
+
 def redeem(intent: dict, grant_obj: dict, signers_path: str,
            ledger_path: str, namespace: str = "mandate",
            allow_self: bool = False, now: float | None = None,

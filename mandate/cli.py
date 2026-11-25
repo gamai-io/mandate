@@ -895,8 +895,10 @@ def main(argv=None) -> int:
                        "message": "the effect is not allowed right now",
                        "detail": gov["detail"]}, None)
                 return 4
+            _intent = _read(args.intent)
+            core.enforce_new_payee(_intent, core.load_policy(args.policy), args.ledger)
             receipt = core.redeem(
-                _read(args.intent), _read(args.grant), args.signers,
+                _intent, _read(args.grant), args.signers,
                 args.ledger, allow_self=args.allow_self,
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked,

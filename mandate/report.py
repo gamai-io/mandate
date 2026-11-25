@@ -359,6 +359,35 @@ def sbom(app_version: str = "", out_path: str = "sbom.json") -> dict:
             "files": len(files)}
 
 
+def payee_history(ledger_path: str, target: str, kind: str = "") -> dict:
+    """Has this bank ever paid this beneficiary before?
+
+    A first-time payee approved by a human is the shape of the memory-poisoning
+    incidents: the instruction is planted weeks earlier, so the approver signs a
+    payee that looks ordinary. Counting prior payments turns that into a question
+    the human can answer.
+    """
+    first = last = None
+    count = 0
+    for entry in _entries(ledger_path):
+        body = entry.get("body") or {}
+        if body.get("type") != "receipt":
+            continue
+        # receipts carry the rendered effect; older ones carry the intent
+        fields = ((body.get("render") or {}).get("fields")
+                  or ((body.get("intent") or {}).get("effect")) or {})
+        if str(fields.get("target") or "") != str(target):
+            continue
+        if kind and str(fields.get("kind") or "") != str(kind):
+            continue
+        count += 1
+        ts = int(body.get("ts") or 0)
+        first = ts if first is None else min(first, ts)
+        last = ts if last is None else max(last, ts)
+    return {"target": str(target), "kind": kind or "", "payments": count,
+            "first_ts": first, "last_ts": last, "first_time": count == 0}
+
+
 def decisions(ledger_path: str) -> dict:
     """How long a human took to decide. The number nobody can produce in minutes."""
     waited = []
