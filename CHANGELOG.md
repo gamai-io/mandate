@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.43.0 — 2026-11-25
+- `mandate policy lint/explain/diff`: a policy is reviewed like code. `lint` blocks
+  `default != deny`, unknown risk, negative `max_auto`, `require_revert` naming a
+  missing effect; warns when a rule has no `purpose`. `diff` names what got stricter.
+- `mandate observe-summary`: observations vs executions; grants observed and never
+  executed. Shipped `policy.json` carries `purpose` for every effect.
+- 279 tests.
+
+## 0.42.0 — 2026-11-25
+- `policy_digest` in grant and receipt; `redeem` refuses when the policy changed
+  after the signature (`PolicyDenied`).
+- `redeem --observe`: receipt with `binding: false`, grant is **not** spent.
+- `effect.revert` accepted and committed; receipts carry `revert` or `irreversible`;
+  `require_revert` per effect kind.
+- 263 tests.
+
+## 0.41.0 — 2026-11-25
+- `mandate watch`: behavioural detection of an inbound agent from an access log —
+  tool switching, UA flipping, docs link following, key probing, submit-only reads,
+  velocity, low-and-slow. Alerts are `control/alert` in the same hash chain.
+- 258 tests.
+
+## 0.40.1 — 2026-11-25
+- Signed release provenance: `attest.yml` builds and attests every artefact
+  (Sigstore/OIDC) and uploads the SBOM next to it.
+- `docs/PILOT_SOW_TEMPLATE.md`, `docs/INCIDENT_RESPONSE.md`.
+
+## 0.40.0 — 2026-11-24
+- Egress proxy: deny-all, host:port allowlist, metadata/RFC1918 guard before the
+  allowlist, connect-to-validated-IP (SSRF and DNS rebinding).
+- SVID issuance and delegation; `require_svid`; wildcard scope refused.
+
+## 0.39.0 — 2026-11-24
+- Cross-ledger nonce store; `mandate nonce serve` as a shared authority (fail-closed).
+- Claim-callback double-spend closed; broker governance fails closed.
+
+## 0.38.0 — 2026-11-24
+- Warden: SIGSTOP, cgroup freeze confirmed via `cgroup.events`, `cgroup.kill`,
+  Firecracker pause confirmed through the API, per-uid quarantine; signed stops and
+  measured time-to-halt.
+- Annex IV packaging (`mandate pack`), inventory and change records.
+
+## 0.37.0 — 2026-11-24
+- Multi-TSA anchoring (`--tsa` repeatable); pack includes ledger and anchors;
+  WORM export.
+
+## 0.36.0 — 2026-11-24
+- One-shot enforced across ledgers (nonce seen in another ledger is refused).
+
+## 0.35.0 — 2026-11-24
+- Red-team round: SVID subject/key binding, spend-limit path, anchor forgery,
+  commitment actor binding, pack hygiene. Each has a regression test.
+
+## 0.34.0 — 2026-11-23
+- Canonical commitment, Ed25519 grant bound to the agent, one-shot redeem under a
+  file lock, hash-chained receipts with a `.head` anchor, provenance enforcement,
+  idempotent effect journal, payment adapter, read-only ERP checks.
+
+## 0.26.0 – 0.33.0 — 2026-11-09 … 2026-11-22
+Summarised: model/provider adapters, bench harness, Merkle transparency log with an
+off-host witness, approver daemon, hardware-backed `sk-` keys, portable receipts,
+MCP policy, sandbox backends. Individual entries were not kept; the tags and tests
+are the record.
+
 ## 0.25.0 — 2026-11-09
 - Concurrent model benchmark (`--workers`) using a thread pool, order
   preserved; enables many parallel agents against one vLLM endpoint.
