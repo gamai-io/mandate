@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.55.0 — 2026-11-25
+- **Containment with an expiry.** `mandate contain --pid N --minutes M` stops the
+  process and records a deadline; `mandate contain --sweep` releases only what
+  passed it, and records the release. If the sweep never runs, nothing is released
+  — the failure mode is the safe one.
+- **Extending needs a signature**: `mandate contain --extend PID --minutes M
+  --approver "Name" --key ...` signs the decision, and `verify_extend()` rejects a
+  changed one. "Keep this stopped" is a decision, not a timeout.
+- 366 tests.
+
 ## 0.54.0 — 2026-11-25
 - **`mandate pack` carries decision latency**: the audit pack now includes
   `decisions.json` (approved/rejected counts, median/p95/max wait), so the number a

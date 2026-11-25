@@ -13,6 +13,7 @@ from . import (
     agentwatch,
     anchor,
     approval_page,
+    containment,
     core,
     demo,
     detect,
@@ -627,6 +628,16 @@ def main(argv=None) -> int:
     p_policy.add_argument("--effect", default=None, help="effect kind for explain")
     p_policy.add_argument("--amount", type=float, default=None)
     p_policy.add_argument("--currency", default=None)
+
+    p_cont = sub.add_parser("contain")
+    p_cont.add_argument("--pid", type=int, default=None)
+    p_cont.add_argument("--minutes", type=int, default=15)
+    p_cont.add_argument("--reason", default="")
+    p_cont.add_argument("--ledger", default="ledger.jsonl")
+    p_cont.add_argument("--extend", type=int, default=None, metavar="PID")
+    p_cont.add_argument("--approver", default="")
+    p_cont.add_argument("--key", default=None)
+    p_cont.add_argument("--sweep", action="store_true")
 
     p_dec = sub.add_parser("decisions")
     p_dec.add_argument("--ledger", default="ledger.jsonl")
@@ -1382,6 +1393,24 @@ def main(argv=None) -> int:
                 return 2
             old = core.load_policy(args.against)
             _emit(policy_tools.diff(old, policy), None)
+            return 0
+
+        if args.cmd == "contain":
+            if args.sweep:
+                _emit(containment.sweep(args.ledger), None)
+                return 0
+            if args.extend is not None:
+                res = containment.extend(args.ledger, args.extend, args.minutes,
+                                         approver=args.approver,
+                                         key_path=args.key or "",
+                                         reason=args.reason or "extended")
+                _emit(res, None)
+                return 0
+            if args.pid is None:
+                _emit({"error": "Usage", "message": "contain --pid N --minutes M"}, None)
+                return 2
+            _emit(containment.contain(pid=args.pid, minutes=args.minutes,
+                                      ledger_path=args.ledger, reason=args.reason), None)
             return 0
 
         if args.cmd == "decisions":

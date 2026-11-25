@@ -274,6 +274,22 @@ certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
 
+## Containment that expires
+
+Stopping something is a decision; keeping it stopped is another one. So a
+containment carries a deadline and a signed extension:
+
+```bash
+mandate contain --pid 4242 --minutes 15 --reason "anomalous egress" --ledger ledger.jsonl
+mandate contain --extend 4242 --minutes 60 --approver "Amina H." --key ~/.ssh/approver
+mandate contain --sweep --ledger ledger.jsonl     # cron: release what expired
+```
+
+The sweep is the only thing that releases, and it releases only what passed its
+deadline. If the sweep never runs, the process stays stopped: the failure mode is
+the safe one. Extending without a signature is refused, and a changed extension
+(another `--minutes`) no longer verifies.
+
 ## Approve in a browser, not a terminal
 
 ```bash
@@ -875,7 +891,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.54.0** — canonical commitment, Ed25519
+**v0.55.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

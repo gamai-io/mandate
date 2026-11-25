@@ -5,8 +5,8 @@ reproduces it does not belong in a sales conversation.
 
 | claim | value | command |
 |---|---|---|
-| version | 0.54.0 | `python3 tools/claims.py --version` |
-| tests | 360 | `python3 -m pytest -q tests/` |
+| version | 0.55.0 | `python3 tools/claims.py --version` |
+| tests | 366 | `python3 -m pytest -q tests/` |
 | runtime dependencies | 0 | `grep -A2 '^dependencies' pyproject.toml` |
 | policy lints clean | yes | `mandate policy lint` |
 | supported python | >=3.9 | `grep requires-python pyproject.toml` |
