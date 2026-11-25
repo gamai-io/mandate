@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.49.0 — 2026-11-25
+- **Per-agent broker tokens.** `mandate-broker agent add|list|revoke` manages a
+  store that keeps only SHA-256 of each token (written `0600`, token shown once).
+  The broker resolves the bearer token to a name and refuses a grant signed for a
+  different agent; revocation is per agent, not global.
+- `/health` reports the number of agents, never a token.
+- 10 tests (store hygiene, duplicate name, corrupt store, wrong-agent redemption,
+  unknown and revoked tokens, single-token mode unchanged); 322 total.
+
 ## 0.48.0 — 2026-11-25
 - **Passkey approval.** `mandate/webauthn.py` verifies WebAuthn assertions with
   the standard library: `ES256` (P-256) and `EdDSA`, `clientDataJSON` type /

@@ -4,11 +4,13 @@ import argparse
 import hmac
 import json
 import os
+import sys
 import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from . import agents as agent_store
 from . import core, sign
 from .adapters import ErpChecker, PaymentAdapter, SmtpSender, WriteAdapter
 from .journal import Journal
@@ -37,7 +39,8 @@ class Broker:
                  require_audience: bool = True, revoked_path: str = "",
                  journal_db: str | None = None, lease_s: float = 60,
                  recover_on_start: bool = True, token: str = "",
-                 rate_per_min: float = 0, rate_burst: float = 0):
+                 rate_per_min: float = 0, rate_burst: float = 0,
+                 agents_path: str = ""):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -54,6 +57,7 @@ class Broker:
         self.require_audience = require_audience
         self.revoked_path = revoked_path
         self.token = token
+        self.agents_path = agents_path
         self.metrics = Registry("mandate_broker")
         self.limiter = (RateLimiter(rate_per_min, rate_burst)
                         if rate_per_min and float(rate_per_min) > 0 else None)
@@ -176,7 +180,7 @@ class Broker:
                 actions.append({"nonce": nonce, "action": "receipted"})
         return actions
 
-    def execute(self, intent: dict, grant_obj: dict) -> dict:
+    def execute(self, intent: dict, grant_obj: dict, caller: str | None = None) -> dict:
         intent = core.normalize_intent(intent)
         # limits and halt apply to every execution path, not only the CLI
         try:
@@ -211,6 +215,11 @@ class Broker:
             revoked_path=self.revoked_path or None)
         intent = verified["intent"]
         grant_core = verified["grant"]
+        if caller and str(grant_core.get("agent") or "") and \
+                str(grant_core.get("agent")) != str(caller):
+            raise core.GrantInvalid(
+                "this token belongs to %r but the grant is for %r"
+                % (str(caller), str(grant_core.get("agent"))))
         nonce = str(grant_core.get("nonce") or "")
         intent_hash = core.sha256(core.jcs(intent))
         begin = self.journal.begin(
@@ -262,6 +271,8 @@ class Broker:
                 "smtp": bool(self.smtp), "erp": bool(self.erp),
                 "payment": bool(self.payment),
                 "custody": self.custody(),
+                "agents": (len(agent_store.names(self.agents_path))
+                           if self.agents_path else 0),
                 "writer": self.writer.mode, "auth": bool(self.token),
                 "journal": self.journal.counts()}
 
@@ -327,11 +338,17 @@ def make_handler(broker: Broker):
                     broker.metrics.inc("rate_limited", action="execute")
                     self._send_text(429, "rate limited\n")
                     return
-            if broker.token:
-                header = self.headers.get("Authorization", "")
-                ok = (header.lower().startswith("bearer ")
-                      and hmac.compare_digest(header[7:].strip(), broker.token))
-                if not ok:
+            caller = None
+            header = self.headers.get("Authorization", "")
+            presented = header[7:].strip() if header.lower().startswith("bearer ") else ""
+            if broker.agents_path:
+                caller = agent_store.resolve(broker.agents_path, presented)
+                if caller is None:
+                    self._send(401, {"ok": False, "error": "unauthorized",
+                                     "message": "a per-agent token is required"})
+                    return
+            elif broker.token:
+                if not (presented and hmac.compare_digest(presented, broker.token)):
                     self._send(401, {"ok": False, "error": "unauthorized"})
                     return
             try:
@@ -343,7 +360,8 @@ def make_handler(broker: Broker):
                 raw = self.rfile.read(length) if length else b"{}"
                 payload = json.loads(raw.decode("utf-8"))
                 result = broker.execute(payload.get("intent") or {},
-                                        payload.get("grant") or {})
+                                        payload.get("grant") or {},
+                                        caller=caller)
                 broker.metrics.inc("requests", action="execute",
                                    result="duplicate" if result.get("duplicate")
                                    else "ok")
@@ -373,7 +391,35 @@ def make_server(host: str, port: int, broker: Broker) -> ThreadingHTTPServer:
     return server
 
 
+def agent_cli(argv: list[str]) -> int:
+    """`mandate-broker agent add|list|revoke --store FILE`"""
+    ap = argparse.ArgumentParser(prog="mandate-broker agent")
+    ap.add_argument("action", choices=("add", "list", "revoke"))
+    ap.add_argument("--store", required=True)
+    ap.add_argument("--name", default="")
+    ap.add_argument("--note", default="")
+    args = ap.parse_args(argv)
+    try:
+        if args.action == "add":
+            if not args.name:
+                ap.error("--name is required for add")
+            print(json.dumps(agent_store.add(args.store, args.name, args.note), indent=1))
+        elif args.action == "list":
+            print(json.dumps({"agents": agent_store.names(args.store)}, indent=1))
+        else:
+            if not args.name:
+                ap.error("--name is required for revoke")
+            print(json.dumps(agent_store.revoke(args.store, args.name), indent=1))
+    except agent_store.AgentStoreError as exc:
+        print(json.dumps({"error": "AgentStoreError", "message": str(exc)}))
+        return 2
+    return 0
+
+
 def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "agent":
+        return agent_cli(argv[1:])
     parser = argparse.ArgumentParser(prog="mandate-broker")
     parser.add_argument("--host", default=os.environ.get("MANDATE_BROKER_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("MANDATE_BROKER_PORT", "8899")))
@@ -396,6 +442,8 @@ def main(argv=None) -> int:
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
     parser.add_argument("--token", default=os.environ.get("MANDATE_BROKER_TOKEN", ""))
+    parser.add_argument("--agents", default=os.environ.get("MANDATE_AGENTS", ""),
+                        help="JSON store of per-agent tokens (see 'mandate broker agent')")
     parser.add_argument("--allow-any-audience", action="store_true")
     parser.add_argument("--revoked", default=os.environ.get(
         "MANDATE_REVOKED", "trust/revoked_signers"))
@@ -405,7 +453,7 @@ def main(argv=None) -> int:
     if args.config:
         with open(args.config, encoding="utf-8") as fh:
             cfg = json.load(fh)
-        for key in ("host", "port", "policy", "signers", "ledger", "nonce_db",
+        for key in ("host", "port", "policy", "signers", "ledger", "nonce_db", "agents",
                     "receipt_key", "broker_name", "effects_dir", "outbox",
                     "revoked", "journal_db"):
             if key in cfg:
@@ -435,6 +483,7 @@ def main(argv=None) -> int:
                     revoked_path=args.revoked,
                     journal_db=args.journal_db or None,
                     lease_s=args.lease,
+                    agents_path=getattr(args, "agents", "") or "",
                     recover_on_start=not args.no_recover,
                     token=args.token,
                     rate_per_min=args.rate_limit_per_min,

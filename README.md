@@ -231,6 +231,21 @@ write access to that cgroup; quarantine is per-uid, not per-process; neither is 
 hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
 Firecracker; "safe state" remains the bank's definition, not ours (row 5).
 
+## One broker, several agents
+
+One bearer token means every caller is "the agent". Per-agent tokens give each
+agent its own credential and make the grant binding real:
+
+```bash
+mandate-broker agent add --store /etc/mandate/agents.json --name bank-agent
+# prints the token once; the store keeps only its sha256 (0600)
+mandate-broker --agents /etc/mandate/agents.json --config broker/config.json
+```
+
+The broker resolves the token to a name and refuses a grant signed for another
+agent (`grant.agent` must equal the caller). Revoking one agent leaves the others
+working: `mandate-broker agent revoke --store ... --name bank-agent`.
+
 ## Approve in a browser, not a terminal
 
 ```bash
@@ -820,7 +835,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.48.0** — canonical commitment, Ed25519
+**v0.49.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

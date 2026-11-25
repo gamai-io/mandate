@@ -67,12 +67,20 @@ a committed effect without a receipt gets one; a claimed grant with no effect is
 abandoned; a duplicate `execute` returns the original receipt instead of charging
 again. `mandate broker recover` runs the same pass by hand.
 
+## Several agents, one broker
+
+`--agents /etc/mandate/agents.json` switches the broker from one shared token to
+per-agent tokens. Each token maps to a name, and a grant signed for `agent-a`
+cannot be redeemed with `agent-b`'s token (tested). The store keeps SHA-256 only;
+`mandate-broker agent add|list|revoke` manages it, tokens are printed once, and
+the file is written `0600`.
+
 ## Open gaps, named
 
 - **No mTLS.** Loopback plus a bearer token; a bank that wants mutual TLS puts a
   sidecar in front or asks us to add it (small change, not built).
-- **No per-agent tokens.** One broker token today; every caller shares it, so the
-  ledger distinguishes them by grant, not by credential.
+- **Per-agent tokens exist, per-agent *keys* do not.** The token identifies the
+  caller; the grant still carries the approver's signature, not the agent's.
 - **Host compromise** is out of scope, as above. So is a malicious broker admin.
 - **The broker is still our code.** The offline verifier covers the evidence, not
   the execution path.
