@@ -14,7 +14,8 @@ reproduces it does not belong in a sales conversation.
 ## Not proven here
 
 - Independent pentest: not done.
-- Second implementation of the verifier: not written.
+- Third-party review of the verifier: not done (two implementations
+  exist, both by the same author).
 - HA / RTO / RPO for the nonce authority: not defined by this repository.
 - PI/cyber insurance: not in place.
 

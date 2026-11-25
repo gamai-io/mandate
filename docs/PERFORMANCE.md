@@ -47,5 +47,13 @@ verification run and should anchor the head rather than the body.
 Run it yourself:
 
 ```bash
-python3 /tmp/bench_receipts.py     # the script is reproduced in the commit message
+python3 tools/bench_ledger.py --count 10000
 ```
+
+## One number that is not reproducible here
+
+The Firecracker pause figure (17.2 ms, guest stopped) was measured once on
+`crusoe-cpu1`, the only host we have with `/dev/kvm`; `gama-lab-fra` has no KVM, so
+CI cannot re-run it. Treat it as a single-site measurement, not a benchmark, and
+ask for a re-run on your own hypervisor.
+

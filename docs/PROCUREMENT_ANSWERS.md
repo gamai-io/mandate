@@ -38,7 +38,7 @@ Usora, Bosnia and Herzegovina.
 | Key generation / storage | `ssh-keygen` file keys or `sk-` hardware keys; **HSM/KMS through `--signer-cmd`** — the bank's adapter signs the canonical payload, our process never holds the key. A native in-process PKCS#11 provider is not shipped. |
 | Key rotation | `allowed_signers` supports multiple keys; remove the old one, add the new one, record it with `change record`. No automated rotation tooling. |
 | Where are private keys? | Never in the repository or the ledger; the approver's environment only. We never see them. |
-| Crypto library | None — the code calls `ssh-keygen`/`openssl`. No home-grown primitives. |
+| Crypto library | None — the code calls `ssh-keygen`/`openssl`. No home-grown primitives in the signing path (Ed25519 comes from OpenSSH); the offline verifier does implement Ed25519 in pure Python, and that is stated where it matters. |
 
 ## Access and identity
 
@@ -77,7 +77,7 @@ Usora, Bosnia and Herzegovina.
 |---|---|
 | Dependencies | **Zero runtime dependencies.** `sbom` emits CycloneDX 1.5 with empty `components`. |
 | SBOM | `mandate sbom` (shipped). |
-| Signed releases | **Gap.** Wheels are published to PyPI with hashes; no Sigstore attestation yet. Tags exist per release. |
+| Signed releases | **Gap.** Wheels are published to PyPI with hashes; Sigstore build attestation and PyPI PEP 740 provenance are both live. Tags exist per release. |
 | Vulnerability handling | `SECURITY.md` with a contact; fixes are released as patch versions and listed in `SECURITY.md`. No formal CVE process, no bounty. |
 | Pentest | **Not done.** Booked as a prerequisite for a pilot; the red-team review we ran internally is public in spirit (findings and fixes are in `SECURITY.md`). |
 
