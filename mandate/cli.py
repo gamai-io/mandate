@@ -14,6 +14,7 @@ from . import (
     anchor,
     approval_page,
     core,
+    demo,
     detect,
     egress,
     governance,
@@ -630,6 +631,10 @@ def main(argv=None) -> int:
     p_obs = sub.add_parser("observe-summary")
     p_obs.add_argument("--ledger", default="ledger.jsonl")
     p_obs.add_argument("--out", default=None)
+
+    p_demo = sub.add_parser("demo")
+    p_demo.add_argument("--dir", default=None, help="use this directory instead of a temp one")
+    p_demo.add_argument("--keep", action="store_true", help="keep the temp directory")
 
     sub.add_parser("version")
 
@@ -1383,6 +1388,11 @@ def main(argv=None) -> int:
                     json.dump(res, fh, indent=1, sort_keys=True)
             _emit(res, None)
             return 0
+
+        if args.cmd == "demo":
+            res = demo.run(args.dir, keep=args.keep)
+            _emit(res, None)
+            return 0 if res["ok"] else 1
 
         if args.cmd == "version":
             from . import __version__

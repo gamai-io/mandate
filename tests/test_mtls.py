@@ -21,7 +21,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def openssl(*args: str) -> None:
-    subprocess.run(["openssl", *args], check=True, capture_output=True)
+    done = subprocess.run(["openssl", *args], capture_output=True, text=True)
+    if done.returncode != 0:
+        raise AssertionError("openssl %s failed: %s" % (" ".join(args[:2]),
+                                                        done.stderr[-400:]))
 
 
 def make_pki(directory: str) -> dict:
@@ -50,6 +53,123 @@ def make_pki(directory: str) -> dict:
         clients[name] = (crt, key)
     return {"ca": ca_crt, "server_crt": server_crt, "server_key": server_key,
             "clients": clients, "ca_key": ca_key}
+
+
+def make_crl(directory: str, revoke: str) -> str:
+    """A real CRL: minimal openssl CA database, revoke one client, generate."""
+    db = os.path.join(directory, "ca")
+    os.makedirs(os.path.join(db, "newcerts"), exist_ok=True)
+    open(os.path.join(db, "index.txt"), "w").close()
+    open(os.path.join(db, "serial"), "w").write("1000\n")
+    open(os.path.join(db, "crlnumber"), "w").write("1000\n")
+    cnf = os.path.join(directory, "ca.cnf")
+    open(cnf, "w").write("""
+[ ca ]
+default_ca = CA_default
+[ CA_default ]
+dir = %s
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = %s
+serial = $dir/serial
+crlnumber = $dir/crlnumber
+private_key = %s
+default_md = sha256
+default_days = 2
+default_crl_days = 2
+unique_subject = no
+policy = policy_any
+[ policy_any ]
+commonName = supplied
+[ req ]
+distinguished_name = req_dn
+[ req_dn ]
+""" % (db, os.path.join(directory, "ca.crt"),
+       os.path.join(directory, "ca.key")))
+    crt = os.path.join(directory, revoke + ".crt")
+    openssl("ca", "-config", cnf, "-revoke", crt, "-batch")
+    crl = os.path.join(directory, "crl.pem")
+    openssl("ca", "-config", cnf, "-gencrl", "-out", crl, "-batch")
+    return crl
+
+
+class Revocation(unittest.TestCase):
+    def _broker(self, crl: str, directory: str, pki: dict, port: int,
+                provider_port: int, key: str):
+        cfg = os.path.join(directory, "broker.json")
+        json.dump({
+            "host": "127.0.0.1", "port": port,
+            "policy": os.path.join(directory, "policy.json"),
+            "signers": os.path.join(directory, "trust", "allowed_signers"),
+            "ledger": os.path.join(directory, "ledger.jsonl"),
+            "nonce_db": os.path.join(directory, "used.sqlite"),
+            "journal_db": os.path.join(directory, "journal.sqlite"),
+            "effects_dir": os.path.join(directory, "effects"),
+            "outbox": os.path.join(directory, "outbox"),
+            "broker_name": "gama-broker",
+            "agents": os.path.join(directory, "agents.json"),
+            "payment": {"provider": "http",
+                        "url": "http://127.0.0.1:%d" % provider_port,
+                        "token_env": "PAY_TOKEN"},
+        }, open(cfg, "w"))
+        env = {k: v for k, v in os.environ.items() if k != "PAY_TOKEN"}
+        env.update({"PAY_TOKEN": PROVIDER_SECRET, "PYTHONPATH": ROOT})
+        return subprocess.Popen(
+            [sys.executable, "-m", "mandate.broker", "--config", cfg,
+             "--tls-cert", pki["server_crt"], "--tls-key", pki["server_key"],
+             "--client-ca", pki["ca"], "--client-crl", crl],
+            cwd=directory, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def test_a_revoked_certificate_cannot_connect(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            shutil.copy(os.path.join(ROOT, "policy.json"), td)
+            os.makedirs(os.path.join(td, "trust"), exist_ok=True)
+            key = os.path.join(td, "approver")
+            subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key],
+                           check=True)
+            with open(os.path.join(td, "trust", "allowed_signers"), "w") as fh:
+                fh.write('approver namespaces="mandate" %s\n'
+                         % open(key + ".pub").read().strip())
+            pki = make_pki(td)
+            store = os.path.join(td, "agents.json")
+            agents.ensure_name(store, "agent-a")
+            agents.ensure_name(store, "agent-b")
+            crl = make_crl(td, "agent-b")
+            provider = FakeProvider()
+            port = free_port()
+            broker = self._broker(crl, td, pki, port, provider.port, key)
+            try:
+                for _ in range(120):
+                    try:
+                        socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+                        break
+                    except OSError:
+                        time.sleep(0.05)
+                context = ssl.create_default_context(cafile=pki["ca"])
+                context.check_hostname = False
+                crt, ckey = pki["clients"]["agent-b"]
+                context.load_cert_chain(crt, ckey)
+                connection = http.client.HTTPSConnection("127.0.0.1", port, timeout=10,
+                                                        context=context)
+                with self.assertRaises((ssl.SSLError, ConnectionError, OSError)):
+                    connection.request("POST", "/execute", body=b"{}",
+                                       headers={"Content-Type": "application/json"})
+                    connection.getresponse()
+                good = ssl.create_default_context(cafile=pki["ca"])
+                good.check_hostname = False
+                crt_a, key_a = pki["clients"]["agent-a"]
+                good.load_cert_chain(crt_a, key_a)
+                connection = http.client.HTTPSConnection("127.0.0.1", port, timeout=10,
+                                                        context=good)
+                connection.request("GET", "/health")
+                self.assertEqual(connection.getresponse().status, 200)
+            finally:
+                broker.terminate()
+                try:
+                    broker.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    broker.kill()
+                provider.stop()
 
 
 class MTLS(unittest.TestCase):

@@ -16,6 +16,15 @@ produces a hash-chained **Receipt**. Anyone can verify the whole chain offline.
 > Approval workflows are ephemeral events. A Mandate is a durable, portable,
 > cryptographically bound artifact — a commit, not a log line.
 
+```bash
+mandate demo        # propose -> grant -> redeem -> replay refused -> changed amount refused
+                    # -> verify offline -> audit pack, on a throwaway directory
+```
+
+`mandate demo` runs the real path, not a mock: a generated Ed25519 key signs a real
+grant, `redeem` executes it, a replay is refused, a changed amount is refused with
+`CommitmentMismatch`, the receipt verifies, and an audit pack is written.
+
 ## One thing
 
 Mandate does one thing: a named human signs a specific business effect, the effect
@@ -259,7 +268,8 @@ mandate-broker --agents /etc/mandate/agents.json \
 mandate-broker agent register --store /etc/mandate/agents.json --name bank-agent
 ```
 
-A grant signed for `agent-a` is refused with `agent-b`'s certificate; a
+Add `--client-crl revoked.pem` and a revoked certificate cannot complete the
+handshake at all (tested with a real CRL). A grant signed for `agent-a` is refused with `agent-b`'s certificate; a
 certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
@@ -307,8 +317,20 @@ python3 spec/verify_offline.py --grant spec/vectors/grant.json \
 ```
 
 `spec/vectors/` also contains a tampered intent and a forged receipt, both of
-which must fail. It is a second implementation by the same author — cheaper to
-audit, not a substitute for an independent one.
+which must fail.
+
+**A second implementation in another language**: `spec/verify_offline.js` does the
+same checks with Node's standard library and OpenSSL's Ed25519, not our Python:
+
+```bash
+node spec/verify_offline.js --grant spec/vectors/grant.json \
+    --intent spec/vectors/intent.json --signers spec/vectors/allowed_signers \
+    --receipt spec/vectors/receipt.json     # ok: true, exit 0
+```
+
+Both verifiers run in the same test suite on the same vectors and must agree. They
+are written by the same author: that lowers the cost of an audit, it does not
+replace an independent review.
 
 ## Review the policy like code
 
@@ -853,7 +875,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.50.0** — canonical commitment, Ed25519
+**v0.51.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

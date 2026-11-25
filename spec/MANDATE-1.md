@@ -99,6 +99,10 @@ python3 spec/verify_offline.py --grant spec/vectors/grant.json \
 # ok: true, exit 0
 ```
 
+A **second implementation** in another language and on another crypto library:
+`spec/verify_offline.js` (Node standard library, OpenSSL Ed25519) performs the same
+checks and is run against the same vectors in the test suite.
+
 The vectors in `spec/vectors/` include a tampered intent (amount changed after
 approval) and a forged receipt, each of which must fail. This is a **second
 implementation by the same author**, not an independent third party: it lowers

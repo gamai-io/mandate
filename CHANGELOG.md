@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.51.0 — 2026-11-25
+- `mandate demo`: the whole chain in one command on a throwaway directory — real
+  key, real grant, redeem, **replay refused**, **changed amount refused**, receipt
+  verified, audit pack written. Exits non-zero if any step does not hold.
+- `spec/verify_offline.js`: a second verifier in Node (OpenSSL Ed25519, own JCS and
+  SSHSIG parsing). Both verifiers run on the same vectors in CI and must agree.
+- Broker `--client-crl`: `VERIFY_CRL_CHECK_LEAF`, so a revoked certificate cannot
+  complete the handshake; tested with a real CRL and a revoked client.
+- 8 new tests; 334 total.
+
 ## 0.50.0 — 2026-11-25
 - **mTLS for the broker.** `--tls-cert/--tls-key` serve HTTPS; `--client-ca`
   requires a client certificate and uses its CN as the agent identity. The CN must

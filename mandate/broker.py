@@ -472,6 +472,8 @@ def main(argv=None) -> int:
     parser.add_argument("--tls-cert", default=os.environ.get("MANDATE_TLS_CERT", ""),
                         help="server certificate (PEM); enables HTTPS")
     parser.add_argument("--tls-key", default=os.environ.get("MANDATE_TLS_KEY", ""))
+    parser.add_argument("--client-crl", default=os.environ.get("MANDATE_CLIENT_CRL", ""),
+                        help="PEM revocation list; a revoked certificate cannot connect")
     parser.add_argument("--client-ca", default=os.environ.get("MANDATE_CLIENT_CA", ""),
                         help="require a client certificate signed by this CA; the "
                              "certificate commonName becomes the agent identity")
@@ -531,6 +533,9 @@ def main(argv=None) -> int:
         if args.client_ca:
             context.verify_mode = ssl.CERT_REQUIRED
             context.load_verify_locations(args.client_ca)
+        if args.client_crl:
+            context.load_verify_locations(cafile=args.client_crl)   # holds the CRL
+            context.verify_flags |= ssl.VERIFY_CRL_CHECK_LEAF
         server.socket = context.wrap_socket(server.socket, server_side=True)
     host, port = server.server_address[:2]
     scheme = "https" if args.tls_cert and args.tls_key else "http"

@@ -87,10 +87,16 @@ Tested end to end with a throwaway CA: own grant executes, another agent's grant
 is refused, an unregistered CN is refused, no certificate means no handshake
 (`tests/test_mtls.py`).
 
+### Revocation
+
+`--client-crl revoked.pem` turns on `VERIFY_CRL_CHECK_LEAF`: a certificate that
+appears in the list cannot complete the TLS handshake, so the grant is never read.
+The list is loaded at start; replacing it needs a restart today.
+
 ## Open gaps, named
 
-- **Certificate rotation and CRL** are the operator's job; the broker reloads only
-  on restart, and there is no OCSP/CRL check yet.
+- **Rotation needs a restart.** The certificate, CA and CRL are loaded at start;
+  there is no live reload and no OCSP.
 - **Per-agent tokens exist, per-agent *keys* do not.** The token identifies the
   caller; the grant still carries the approver's signature, not the agent's.
 - **Host compromise** is out of scope, as above. So is a malicious broker admin.
