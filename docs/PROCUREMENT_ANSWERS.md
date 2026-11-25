@@ -4,7 +4,7 @@ Pre-filled answers to the questions a bank's security/procurement process asks.
 Every "no" is a real gap with a plan; a questionnaire that answers "yes" to
 everything is the first thing a reviewer distrusts.
 
-Product: `gama-mandate` 0.51.0 and the four companion packages (`gamai-trust`,
+Product: `gama-mandate` 0.51.1 and the four companion packages (`gamai-trust`,
 `gamai-guard`, `gamai-plugins`, `gama-l`). Vendor: GAMA TRADE d.o.o. / gamAI,
 Usora, Bosnia and Herzegovina.
 
@@ -113,10 +113,13 @@ Usora, Bosnia and Herzegovina.
 
 ### Release provenance (PEP 740)
 
-The release workflow publishes with `attestations: true` **when** the repository
-variable `PYPI_OIDC=true` is set, which requires a PyPI trusted publisher entry
-for this repository. Until that entry exists the release uses a project-scoped
-API token, and PyPI records **no** provenance for the artefact. That is a real
-gap: a project that sells verifiability should publish verifiably. The fix is one
-publisher entry plus one repository variable; it is listed here rather than
-described as done.
+Releases use OIDC trusted publishing with `attestations: true`. The trusted
+publisher for `gamai-io/mandate` + `release.yml` exists and `PYPI_OIDC=true` is
+set, so every artefact carries a PyPI provenance attestation. Check it without
+trusting us:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" \
+  https://pypi.org/integrity/gama-mandate/<version>/\
+gama_mandate-<version>-py3-none-any.whl/provenance    # 200 = attestation exists
+```

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.51.1 — 2026-11-25
+- Publish through OIDC trusted publishing with PEP 740 attestations: the PyPI
+  trusted publisher for `gamai-io/mandate` + `release.yml` was added on
+  2026-11-25, and `PYPI_OIDC=true` is set on the repository. The long-lived API
+  token is no longer needed for releases.
+
 ## 0.51.0 — 2026-11-25
 - `mandate demo`: the whole chain in one command on a throwaway directory — real
   key, real grant, redeem, **replay refused**, **changed amount refused**, receipt
