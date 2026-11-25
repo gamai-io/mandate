@@ -92,11 +92,28 @@ def resolve(path: str, token: str) -> str | None:
     except AgentStoreError:
         return None
     for entry in data["agents"]:
-        if entry.get("revoked"):
-            continue
+        if entry.get("revoked") or not entry.get("sha256"):
+            continue                  # a TLS-only identity has no token to match
         if hmac.compare_digest(entry["sha256"], _hash(token)):
             return str(entry["name"])
     return None
+
+
+def ensure_name(path: str, name: str, kind: str = "mtls") -> dict:
+    """Register an identity that authenticates by certificate, not by token."""
+    data = load(path, strict=False)
+    for entry in data["agents"]:
+        if entry["name"] == name:
+            return {"name": name, "added": False}
+    data["agents"].append({"name": name, "sha256": "", "kind": kind,
+                           "created": int(time.time()), "revoked": False})
+    save(path, data)
+    return {"name": name, "added": True}
+
+
+def is_registered(path: str, name: str) -> bool:
+    data = load(path, strict=False)
+    return any(e["name"] == name and not e.get("revoked") for e in data["agents"])
 
 
 def list_store(path: str) -> dict:

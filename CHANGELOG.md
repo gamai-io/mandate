@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.50.0 — 2026-11-25
+- **mTLS for the broker.** `--tls-cert/--tls-key` serve HTTPS; `--client-ca`
+  requires a client certificate and uses its CN as the agent identity. The CN must
+  be registered (`agent register`), and the grant's `agent` must equal it.
+  Unregistered CN → 403 before the grant is read; no certificate → handshake
+  failure; wrong agent → 409.
+- 4 end-to-end tests with a throwaway CA (own grant, other agent's grant,
+  unregistered CN, no certificate); 326 total.
+- Broker docs state what is *not* covered: certificate rotation is a restart, no
+  CRL/OCSP check yet.
+
 ## 0.49.1 — 2026-11-25
 - CI installs `cryptography` (test-only): the WebAuthn tests import it to emulate
   an authenticator, so 0.49.0 passed locally and failed in CI at import. The code

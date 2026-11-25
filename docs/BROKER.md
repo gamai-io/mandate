@@ -75,10 +75,22 @@ cannot be redeemed with `agent-b`'s token (tested). The store keeps SHA-256 only
 `mandate-broker agent add|list|revoke` manages it, tokens are printed once, and
 the file is written `0600`.
 
+## Certificates
+
+`--tls-cert/--tls-key` serve HTTPS; `--client-ca` additionally requires a client
+certificate and uses its **CN** as the agent name. The CN must be registered in
+the agent store (`mandate-broker agent register`), and the grant's `agent` must
+equal it — a valid certificate for the wrong agent is a 409, not a 401, because
+the identity is known and the authorisation is wrong.
+
+Tested end to end with a throwaway CA: own grant executes, another agent's grant
+is refused, an unregistered CN is refused, no certificate means no handshake
+(`tests/test_mtls.py`).
+
 ## Open gaps, named
 
-- **No mTLS.** Loopback plus a bearer token; a bank that wants mutual TLS puts a
-  sidecar in front or asks us to add it (small change, not built).
+- **Certificate rotation and CRL** are the operator's job; the broker reloads only
+  on restart, and there is no OCSP/CRL check yet.
 - **Per-agent tokens exist, per-agent *keys* do not.** The token identifies the
   caller; the grant still carries the approver's signature, not the agent's.
 - **Host compromise** is out of scope, as above. So is a malicious broker admin.

@@ -40,7 +40,7 @@ class Broker:
                  journal_db: str | None = None, lease_s: float = 60,
                  recover_on_start: bool = True, token: str = "",
                  rate_per_min: float = 0, rate_burst: float = 0,
-                 agents_path: str = ""):
+                 agents_path: str = "", tls_client_ca: str = ""):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -58,6 +58,7 @@ class Broker:
         self.revoked_path = revoked_path
         self.token = token
         self.agents_path = agents_path
+        self.tls_client_ca = tls_client_ca
         self.metrics = Registry("mandate_broker")
         self.limiter = (RateLimiter(rate_per_min, rate_burst)
                         if rate_per_min and float(rate_per_min) > 0 else None)
@@ -295,6 +296,17 @@ def make_handler(broker: Broker):
             self.end_headers()
             self.wfile.write(data)
 
+        def _client_cert_name(self) -> str | None:
+            try:
+                cert = self.connection.getpeercert() or {}
+            except AttributeError:
+                return None
+            for field in cert.get("subject", ()):
+                for key, value in field:
+                    if key in ("commonName", "CN"):
+                        return str(value)
+            return None
+
         def _client_ip(self) -> str:
             return str(self.client_address[0]) if self.client_address else "?"
 
@@ -341,7 +353,18 @@ def make_handler(broker: Broker):
             caller = None
             header = self.headers.get("Authorization", "")
             presented = header[7:].strip() if header.lower().startswith("bearer ") else ""
-            if broker.agents_path:
+            if broker.tls_client_ca:
+                caller = self._client_cert_name()
+                if not caller:
+                    self._send(403, {"ok": False, "error": "no_client_certificate"})
+                    return
+                if broker.agents_path and not agent_store.is_registered(
+                        broker.agents_path, caller):
+                    self._send(403, {"ok": False, "error": "unknown_agent",
+                                     "message": "certificate %r is not registered"
+                                                % caller})
+                    return
+            elif broker.agents_path:
                 caller = agent_store.resolve(broker.agents_path, presented)
                 if caller is None:
                     self._send(401, {"ok": False, "error": "unauthorized",
@@ -394,7 +417,7 @@ def make_server(host: str, port: int, broker: Broker) -> ThreadingHTTPServer:
 def agent_cli(argv: list[str]) -> int:
     """`mandate-broker agent add|list|revoke --store FILE`"""
     ap = argparse.ArgumentParser(prog="mandate-broker agent")
-    ap.add_argument("action", choices=("add", "list", "revoke"))
+    ap.add_argument("action", choices=("add", "list", "revoke", "register"))
     ap.add_argument("--store", required=True)
     ap.add_argument("--name", default="")
     ap.add_argument("--note", default="")
@@ -404,6 +427,10 @@ def agent_cli(argv: list[str]) -> int:
             if not args.name:
                 ap.error("--name is required for add")
             print(json.dumps(agent_store.add(args.store, args.name, args.note), indent=1))
+        elif args.action == "register":
+            if not args.name:
+                ap.error("--name is required for register")
+            print(json.dumps(agent_store.ensure_name(args.store, args.name), indent=1))
         elif args.action == "list":
             print(json.dumps({"agents": agent_store.names(args.store)}, indent=1))
         else:
@@ -442,6 +469,12 @@ def main(argv=None) -> int:
     parser.add_argument("--config", default=os.environ.get("MANDATE_BROKER_CONFIG", ""))
     parser.add_argument("--allow-remote", action="store_true")
     parser.add_argument("--token", default=os.environ.get("MANDATE_BROKER_TOKEN", ""))
+    parser.add_argument("--tls-cert", default=os.environ.get("MANDATE_TLS_CERT", ""),
+                        help="server certificate (PEM); enables HTTPS")
+    parser.add_argument("--tls-key", default=os.environ.get("MANDATE_TLS_KEY", ""))
+    parser.add_argument("--client-ca", default=os.environ.get("MANDATE_CLIENT_CA", ""),
+                        help="require a client certificate signed by this CA; the "
+                             "certificate commonName becomes the agent identity")
     parser.add_argument("--agents", default=os.environ.get("MANDATE_AGENTS", ""),
                         help="JSON store of per-agent tokens (see 'mandate broker agent')")
     parser.add_argument("--allow-any-audience", action="store_true")
@@ -484,13 +517,26 @@ def main(argv=None) -> int:
                     journal_db=args.journal_db or None,
                     lease_s=args.lease,
                     agents_path=getattr(args, "agents", "") or "",
+                    tls_client_ca=getattr(args, "client_ca", "") or "",
                     recover_on_start=not args.no_recover,
                     token=args.token,
                     rate_per_min=args.rate_limit_per_min,
                     rate_burst=args.rate_burst)
     server = make_server(args.host, args.port, broker)
+    if args.tls_cert and args.tls_key:
+        import ssl
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(args.tls_cert, args.tls_key)
+        if args.client_ca:
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(args.client_ca)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
     host, port = server.server_address[:2]
-    print("mandate-broker listening on http://%s:%s" % (host, port), flush=True)
+    scheme = "https" if args.tls_cert and args.tls_key else "http"
+    print("mandate-broker listening on %s://%s:%s%s"
+          % (scheme, host, port,
+             " (client certificate required)" if args.client_ca else ""), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

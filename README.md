@@ -246,6 +246,24 @@ The broker resolves the token to a name and refuses a grant signed for another
 agent (`grant.agent` must equal the caller). Revoking one agent leaves the others
 working: `mandate-broker agent revoke --store ... --name bank-agent`.
 
+## Identity from a certificate, not a header
+
+A bearer token proves possession of a string; a client certificate proves control
+of a key and survives a sloppy proxy. With `--client-ca` the broker requires a
+certificate signed by your CA and takes the **commonName as the agent**:
+
+```bash
+mandate-broker --agents /etc/mandate/agents.json \
+    --tls-cert /etc/mandate/server.crt --tls-key /etc/mandate/server.key \
+    --client-ca /etc/mandate/agents-ca.crt
+mandate-broker agent register --store /etc/mandate/agents.json --name bank-agent
+```
+
+A grant signed for `agent-a` is refused with `agent-b`'s certificate; a
+certificate whose CN is not registered is refused before the grant is even read;
+a client with no certificate cannot complete the handshake. Tokens and
+certificates are separate mechanisms and can be used independently.
+
 ## Approve in a browser, not a terminal
 
 ```bash
@@ -835,7 +853,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.49.1** — canonical commitment, Ed25519
+**v0.50.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
