@@ -90,10 +90,23 @@ def check_versions() -> list[str]:
 
 
 def count_tests() -> int:
+    """pytest when available, otherwise count the unittest methods.
+
+    CI installs only ruff/build/twine for the unittest job, so a hard dependency
+    on pytest made the gate fail on "could not collect" instead of on drift.
+    """
     out = subprocess.run([sys.executable, "-m", "pytest", "-q", "--collect-only",
                           "tests/"], cwd=ROOT, capture_output=True, text=True)
     match = re.search(r"(\d+) tests? collected", out.stdout + out.stderr)
-    return int(match.group(1)) if match else -1
+    if match:
+        return int(match.group(1))
+    total = 0
+    for name in sorted(os.listdir(os.path.join(ROOT, "tests"))):
+        if not name.startswith("test_") or not name.endswith(".py"):
+            continue
+        text = open(os.path.join(ROOT, "tests", name), encoding="utf-8").read()
+        total += len(re.findall(r"^\s+def test_", text, re.M))
+    return total or -1
 
 
 def check_tests() -> list[str]:
