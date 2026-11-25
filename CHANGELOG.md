@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.62.0 — 2026-11-25
+- **Signed instructions (memory provenance).** `mandate memory add` records an
+  instruction with a text, a scope (`kind:target`), an approver signature and an
+  expiry; `memory verify`, `memory revoke`, `memory list`. An intent may cite one in
+  `provenance` with `type: "instruction"`; `check_provenance` refuses a citation
+  that is unsigned, revoked, expired or out of scope, in `redeem` and in the broker
+  (`--instructions`). It does not stop a model from believing something; it stops
+  the belief from authorising an effect alone.
+- `docs/EGRESS_POLICY.md`: what belongs on the allowlist, the order the checks run
+  in, and what an application-level gate cannot do.
+- 14 memory tests plus the egress document; 412 pass, 3 documented skips.
+
 ## 0.61.0 — 2026-11-25
 - **SMTP send goes through the egress gate** like payment and publish, so a live
   mail cannot leave for a host nobody allowed.

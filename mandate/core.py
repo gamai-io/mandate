@@ -140,10 +140,11 @@ def normalize_intent(intent: dict) -> dict:
         if not isinstance(entry, dict):
             raise MandateError("provenance entries must be objects")
         kind = entry.get("type")
-        if kind not in ("user_pref", "data_ref", "model_inference"):
+        if kind not in ("user_pref", "data_ref", "model_inference", "instruction"):
             raise MandateError("provenance type must be user_pref, data_ref "
                                "or model_inference")
-        if kind == "data_ref" and not str(entry.get("source") or "").strip():
+        if kind in ("data_ref", "instruction") and \
+                not str(entry.get("source") or "").strip():
             raise MandateError("data_ref provenance requires a source")
         covers = entry.get("covers")
         if covers is not None and (
@@ -643,7 +644,8 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            require_audience: bool = False,
            revoked_path: str | None = None,
            sign_key: str | None = None, signer: str | None = None,
-           signer_cmd: str | None = None, observe: bool = False) -> dict:
+           signer_cmd: str | None = None, observe: bool = False,
+           instruction_store: str = "") -> dict:
     verified = verify_authorization(
         intent, grant_obj, signers_path, namespace, allow_self, now, policy,
         audience, require_audience, revoked_path)
@@ -651,6 +653,12 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
     grant_core = verified["grant"]
     enforce_new_payee(intent, policy if isinstance(policy, dict) else load_policy(),
                       ledger_path)
+    if instruction_store:
+        from . import memory as memory_store
+        try:
+            memory_store.check_provenance(intent, instruction_store, signers_path)
+        except memory_store.MemoryError as exc:
+            raise PolicyDenied(str(exc)) from exc
     nonce = str(grant_core.get("nonce") or "")
     receipt = build_receipt(intent, grant_core, verified["commitment"],
                             sha256(jcs(intent)), ts=verified["moment"],

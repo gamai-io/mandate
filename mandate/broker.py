@@ -42,7 +42,7 @@ class Broker:
                  rate_per_min: float = 0, rate_burst: float = 0,
                  agents_path: str = "", tls_client_ca: str = "",
                  tools_path: str = "", sql: dict | None = None,
-                 publish: dict | None = None):
+                 publish: dict | None = None, instruction_store: str = ""):
         self.policy_path = policy
         self.policy = core.load_policy(policy)
         self.signers = signers
@@ -62,6 +62,7 @@ class Broker:
         self.agents_path = agents_path
         self.tls_client_ca = tls_client_ca
         self.tools_path = tools_path
+        self.instruction_store = instruction_store
         self.sql = SqlWriter(sql) if sql else None
         self.publisher = Publisher(publish) if publish else None
         self.metrics = Registry("mandate_broker")
@@ -219,6 +220,13 @@ class Broker:
         if self.tools_path:
             from . import tools as tool_registry
             tool_registry.enforce(intent, self.tools_path)
+        if self.instruction_store:
+            from . import memory as memory_store
+            try:
+                memory_store.check_provenance(intent, self.instruction_store,
+                                              self.signers)
+            except memory_store.MemoryError as exc:
+                raise core.PolicyDenied(str(exc)) from exc
         if self.erp is not None:
             pre = self.erp.check(intent)
             if not pre.get("ok"):
@@ -517,6 +525,8 @@ def main(argv=None) -> int:
     parser.add_argument("--client-ca", default=os.environ.get("MANDATE_CLIENT_CA", ""),
                         help="require a client certificate signed by this CA; the "
                              "certificate commonName becomes the agent identity")
+    parser.add_argument("--instructions", default=os.environ.get("MANDATE_INSTRUCTIONS", ""),
+                        help="store of signed instructions an intent may cite")
     parser.add_argument("--tools", default=os.environ.get("MANDATE_TOOLS", ""),
                         help="JSON registry pinning tool schema hashes")
     parser.add_argument("--agents", default=os.environ.get("MANDATE_AGENTS", ""),
@@ -564,6 +574,7 @@ def main(argv=None) -> int:
                     agents_path=getattr(args, "agents", "") or "",
                     tls_client_ca=getattr(args, "client_ca", "") or "",
                     tools_path=getattr(args, "tools", "") or "",
+                    instruction_store=getattr(args, "instructions", "") or "",
                     recover_on_start=not args.no_recover,
                     token=args.token,
                     rate_per_min=args.rate_limit_per_min,

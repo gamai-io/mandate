@@ -274,6 +274,24 @@ certificate whose CN is not registered is refused before the grant is even read;
 a client with no certificate cannot complete the handshake. Tokens and
 certificates are separate mechanisms and can be used independently.
 
+## A belief needs a signature
+
+Memory poisoning is the one failure where the receipt chain would otherwise prove a
+fraud was authorised. An instruction the agent keeps can be signed, scoped and made
+to expire, and an intent that cites it must pass all three:
+
+```bash
+mandate memory add --text "pay Acme invoices under 5000" \
+    --scope payment.send:Acme --approver alice --key ~/.ssh/alice --ttl 30d
+mandate memory verify --id m-1a2b3c4d5e
+mandate redeem ... --instructions instructions.jsonl   # cites must verify
+```
+
+A citation that is unsigned, revoked, expired or out of scope is refused with a
+`PolicyDenied`; the broker checks the same thing when `--instructions` is set. It
+does not stop the model from believing something — it stops the belief from
+authorising an effect on its own.
+
 ## Not just payments
 
 The incident list is full of non-payment effects: a package published to a
@@ -962,7 +980,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.61.0** — canonical commitment, Ed25519
+**v0.62.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

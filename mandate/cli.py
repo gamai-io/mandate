@@ -444,6 +444,8 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--svid-audience", dest="svid_audience", default=None)
     p_redeem.add_argument("--key", default=None, help="sign the receipt")
     p_redeem.add_argument("--signer", default=None)
+    p_redeem.add_argument("--instructions", default=None,
+                          help="store of signed instructions the intent may cite")
     p_redeem.add_argument("--observe", action="store_true",
                           help="record what would happen without spending the grant")
     p_redeem.add_argument("--signer-cmd", dest="signer_cmd", default=None,
@@ -628,6 +630,20 @@ def main(argv=None) -> int:
     p_policy.add_argument("--effect", default=None, help="effect kind for explain")
     p_policy.add_argument("--amount", type=float, default=None)
     p_policy.add_argument("--currency", default=None)
+
+    p_mem = sub.add_parser("memory")
+    p_mem.add_argument("action", choices=("add", "list", "verify", "revoke"))
+    p_mem.add_argument("--store", default="instructions.jsonl")
+    p_mem.add_argument("--text", default="")
+    p_mem.add_argument("--scope", action="append", default=None,
+                       help="kind:target, e.g. payment.send:Acme (repeatable)")
+    p_mem.add_argument("--approver", default="")
+    p_mem.add_argument("--key", default=None)
+    p_mem.add_argument("--ttl", type=int, default=30 * 86400)
+    p_mem.add_argument("--id", default=None)
+    p_mem.add_argument("--reason", default="")
+    p_mem.add_argument("--signers", default=os.environ.get("MANDATE_SIGNERS",
+                                                           "trust/allowed_signers"))
 
     p_tool = sub.add_parser("tool")
     p_tool.add_argument("action", choices=("lock", "list", "verify"))
@@ -912,7 +928,8 @@ def main(argv=None) -> int:
                 sign_key=getattr(args, "key", None),
                 signer=getattr(args, "signer", None),
                 signer_cmd=getattr(args, "signer_cmd", None),
-                observe=getattr(args, "observe", False))
+                observe=getattr(args, "observe", False),
+                instruction_store=getattr(args, "instructions", None) or "")
             _emit(receipt, None)
             return 0
 
@@ -1402,6 +1419,35 @@ def main(argv=None) -> int:
                 return 2
             old = core.load_policy(args.against)
             _emit(policy_tools.diff(old, policy), None)
+            return 0
+
+        if args.cmd == "memory":
+            from . import memory as memory_store
+            if args.action == "add":
+                _emit(memory_store.add(args.store, args.text, args.scope or [],
+                                       args.approver, args.key or "", args.ttl), None)
+                return 0
+            if args.action == "list":
+                records = memory_store.load(args.store)
+                _emit({"count": len(records),
+                       "instructions": [{"id": r.get("id"), "text": r.get("text"),
+                                         "scope": r.get("scope"),
+                                         "expires": r.get("expires"),
+                                         "revoked": r.get("revoked")}
+                                        for r in records]}, None)
+                return 0
+            if args.action == "verify":
+                if not args.id:
+                    _emit({"error": "Usage", "message": "memory verify --id m-..."}, None)
+                    return 2
+                record = memory_store.get(args.store, args.id)
+                ok = bool(record) and memory_store.verify(record, args.signers)
+                _emit({"id": args.id, "ok": ok}, None)
+                return 0 if ok else 1
+            if not args.id:
+                _emit({"error": "Usage", "message": "memory revoke --id m-..."}, None)
+                return 2
+            _emit(memory_store.revoke(args.store, args.id, args.reason), None)
             return 0
 
         if args.cmd == "tool":
