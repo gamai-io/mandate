@@ -8,14 +8,14 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import unittest
 import urllib.error
 import urllib.request
 
-from mandate import core
 from test_broker_custody import PROVIDER_SECRET, FakeProvider, free_port
+
+from mandate import core
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

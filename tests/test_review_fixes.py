@@ -1,7 +1,6 @@
 """Regressions from the external review: audience, governance, ledger integrity."""
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import tempfile

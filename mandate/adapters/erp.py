@@ -106,8 +106,7 @@ class ErpChecker:
                     con.rollback()
                 con.close()
             except Exception:
-                # closing a broken connection must not mask the real error
-                return_quietly = True
+                _ = None      # closing a broken connection must not mask the error
 
     def check(self, intent: dict) -> dict:
         kind = str((intent.get("effect") or {}).get("kind") or "")

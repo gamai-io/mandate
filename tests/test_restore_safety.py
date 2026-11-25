@@ -6,8 +6,8 @@ import tarfile
 import tempfile
 import unittest
 
-from mandate.core import MandateError
 from mandate import report
+from mandate.core import MandateError
 
 
 def make_tar(path: str, member: str, payload: bytes = b"x") -> None:
