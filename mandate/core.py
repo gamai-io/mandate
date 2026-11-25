@@ -343,9 +343,45 @@ def read_ledger(path: str) -> list[dict]:
     return entries
 
 
+def _tail_entry(path: str) -> dict | None:
+    """Read only the last line of the ledger.
+
+    The previous append wrote `.head`, so a cheap check suffices: if the last line
+    parses and its hash equals `.head`, the whole file does not need reading.
+    Anything unexpected falls back to a full read.
+    """
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            if size == 0:
+                return None
+            window = min(65536, size)
+            fh.seek(size - window)
+            tail = fh.read()
+    except OSError:
+        return None
+    line = tail.rstrip().split(b"\n")[-1]
+    try:
+        entry = json.loads(line.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(entry, dict) or "body" not in entry or "hash" not in entry:
+        return None
+    try:
+        head = open(path + ".head", encoding="utf-8").read().strip()
+    except OSError:
+        return None
+    return entry if entry["hash"] == head else None
+
+
 def _append_locked(path: str, body: dict) -> dict:
-    entries = read_ledger(path)
-    prev = entries[-1]["hash"] if entries else "GENESIS"
+    tail = _tail_entry(path)
+    if tail is not None:
+        prev = tail["hash"]
+    else:
+        entries = read_ledger(path)
+        prev = entries[-1]["hash"] if entries else "GENESIS"
     body = dict(body, prev=prev)
     entry = {"body": body, "hash": sha256(jcs(body))}
     with open(path, "a", encoding="utf-8") as fh:

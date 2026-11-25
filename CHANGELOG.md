@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.51.2 — 2026-11-25
+- **Append is no longer quadratic.** `_append_locked` read the entire ledger on
+  every write, so the n-th receipt cost O(n). It now reads only the last line and
+  checks it against `.head`, falling back to a full read on any mismatch. Measured:
+  10,000 receipts at a flat **9.7 ms** each (fsync-bound), ledger 8.1 MB,
+  `verify_chain` **1.94 s**, `mandate pack` **0.55 s** — see `docs/PERFORMANCE.md`.
+- `tests/test_append.py`: a four-times-larger ledger must not cost more per append,
+  plus fallbacks for a tampered tail and a missing `.head`.
+- `docs/DORA_SUPPLIER_PACK.md`: register data points, contract elements, the
+  evidence we can show, and the list of what is missing.
+- 338 tests.
+
 ## 0.51.1 — 2026-11-25
 - Publish through OIDC trusted publishing with PEP 740 attestations: the PyPI
   trusted publisher for `gamai-io/mandate` + `release.yml` was added on
