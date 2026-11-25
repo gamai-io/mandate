@@ -1,0 +1,17 @@
+{
+ "grant": {
+  "agent": "bank-agent",
+  "approver": "approver",
+  "audience": "local-broker",
+  "commitment": "sha256:9c81e92cf331c8ea9f93821ee8c02b222689331e6c58e8b38b3161e2cef74ee6",
+  "nonce": "8574424edf7241d69021fdef919a4723",
+  "policy_digest": "1e9888bc597046edfc5790571fbc5d8c",
+  "render_hash": "e26b7052ee91994c4c7e53bdf8402be1abc4cc1343cd9f7c33828904f0f4c2eb",
+  "scope": {
+   "max_uses": 1,
+   "not_after": 1795689304
+  },
+  "v": 1
+ },
+ "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgyi401H0gjeCHtCCMLOjNk4SBMN\nSkYt7z6HauCKkP5u4AAAAHbWFuZGF0ZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy\nNTUxOQAAAEBWI+D4eyi3TH/fX8F9Gua+az7BcN/wf1aB4FlsQdEXukLvLMPIMbwScEu9Q0\nYHmlYcaZkhX1tWojwkx98Z9/EJ\n-----END SSH SIGNATURE-----\n"
+}

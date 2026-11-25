@@ -1,0 +1,27 @@
+{
+ "actor": {
+  "agent": "bank-agent",
+  "session": "s-42"
+ },
+ "effect": {
+  "amount": {
+   "currency": "BAM",
+   "value": 1170.0
+  },
+  "kind": "payment.send",
+  "params": {
+   "ref": "faktura-77"
+  },
+  "revert": "reverse_transfer",
+  "target": "Example Supplier"
+ },
+ "nonce": "n-vector-1",
+ "provenance": [
+  {
+   "source": "erp:vendor:1",
+   "type": "data_ref"
+  }
+ ],
+ "requested_by": "ops",
+ "v": 1
+}

@@ -1,0 +1,35 @@
+{
+ "body": {
+  "agent": "bank-agent",
+  "approver": "approver",
+  "commitment": "sha256:9c81e92cf331c8ea9f93821ee8c02b222689331e6c58e8b38b3161e2cef74ee6",
+  "decision": "allowed",
+  "grant_nonce": "8574424edf7241d69021fdef919a4723",
+  "prev": "GENESIS",
+  "proposal_id": "m12c8e41a8b4d0eeb1d7105998",
+  "render": {
+   "fields": {
+    "amount": {
+     "currency": "BAM",
+     "value": 1170
+    },
+    "evidence": [
+     "erp:vendor:1"
+    ],
+    "kind": "payment.send",
+    "params": {
+     "ref": "faktura-77"
+    },
+    "target": "Example Supplier"
+   },
+   "summary": "payment.send | target=\"Example Supplier\" | amount=1170.00 BAM | ref=\"faktura-77\" | evidence=erp:vendor:1"
+  },
+  "render_hash": "e26b7052ee91994c4c7e53bdf8402be1abc4cc1343cd9f7c33828904f0f4c2eb",
+  "result_hash": "2c8e41a8b4d0eeb1d7105998afc24d5bbfa8777666150b07310a8649dc7bdbd4",
+  "session": "s-42",
+  "ts": 1795560000,
+  "type": "receipt",
+  "v": 1
+ },
+ "hash": "914843b70b1c0cd3e2e10c1cb51b8c9237dfe8211be6168f10b926431b416fc2"
+}

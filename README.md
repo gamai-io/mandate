@@ -222,6 +222,22 @@ write access to that cgroup; quarantine is per-uid, not per-process; neither is 
 hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
 Firecracker; "safe state" remains the bank's definition, not ours (row 5).
 
+## Verify without our code
+
+`spec/verify_offline.py` checks a grant and a receipt with the Python standard
+library only — no `import mandate`, no `ssh-keygen`. It re-implements JCS, the
+SSHSIG container and Ed25519, so a reviewer can read every step:
+
+```bash
+python3 spec/verify_offline.py --grant spec/vectors/grant.json \
+    --intent spec/vectors/intent.json --signers spec/vectors/allowed_signers \
+    --receipt spec/vectors/receipt.json     # ok: true, exit 0
+```
+
+`spec/vectors/` also contains a tampered intent and a forged receipt, both of
+which must fail. It is a second implementation by the same author — cheaper to
+audit, not a substitute for an independent one.
+
 ## Review the policy like code
 
 ```bash
@@ -765,7 +781,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.44.0** — canonical commitment, Ed25519
+**v0.45.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

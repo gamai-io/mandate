@@ -2,7 +2,8 @@ include README.md
 include LICENSE
 include CHANGELOG.md
 include policy.json
-recursive-include spec *.md
+recursive-include spec *.md *.py
+recursive-include spec/vectors *.json allowed_signers README.md
 recursive-include docs *.md
 recursive-include skills *.md
 recursive-include examples *.json *.sh *.md

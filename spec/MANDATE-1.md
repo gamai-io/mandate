@@ -83,3 +83,24 @@ and principal = `approver`.
 Before the nonce is claimed, the broker may run read-only checks (ERP master
 data). A failed precondition aborts with `PreconditionFailed` and leaves the
 grant unconsumed. Preconditions never mutate external state.
+
+## Independent verification
+
+`spec/verify_offline.py` checks a grant and a receipt using nothing but the
+Python standard library: it imports no project code and never calls `ssh-keygen`.
+It re-implements JCS (RFC 8785), the SSHSIG container and Ed25519 from the RFCs,
+so every step that decides the answer is readable in one file.
+
+```bash
+python3 spec/verify_offline.py --grant spec/vectors/grant.json \
+    --intent spec/vectors/intent.json \
+    --signers spec/vectors/allowed_signers \
+    --receipt spec/vectors/receipt.json
+# ok: true, exit 0
+```
+
+The vectors in `spec/vectors/` include a tampered intent (amount changed after
+approval) and a forged receipt, each of which must fail. This is a **second
+implementation by the same author**, not an independent third party: it lowers
+the cost of an audit and of a re-implementation, and it is not a substitute for
+one. The distinction is stated so nobody has to discover it.

@@ -4,7 +4,7 @@ Pre-filled answers to the questions a bank's security/procurement process asks.
 Every "no" is a real gap with a plan; a questionnaire that answers "yes" to
 everything is the first thing a reviewer distrusts.
 
-Product: `gama-mandate` 0.44.0 and the four companion packages (`gamai-trust`,
+Product: `gama-mandate` 0.45.0 and the four companion packages (`gamai-trust`,
 `gamai-guard`, `gamai-plugins`, `gama-l`). Vendor: GAMA TRADE d.o.o. / gamAI,
 Usora, Bosnia and Herzegovina.
 
@@ -97,3 +97,16 @@ Usora, Bosnia and Herzegovina.
 - "Containment" or "cannot escape" — we stop and record what we route.
 - "SOC 2 / ISO 27001 equivalent" — no certificate exists.
 - Any customer reference or bank pilot that has not happened.
+
+### "Who verifies your verifier?"
+
+- **Published format**: `spec/MANDATE-1.md` — canonicalisation, commitment, grant,
+  receipt, hash chain.
+- **Test vectors**: `spec/vectors/` — a valid grant and receipt, plus a tampered
+  intent and a forged receipt that must fail.
+- **A verifier that is not our package**: `spec/verify_offline.py` — standard
+  library only, no `import mandate`, no `ssh-keygen`. It re-implements JCS, SSHSIG
+  and Ed25519 so every deciding step is readable in one file.
+- **Honest limit**: it is a second implementation by the same author, not an
+  independent third party. An external implementation or a funded review is still
+  open, and `CLAIMS.md` lists it as unproven.
