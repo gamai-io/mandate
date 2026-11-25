@@ -135,6 +135,28 @@ export MANDATE_NONCE_URL=http://nonce.internal:8899 MANDATE_NONCE_TOKEN="$TOKEN"
 
 Unreachable authority = refusal (`NonceUnavailable`), not a pass.
 
+## Detect an inbound agent (behaviour, not blocklists)
+
+The Nov 2026 incident that used OpenCode + Chrome + curl matched no blocklist; the
+signal was behaviour. `mandate watch` scores each source address from an access log:
+
+```bash
+mandate watch --log access.jsonl --window 600 --ledger alerts.jsonl
+```
+
+| rule | points | what it sees |
+|---|---|---|
+| `tool_switch` | 3 | browser then curl/wget/httpx from one address within 15 min |
+| `ua_flip` | 2 | same address claims desktop and mobile within 5 min |
+| `docs_link_follow` | 3 | request whose Referer is an API/spec document |
+| `key_probing` | 4 | 3+ distinct auth values on one path within 60 s |
+| `read_after_submit` | 2 | repeated GETs refused by submit-only endpoints |
+| `velocity` | 1 | 15+ distinct paths in one minute |
+| `low_and_slow_scan` | 2 | 10+ paths answering 4xx with a single UA |
+
+`>=6` high, `>=3` medium; alerts go into the ledger as `control/alert`. No model
+is in the decision path — a judge may explain a finding, it cannot lower it.
+
 ## Detection: what a bank watches at runtime
 
 Reuters reports banks adding detection for "agents using human employee

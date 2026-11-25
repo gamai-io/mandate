@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import anchor, core, detect, egress, governance, sign, svid, warden
+from . import agentwatch, anchor, core, detect, egress, governance, sign, svid, warden
 from . import report as audit_report
 from . import ship as ship_mod
 
@@ -443,6 +443,13 @@ def main(argv=None) -> int:
     p_chg.add_argument("--signers", default=None)
     p_chg.add_argument("--signer-cmd", dest="signer_cmd", default=None)
 
+    p_watch = sub.add_parser("watch")
+    p_watch.add_argument("--log", required=True, help="JSONL access log")
+    p_watch.add_argument("--window", type=int, default=agentwatch.WINDOW)
+    p_watch.add_argument("--ledger", default=None, help="write alerts into this ledger")
+    p_watch.add_argument("--min-level", dest="min_level", choices=("low", "medium", "high"),
+                         default="medium")
+
     p_ship = sub.add_parser("ship")
     p_ship.add_argument("--ledger", default="ledger.jsonl")
     p_ship.add_argument("--url", required=True)
@@ -850,6 +857,17 @@ def main(argv=None) -> int:
             res = audit_report.changes(args.ledger, args.signers)
             _emit(res, None)
             return 0
+
+        if args.cmd == "watch":
+            res = agentwatch.watch(args.log, args.window, args.ledger)
+            order = {"low": 0, "medium": 1, "high": 2}
+            floor = order[args.min_level]
+            flagged = {ip: s for ip, s in res["sessions"].items()
+                       if order[s["level"]] >= floor}
+            _emit({"sources": res["sources"], "flagged": len(flagged),
+                   "highest_points": res["highest"],
+                   "sessions": flagged}, None)
+            return 0 if not flagged else 1
 
         if args.cmd == "ship":
             try:
