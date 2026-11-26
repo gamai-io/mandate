@@ -16,7 +16,8 @@ printf 'approver namespaces="mandate" %s\n' "$(cat approver_key.pub)" >> trust/a
 mandate propose --intent examples/intent.json --out proposal.json
 mandate grant --proposal proposal.json --approver approver --key ./approver_key \
   --audience local-broker --out grant.json >/dev/null
-mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl > receipt.json
+mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl \
+  --audience local-broker > receipt.json
 echo "ledger: $(wc -l < ledger.jsonl) receipt(s), head $(cut -c1-16 ledger.jsonl.head)"
 
 echo "1) anchor the head with a public TSA (RFC 3161)"
@@ -35,20 +36,27 @@ fi
 TOKEN=$(ls anchors/*.tsr 2>/dev/null | head -1 || true)
 if [ -n "$TOKEN" ]; then
   echo "2) verify the anchor offline (imprint + status + time)"
-  mandate anchor-verify --ledger ledger.jsonl --token "$TOKEN" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print('   valid=%s genTime=%s' % (d['valid'], d['gen_time']))
-assert d['valid'] is True
-"
+  mandate anchor-verify --ledger ledger.jsonl --token "$TOKEN" > anchor-verify.json || true
+  python3 - <<'PY'
+import json
+d = json.load(open("anchor-verify.json"))
+print("   imprint=%s status=%s code=%s" % (
+    d["imprint_matches_head"], d["status"], d["code"]))
+# Without the TSA CA bundle the imprint, status and time are checked but the
+# CMS signature is not; the result says so (code=cms_unverified) instead of
+# claiming a verification that did not happen.
+assert d["imprint_matches_head"] is True
+assert d["code"] in ("ok", "cms_unverified")
+PY
 
-  echo "3) optional full CMS check against the TSA CA bundle"
+  echo "3) full CMS check against the TSA CA bundle"
   if curl -sfL -o tsa-ca.pem https://freetsa.org/files/cacert.pem 2>/dev/null; then
     if mandate anchor-verify --ledger ledger.jsonl --token "$TOKEN" --ca tsa-ca.pem > full.json 2>/dev/null; then
       python3 -c "
 import json;d=json.load(open('full.json'))
-print('   openssl signature check: %s' % d['openssl_verify']['verified'])
-assert d['valid'] is True
+print('   valid=%s openssl signature check: %s' % (
+    d['valid'], d['openssl_verify']['verified']))
+assert d['valid'] is True and d['openssl_verify']['verified'] is True
 "
     else
       echo "   openssl check not available in this environment (skipped)"

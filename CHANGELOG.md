@@ -1,10 +1,25 @@
 # Changelog
 
 ## 0.68.2 — 2026-11-26
+- **The quickstart now runs as written.** `grant --audience local-broker` binds the
+  grant to a broker, but `redeem` had no way to name it, so the documented flow
+  died with `GrantInvalid: this caller did not identify itself`. `redeem` takes
+  `--audience`; `tests/test_quickstart.py` runs the README commands in a temp dir
+  and asserts `{"valid": true}` plus `GrantReplayed` on replay.
+- **Examples were run, not just written.** All of them now pass `--audience` to
+  `redeem`; `02-audit-bundle.sh` produces the proof/STH/witness an audit bundle
+  needs (it built a bundle that could never verify); `05-bank-scenario.sh`
+  re-approves after a deliberate policy change and passes `--policy` to `grant`;
+  `06-anchor-and-worm.sh` treats `cms_unverified` as the honest result it is and
+  checks the CMS signature in its own step; `12-detect.sh` no longer passes
+  `--audience` to `detect` (which does not take it).
 - `README.md` states the test count again (it had lost the line, and a claims gate
   with no anchor passes silently — that is now itself a failure).
 - The gate compares the README figure against **passing** tests, and CLAIMS.md keeps
   collected and passing apart.
+- `README.md` no longer says VM pause is "not demonstrated": the measured numbers
+  (boot 125 ms, pause 7 ms, resume 6 ms on `crusoe-cpu1`) were in
+  `docs/PERFORMANCE.md` and contradicted the text.
 
 ## 0.68.1 — 2026-11-26
 - The claims gate now also checks `CLAIMS.md` and the `__version__` fallback in

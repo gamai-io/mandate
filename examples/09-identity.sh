@@ -47,7 +47,7 @@ mandate svid issue --sub bank-agent --issuer bank-agent --key agent_key \
 intent main n-1 bank-agent
 approved main
 mandate redeem --intent intent_main.json --grant grant_main.json --ledger ledger.jsonl \
-  --svid token.json --svid-audience local-broker \
+  --svid token.json --audience local-broker --svid-audience local-broker \
   | python3 -c "import json,sys;d=json.load(sys.stdin);print('   redeemed with token, receipt %s...' % d['hash'][:12])"
 
 echo "2) a token for a different effect kind is refused"
@@ -57,7 +57,7 @@ intent scope n-2 bank-agent
 approved scope
 set +e
 mandate redeem --intent intent_scope.json --grant grant_scope.json --ledger ledger2.jsonl \
-  --svid token_scope.json --svid-audience local-broker > scope.json 2>&1
+  --svid token_scope.json --audience local-broker --svid-audience local-broker > scope.json 2>&1
 set -e
 python3 -c "
 import json;d=json.load(open('scope.json'));print('   refused: %s / %s' % (d['error'], d['code']))
@@ -69,7 +69,7 @@ mandate svid issue --sub bank-agent --issuer bank-agent --key agent_key \
 sleep 2
 set +e
 mandate redeem --intent intent_main.json --grant grant_main.json --ledger ledger3.jsonl \
-  --svid token_exp.json --svid-audience local-broker > exp.json 2>&1
+  --svid token_exp.json --audience local-broker --svid-audience local-broker > exp.json 2>&1
 set -e
 python3 -c "
 import json;d=json.load(open('exp.json'));print('   refused: %s / %s' % (d['error'], d['code']))
@@ -84,7 +84,7 @@ assert c['parent_sub'] == 'bank-agent'"
 intent sub n-3 sub-agent
 approved sub
 mandate redeem --intent intent_sub.json --grant grant_sub.json --ledger ledger4.jsonl \
-  --svid child.json --svid token.json --svid-audience local-broker \
+  --svid child.json --svid token.json --audience local-broker --svid-audience local-broker \
   | python3 -c "import json,sys;d=json.load(sys.stdin);print('   child redeemed, receipt %s...' % d['hash'][:12])"
 
 echo "5) a child that tries to widen its scope is refused"
@@ -92,7 +92,7 @@ mandate svid delegate --parent token.json --sub sub-agent --issuer sub-agent \
   --key sub_key --ttl 30 --scope payment.send --scope order.create --out child_wide.json >/dev/null
 set +e
 mandate redeem --intent intent_sub.json --grant grant_sub.json --ledger ledger5.jsonl \
-  --svid child_wide.json --svid token.json --svid-audience local-broker > wide.json 2>&1
+  --svid child_wide.json --svid token.json --audience local-broker --svid-audience local-broker > wide.json 2>&1
 set -e
 python3 -c "
 import json;d=json.load(open('wide.json'));print('   refused: %s / %s' % (d['error'], d['code']))

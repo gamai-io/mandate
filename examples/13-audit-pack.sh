@@ -29,9 +29,10 @@ json.dump({"v": 1, "actor": {"agent": agent, "session": "run-1"},
 PY
   mandate propose --intent "intent$1.json" --out "prop$1.json" >/dev/null
   mandate grant --proposal "prop$1.json" --approver approver --key ./approver_key \
+    --policy mandate/policy.json \
     --audience local-broker --out "grant$1.json" >/dev/null
   mandate redeem --intent "intent$1.json" --grant "grant$1.json" \
-    --ledger ledger.jsonl --policy mandate/policy.json >/dev/null
+    --ledger ledger.jsonl --policy mandate/policy.json --audience local-broker >/dev/null
 }
 
 echo "1) some real activity"

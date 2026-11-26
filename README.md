@@ -25,9 +25,10 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 438 tests pass (442 collected, 4 documented skips) —
-`python3 -m pytest -q tests/`. Every number in these docs is checked by
-`tools/claims.py`, which fails CI when a document disagrees with the code.
+**Status:** 444 tests collected; 440 pass on a host with Node and bubblewrap, and
+the rest skip with a stated reason. `python3 -m pytest -q tests/`. Every number in
+these docs is checked by `tools/claims.py`, which fails CI when a document
+disagrees with the code.
 
 ## One thing
 
@@ -70,7 +71,8 @@ printf 'approver namespaces="mandate" %s\n' "$(cat approver_key.pub)" >> trust/a
 mandate propose --intent examples/intent.json --out proposal.json
 mandate grant  --proposal proposal.json --approver approver \
                --key ./approver_key --audience local-broker --out grant.json
-mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl > receipt.json
+mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl \
+    --audience local-broker > receipt.json
 mandate verify --receipt receipt.json --intent examples/intent.json --grant grant.json
 ```
 
@@ -226,23 +228,22 @@ mandate warden --quarantine --uid 65534 --undo --ledger L.jsonl
   works where the iptables `owner` module is missing. The agent must run under its
   own uid for this to mean anything.
 
-**MicroVM pause** is implemented against the Firecracker API and tested against a
-stub, but it needs `/dev/kvm`:
+**MicroVM pause** is measured, not just implemented. `tools/firecracker_demo.sh`
+boots a guest with **no network device** on `crusoe-cpu1` (KVM, Firecracker 1.17)
+and reports **boot 125 ms, pause 7 ms, resume 6 ms**, reading the state back
+through the API each time (`docs/PERFORMANCE.md`). `gama-lab-fra` has no
+`/dev/kvm`, so nothing runs there; CI cannot run this either. The code needs a
+KVM host:
 
 ```bash
 mandate warden --method vm-pause --vm-socket /tmp/fc.sock --ledger L.jsonl
 # without KVM: exit 4, {"error": "NoKvm", "message": "/dev/kvm is not available on this host"}
 ```
 
-Verified 2026-11-24: the lab node `gama-lab-fra` (Vultr FRA, 8 vCPU / 31 GB,
-20 containers) has **no** `/dev/kvm` and no `kvm` module, so Firecracker and VM
-pause cannot run there. MicroVM work needs a KVM-capable host (nested virt or
-bare metal); the client code is host-agnostic and ready for it.
-
 Honest limits: a cgroup freeze keeps memory and can be thawed by anyone with
 write access to that cgroup; quarantine is per-uid, not per-process; neither is a
-hypervisor boundary. VM pause is code-ready but not yet demonstrated on real
-Firecracker; "safe state" remains the bank's definition, not ours (row 5).
+hypervisor boundary. The VM-pause number above is a single-host measurement, not a
+benchmark; "safe state" remains the bank's definition, not ours (row 5).
 
 ## One broker, several agents
 

@@ -442,6 +442,9 @@ def main(argv=None) -> int:
     p_redeem.add_argument("--svid", action="append", default=None,
                           help="agent token (repeatable: child first, then parents)")
     p_redeem.add_argument("--svid-audience", dest="svid_audience", default=None)
+    p_redeem.add_argument("--audience", default=None,
+                          help="name of this broker; required when the grant is bound "
+                               "to an audience (grant --audience)")
     p_redeem.add_argument("--key", default=None, help="sign the receipt")
     p_redeem.add_argument("--signer", default=None)
     p_redeem.add_argument("--instructions", default=None,
@@ -942,6 +945,7 @@ def main(argv=None) -> int:
             receipt = core.redeem(
                 _intent, _read(args.grant), args.signers,
                 args.ledger, allow_self=args.allow_self,
+                audience=getattr(args, "audience", None),
                 policy=core.load_policy(args.policy),
                 revoked_path=args.revoked,
                 sign_key=getattr(args, "key", None),

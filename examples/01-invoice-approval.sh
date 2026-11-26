@@ -25,14 +25,16 @@ mandate grant --proposal proposal.json --approver approver --key ./approver_key 
   --audience local-broker --out grant.json
 
 echo "5) agent redeems once (receipt goes to stdout, hash-chained ledger on disk)"
-mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl > receipt.json
+mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl \
+  --audience local-broker > receipt.json
 python3 -c "import json;r=json.load(open('receipt.json'));print('   receipt hash:',r.get('hash','?')[:24]+'...')"
 
 echo "6) verify offline: receipt + intent + grant, no network, no database"
 mandate verify --receipt receipt.json --intent examples/intent.json --grant grant.json
 
 echo "7) replay the same grant (must be rejected)"
-if mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl >/dev/null 2>&1; then
+if mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl \
+    --audience local-broker >/dev/null 2>&1; then
   echo "FAIL: replay was accepted"; exit 1
 else
   echo "   rejected as expected (GrantReplayed)"

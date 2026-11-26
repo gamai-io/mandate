@@ -51,7 +51,8 @@ printf 'approver namespaces="mandate" %s\n' "$(cat approver_key.pub)" >> trust/a
 mandate propose --intent examples/intent.json --out proposal.json
 mandate grant --proposal proposal.json --approver approver --key ./approver_key \
   --audience local-broker --out grant.json >/dev/null
-mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl > receipt.json
+mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.jsonl \
+  --audience local-broker > receipt.json
 python3 - <<'PY'
 import json
 rec = json.load(open("receipt.json"))["hash"]

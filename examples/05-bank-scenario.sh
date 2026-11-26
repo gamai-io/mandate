@@ -44,12 +44,13 @@ PY
 propose_grant () { # n
   mandate propose --intent "intent$1.json" --out "prop$1.json" >/dev/null
   mandate grant --proposal "prop$1.json" --approver approver --key ./approver_key \
+    --policy mandate/policy.json \
     --audience local-broker --out "grant$1.json" >/dev/null
 }
 
 redeem () { # n
   mandate redeem --intent "intent$1.json" --grant "grant$1.json" \
-    --ledger ledger.jsonl --policy mandate/policy.json
+    --ledger ledger.jsonl --policy mandate/policy.json --audience local-broker
 }
 
 echo "1) four-eyes: the agent tries to approve its own payment"
@@ -128,6 +129,9 @@ p["limits"]["max_effects"] = 10
 json.dump(p, open("mandate/policy.json", "w"), indent=1)
 print("   limit raised to 10 for this investigation")
 PY
+# the policy digest is part of the grant: changing the policy invalidates the
+# old grant, so the human approves the effect again under the new policy
+propose_grant 5
 redeem 5 > receipt5.json
 python3 -c "import json;d=json.load(open('receipt5.json'));print('   effect 5: ok, receipt %s...' % d['hash'][:12])"
 
