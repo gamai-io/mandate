@@ -22,7 +22,8 @@ class PublishedVersions(unittest.TestCase):
 
     def test_this_package_is_not_ahead_of_the_record(self):
         text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        version = [l.split('"')[1] for l in text.splitlines() if l.startswith("version = ")][0]
+        line = next(row for row in text.splitlines() if row.startswith("version = "))
+        version = line.split('"')[1]
         recorded = json.loads((ROOT / "tools" / "published_versions.json")
                               .read_text(encoding="utf-8"))["gama-mandate"]
         self.assertEqual(recorded, version,
