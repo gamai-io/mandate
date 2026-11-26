@@ -26,12 +26,3 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: twine upload --non-interactive dist/*
-      - name: Yank the vulnerable 0.2.6
-        continue-on-error: true
-        env:
-          TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          curl -sS -X POST "https://pypi.org/pypi/gamai-plugins/0.2.6/yank" \
-            -H "Authorization: Bearer $TOKEN" \
-            --data-urlencode "reason=deny bypass via shell metacharacters; skipped-dir integrity (fixed in 0.2.7/0.2.8)" \
-            -w "\nyank HTTP %{http_code}\n"
