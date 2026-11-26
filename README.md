@@ -25,6 +25,10 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
+**Status:** 438 tests pass (442 collected, 4 documented skips) —
+`python3 -m pytest -q tests/`. Every number in these docs is checked by
+`tools/claims.py`, which fails CI when a document disagrees with the code.
+
 ## One thing
 
 Mandate does one thing: a named human signs a specific business effect, the effect
@@ -997,7 +1001,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.68.1** — canonical commitment, Ed25519
+**v0.68.2** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

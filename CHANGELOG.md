@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.68.2 — 2026-11-26
+- `README.md` states the test count again (it had lost the line, and a claims gate
+  with no anchor passes silently — that is now itself a failure).
+- The gate compares the README figure against **passing** tests, and CLAIMS.md keeps
+  collected and passing apart.
+
 ## 0.68.1 — 2026-11-26
 - The claims gate now also checks `CLAIMS.md` and the `__version__` fallback in
   `mandate/__init__.py`; both had drifted (CLAIMS said 0.56.0 / 370 tests while the

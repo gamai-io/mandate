@@ -149,10 +149,14 @@ def count_tests() -> int:
 
 
 def check_tests() -> list[str]:
-    actual = count_tests()
+    actual = count_passed()
     if actual < 0:
         return ["could not collect the test suite"]
     problems = []
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    if not re.search(r"\d+\s+tests?", readme):
+        problems.append("README.md states no test count; a silent pass is not a "
+                        "claim")
     for path, pattern in TEST_COUNT_ANCHORS:
         full = os.path.join(ROOT, path)
         if not os.path.exists(full):
@@ -160,7 +164,7 @@ def check_tests() -> list[str]:
         for match in re.finditer(pattern, open(full, encoding="utf-8").read()):
             claimed = int(match.group("n"))
             if claimed != actual:
-                problems.append("%s: claims %d tests, suite has %d"
+                problems.append("%s: claims %d tests, suite has %d passing"
                                 % (path, claimed, actual))
     return problems
 
