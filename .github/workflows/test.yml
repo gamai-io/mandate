@@ -22,7 +22,9 @@ jobs:
         run: python -m pip install ruff cryptography pytest && ruff check .
       - name: PKCS#11 tools (3.12 only)
         if: matrix.python-version == '3.12'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq softhsm2 opensc python3-pkcs11
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq softhsm2 opensc
+          python -m pip install -q python-pkcs11
       - name: Claims (version, changelog, test counts)
         env:
           CLAIMS_FULL: ${{ matrix.python-version == '3.12' && '1' || '0' }}
