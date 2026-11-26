@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.67.0 — 2026-11-26
+Operational readiness (blue-team review):
+- **`docs/RUNBOOK.md`**: first action for eight events — refusal, expired
+  instruction, tool drift, config drift, expired containment, ledger head mismatch,
+  nonce authority down, egress denied — plus the inbound alerts and escalation.
+- **`mandate chain` explains itself**: `diagnose_chain` distinguishes `link_broken`,
+  `entry_tampered` and `truncated_or_head_edited` instead of one `valid: false`.
+- **`mandate pack --grant --intent`**: the artefacts behind the receipts are
+  archived in the pack, so "who approved X" is answerable from the pack alone.
+- 435 pass, 4 documented skips.
+
 ## 0.66.0 — 2026-11-25
 Second red-team pass, this time over the modules added in 0.62–0.65. Every fix has
 a test that fails on the previous behaviour:

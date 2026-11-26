@@ -48,3 +48,30 @@ class Decisions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PackArtefacts(unittest.TestCase):
+    def test_grants_and_intents_are_archived_in_the_pack(self) -> None:
+        import json as _json
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "l.jsonl")
+            append_receipt(ledger, approval("approved", 5.0))
+            grant = os.path.join(td, "grant.json")
+            intent = os.path.join(td, "intent.json")
+            _json.dump({"grant": {"v": 1}, "sig": "x"}, open(grant, "w"))
+            _json.dump({"v": 1}, open(intent, "w"))
+            out = os.path.join(td, "pack")
+            result = report.pack(ledger, out, grants=[grant], intents=[intent])
+            self.assertTrue(os.path.isdir(os.path.join(out, "grants")))
+            self.assertTrue(os.path.isdir(os.path.join(out, "intents")))
+            names = [name for name in (result.get("files") or {}) if "grants/" in name]
+            self.assertTrue(names, result.get("files"))
+
+    def test_a_missing_grant_is_refused_rather_than_silently_skipped(self) -> None:
+        from mandate.core import MandateError
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "l.jsonl")
+            append_receipt(ledger, approval("approved", 5.0))
+            with self.assertRaises(MandateError):
+                report.pack(ledger, os.path.join(td, "pack"),
+                            grants=[os.path.join(td, "nope.json")])

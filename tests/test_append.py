@@ -78,3 +78,38 @@ class Append(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Diagnosis(unittest.TestCase):
+    def test_a_healthy_chain_says_ok(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "l.jsonl")
+            for i in range(3):
+                core.append_receipt(ledger, body("n%d" % i))
+            diag = core.diagnose_chain(ledger)
+            self.assertTrue(diag["valid"])
+            self.assertEqual(diag["code"], "ok")
+
+    def test_truncation_is_named(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "l.jsonl")
+            for i in range(3):
+                core.append_receipt(ledger, body("n%d" % i))
+            lines = open(ledger).read().strip().splitlines()
+            open(ledger, "w").write("\n".join(lines[:2]) + "\n")
+            diag = core.diagnose_chain(ledger)
+            self.assertFalse(diag["valid"])
+            self.assertEqual(diag["code"], "truncated_or_head_edited")
+
+    def test_an_edited_entry_is_named(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            ledger = os.path.join(td, "l.jsonl")
+            for i in range(2):
+                core.append_receipt(ledger, body("n%d" % i))
+            lines = open(ledger).read().strip().splitlines()
+            last = json.loads(lines[-1])
+            last["body"]["decision"] = "allowed"
+            lines[-1] = json.dumps(last, sort_keys=True)
+            open(ledger, "w").write("\n".join(lines) + "\n")
+            diag = core.diagnose_chain(ledger)
+            self.assertEqual(diag["code"], "entry_tampered")

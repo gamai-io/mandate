@@ -455,6 +455,39 @@ def _used_nonces(path: str) -> set[str]:
     return used
 
 
+def diagnose_chain(path: str) -> dict:
+    """Say *which* of the three failures happened, because at 03:00 it matters."""
+    if not os.path.exists(path):
+        return {"valid": False, "code": "missing", "detail": "no ledger at %s" % path}
+    entries = read_ledger(path)
+    if not entries:
+        return {"valid": False, "code": "empty", "detail": "the ledger has no entries"}
+    prev = "GENESIS"
+    for index, entry in enumerate(entries, start=1):
+        body = entry.get("body") or {}
+        if body.get("prev") != prev:
+            return {"valid": False, "code": "link_broken", "entry": index,
+                    "detail": "entry %d points at %s, expected %s"
+                              % (index, str(body.get("prev"))[:16], prev[:16])}
+        if sha256(jcs(body)) != entry.get("hash"):
+            return {"valid": False, "code": "entry_tampered", "entry": index,
+                    "detail": "entry %d does not match its own hash" % index}
+        prev = entry.get("hash")
+    head_path = path + ".head"
+    if os.path.exists(head_path):
+        try:
+            head = open(head_path, encoding="utf-8").read().strip()
+        except OSError as exc:
+            return {"valid": False, "code": "head_unreadable", "detail": str(exc)[:120]}
+        if head != prev:
+            return {"valid": False, "code": "truncated_or_head_edited",
+                    "entries": len(entries), "head": head[:16], "last": prev[:16],
+                    "detail": "the ledger has %d entries and ends at %s, but .head "
+                              "says %s: either entries were removed or .head was "
+                              "edited" % (len(entries), prev[:16], head[:16])}
+    return {"valid": True, "code": "ok", "entries": len(entries)}
+
+
 def verify_chain(path: str, anchor: bool = True) -> bool:
     entries = read_ledger(path)
     if not entries:

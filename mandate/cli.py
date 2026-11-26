@@ -526,6 +526,10 @@ def main(argv=None) -> int:
     p_pack.add_argument("--controls", default=None)
     p_pack.add_argument("--signers", default=None)
     p_pack.add_argument("--anchors", default="anchors")
+    p_pack.add_argument("--grant", action="append", default=None,
+                        help="archive this grant in the pack (repeatable)")
+    p_pack.add_argument("--intent", action="append", default=None,
+                        help="archive this intent in the pack (repeatable)")
     p_pack.add_argument("--key", default=None)
     p_pack.add_argument("--signer", default=None)
 
@@ -1042,7 +1046,8 @@ def main(argv=None) -> int:
                                     getattr(args, "signers", None),
                                     getattr(args, "anchors", None),
                                     getattr(args, "key", None),
-                                    getattr(args, "signer", None))
+                                    getattr(args, "signer", None),
+                                    grants=args.grant, intents=args.intent)
             _emit({"path": res["path"], "files": sorted(res["files"]),
                    "agents": res["agents"], "changes": res["changes"],
                    "ledger_head": res["ledger_head"]}, None)
@@ -1290,7 +1295,8 @@ def main(argv=None) -> int:
         if args.cmd == "chain":
             entries = core.read_ledger(args.ledger)
             ok = core.verify_chain(args.ledger)
-            report = {"valid": ok, "entries": len(entries)}
+            report = {"valid": ok, "entries": len(entries),
+                      "diagnosis": core.diagnose_chain(args.ledger)}
             if args.signers:
                 signed = [e for e in entries
                           if (e.get("body") or {}).get("signature")]

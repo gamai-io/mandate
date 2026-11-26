@@ -162,7 +162,9 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
          controls_path: str | None = None,
          signers_path: str | None = None,
          anchors_dir: str | None = None,
-         sign_key: str | None = None, signer: str | None = None) -> dict:
+         sign_key: str | None = None, signer: str | None = None,
+         grants: list[str] | None = None,
+         intents: list[str] | None = None) -> dict:
     """Row 11: everything an auditor asks for, generated from the ledger.
 
     The pack now carries the ledger itself, the anchors, and (optionally) a
@@ -198,6 +200,19 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(target, name))
 
+    # the artefacts behind the receipts: an auditor asks "who approved X", which a
+    # hash in a chain cannot answer without the grant that carries the signature
+    for folder, paths in (("grants", grants or []), ("intents", intents or [])):
+        if not paths:
+            continue
+        target = os.path.join(out_dir, folder)
+        os.makedirs(target, exist_ok=True)
+        for index, path in enumerate(paths, start=1):
+            if not os.path.isfile(path):
+                raise MandateError("pack: %s is missing" % path)
+            shutil.copy2(path, os.path.join(target, "%02d-%s" % (index,
+                                                                 os.path.basename(path))))
+
     dec = decisions(ledger_path)
     with open(os.path.join(out_dir, "decisions.json"), "w", encoding="utf-8") as fh:
         json.dump(dec, fh, indent=1, sort_keys=True)
@@ -226,6 +241,17 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
             full = os.path.join(anchors_dir_out, name)
             if os.path.isfile(full):
                 files["anchors/" + name] = {
+                    "sha256": hashlib.sha256(open(full, "rb").read()).hexdigest(),
+                    "bytes": os.path.getsize(full)}
+
+    for folder in ("grants", "intents"):
+        full_dir = os.path.join(out_dir, folder)
+        if not os.path.isdir(full_dir):
+            continue
+        for name in sorted(os.listdir(full_dir)):
+            full = os.path.join(full_dir, name)
+            if os.path.isfile(full):
+                files["%s/%s" % (folder, name)] = {
                     "sha256": hashlib.sha256(open(full, "rb").read()).hexdigest(),
                     "bytes": os.path.getsize(full)}
 
