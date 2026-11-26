@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.68.10 — 2026-11-26
+- **Differential test between the two verifiers.** The same grant/intent/receipt
+  cases (valid, tampered, wrong namespace, revoked) must produce the same answer
+  from `spec/verify_offline.py` and the package. This is the test that would have
+  caught RT5's namespace divergence immediately.
+- **Key-rotation drill** as a test: after the signer key is replaced, old grants
+  fail and new ones redeem.
+- Fuzz pass over `normalize_intent` and `policy_tools.lint` with 600 random shapes;
+  they may reject, never crash.
+
 ## 0.68.9 — 2026-11-26
 - **HSM path is tested, not just documented.** `tools/mandate-pkcs11-sign.py` is a
   PKCS#11 `--signer-cmd` adapter (Ed25519, `EC_EDWARDS`) that builds the SSHSIG
