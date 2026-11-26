@@ -66,7 +66,8 @@ class Approver:
 
     def request(self, intent: dict, audience: str | None = None,
                 ttl: int | None = None) -> dict:
-        with self._lock:
+        if True:      # no lock across the human prompt: a slow approval must not
+            # block every other request thread
             intent = core.normalize_intent(intent)
             proposal = core.propose(intent)
             agent = str(intent["actor"].get("agent") or "")
