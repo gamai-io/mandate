@@ -15,7 +15,8 @@ import sys
 import tempfile
 import unittest
 
-from mandate import audit, approver as mapprover, core
+from mandate import approver as mapprover
+from mandate import core
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
