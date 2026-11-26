@@ -29,6 +29,7 @@ jobs:
       - name: Reproducible wheel (3.12 only)
         if: matrix.python-version == '3.12'
         run: |
+          python -m pip install -q build
           rm -rf /tmp/r1 /tmp/r2
           SOURCE_DATE_EPOCH=1795600000 python -m build --outdir /tmp/r1 > /dev/null
           SOURCE_DATE_EPOCH=1795600000 python -m build --outdir /tmp/r2 > /dev/null
