@@ -39,7 +39,7 @@ the same host as the approver's key; denial of service by simply not acting.
 - default-deny policy for unknown effects,
 - off-host Ed25519 grants with namespace-scoped `allowed_signers`,
 - validity windows and SHA256 fingerprint revocation,
-- one-shot grants and idempotent effects (grant nonce),
+- one-shot grants per nonce store and idempotent effects (grant nonce),
 - receipt only after the effect commits, with crash recovery,
 - loopback-only defaults, bearer token for non-loopback broker,
 - request body caps on broker and witness,

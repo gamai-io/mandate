@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.68.6 — 2026-11-26
+- **The offline examples now run in CI.** `tests/test_examples.py` executes 01, 02,
+  05, 09, 12 and 13 (06 needs a public TSA, so it stays out) on one matrix job
+  with `RUN_EXAMPLES=1`. The README quickstart already had a test; these are the
+  rest of the scripts that once broke silently.
+- Supply chain: GitHub Actions are pinned by commit SHA, the build job no longer
+  inherits `contents: write`, the pre-publish secret scan runs before upload, and
+  the separate `attest.yml` rebuild is gone — provenance is created by the publish
+  step (`attestations: true`), so there is one build, not two.
+- Docs: "one-shot" is qualified per nonce store in the control matrix, broker and
+  DORA pack; SECURITY.md says it the same way.
+
 ## 0.68.5 — 2026-11-26
 Fourth review (RT4).
 

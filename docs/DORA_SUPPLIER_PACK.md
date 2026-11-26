@@ -36,7 +36,7 @@ is genuinely missing. Nothing here is a certification.
 | control | artefact | how the bank checks it |
 |---|---|---|
 | integrity of the audit trail | hash chain + optional Ed25519 receipts + RFC 3161 anchors | `mandate chain`, `mandate anchor-verify --ca` |
-| authorisation is one-shot | nonce store, cross-ledger refusal | `tests/`, `mandate demo` |
+| authorisation is one-shot (per nonce store) | nonce store, cross-ledger refusal | `tests/`, `mandate demo` |
 | approval is bound to the effect | commitment over kind/target/amount/agent/session/nonce | `mandate verify`, `spec/verify_offline.py` |
 | the agent holds no payment credential | broker custody test with three processes | `tests/test_broker_custody.py` |
 | agent identity | per-agent tokens, mTLS with CN, CRL | `tests/test_agents.py`, `tests/test_mtls.py` |

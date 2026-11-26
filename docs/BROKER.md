@@ -8,6 +8,8 @@ what is on each side of it.
 
 > An agent with no payment credential can cause a payment **only** by presenting
 > a signed, one-shot grant to the broker; a replayed grant charges once.
+> ("One-shot" is per nonce store: two hosts or two ledgers without a shared
+> `MANDATE_NONCE_URL` are two stores.)
 
 `tests/test_broker_custody.py` proves it with three processes:
 
