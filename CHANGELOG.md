@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.68.5 — 2026-11-26
+Fourth review (RT4).
+
+- **A revoked key can no longer sign just because the same principal has a second
+  key.** `ssh-keygen -Y verify` reads the whole signers file and accepts any
+  matching key, while `authorize_signer` only checked that *some* valid line
+  existed. Verification now writes a filtered signers file containing only the
+  allowed, non-revoked, in-window lines and verifies against that. A test covers
+  the two-keys-one-revoked case.
+- **`approver serve --page --policy` now honours `--policy`.** The page path
+  signed the packaged default's digest regardless of the flag; a grant then
+  failed `PolicyDenied` on redeem. The policy is also loaded before the human is
+  asked and validated at startup, so a bad path is an error, not a dropped
+  approval.
+- **`executed` is only true when the receipt is valid.** A tampered receipt used
+  to print `executed: true` next to `valid: false`. Output now also carries
+  `signed`; the README says `executed` means "the grant was spent", not "the bank
+  confirmed a payment".
+- **The claims gate closes the holes RT4 found:** it refuses a missing or
+  duplicate version row, a non-plain version (`x.y.z` only), a stale dependency
+  or policy-lint row, and it accepts `-` as well as `—` in the changelog. A full
+  run with pytest missing now says "could not run the suite", not "0 failed".
+- **Release workflow:** the tag check and pre-publish secret scan run before
+  upload; `skip-existing` is gone, so a force-moved tag fails instead of leaving
+  PyPI unchanged while GitHub gets new files; the build job no longer inherits
+  `contents: write`; the PyPI guard runs on `main`, not after publication.
+- **`verify-inclusion`:** a signed STH without `root_hash`/`tree_size` is refused
+  (`SthIncomplete`) instead of falling back to the proof's own root; a malformed
+  `--sth`/entry/proof is exit 2, not a traceback.
+- Packaging: MIT/development/Python classifiers and the Changelog URL (the MIT
+  classifier itself is not used because PEP 639 licence expressions conflict with
+  it on current setuptools).
+- Docs: "one-shot" is qualified per nonce store wherever it appears; the auditor
+  bundle "records" an action and the witness state is named as a claim.
+
+  Correction to 0.68.4's note: it said the gate cross-checks README's passing
+  count. It did not (the row had been removed); the gate now checks the collected
+  row, the failed row, dependencies and lint, and a full run proves the counts.
+
 ## 0.68.4 — 2026-11-26
 Third adversarial review (RT3). Two real bugs and four honesty fixes.
 

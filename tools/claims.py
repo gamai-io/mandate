@@ -30,7 +30,7 @@ ANCHORS = [
     ("SECURITY.md", r"\| (?P<v>\d+\.\d+)\.x\s+\| yes", "supported version table"),
     ("docs/PROCUREMENT_ANSWERS.md", r"`gama-mandate` (?P<v>\d+\.\d+\.\d+)", "product line"),
     ("docs/REFERENCE_ARCHITECTURE.md", r"`gama-mandate` (?P<v>\d+\.\d+\.\d+)", "status line"),
-    ("CHANGELOG.md", r"## (?P<v>\d+\.\d+\.\d+) —", "release section"),
+    ("CHANGELOG.md", r"## (?P<v>\d+\.\d+\.\d+) [—-]", "release section"),
 ]
 
 CLAIMS_FILE = "CLAIMS.md"
@@ -46,7 +46,11 @@ def version() -> str:
     match = re.search(r'^version = "(?P<v>[^"]+)"', text, re.M)
     if not match:
         raise SystemExit("pyproject.toml has no version")
-    return match.group("v")
+    found = match.group("v")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", found):
+        raise SystemExit("pyproject version %r is not a plain release x.y.z"
+                         % found)
+    return found
 
 
 def module_version() -> str:
@@ -92,7 +96,10 @@ def check_versions() -> list[str]:
     # proves the number is the suite's real pass count
     if os.environ.get("CLAIMS_FULL") == "1":
         summary = count_summary()
-        if summary.get("exit") != 0 or summary.get("failed", 1) != 0:
+        if summary.get("exit") != 0:
+            problems.append("could not run the test suite (pytest exit %d)"
+                            % summary.get("exit", -1))
+        elif summary.get("failed", 1) != 0:
             problems.append("the suite reports %d failed"
                             % summary.get("failed", -1))
         elif summary.get("passed", 0) + summary.get("skipped", 0) != count_tests():
@@ -109,10 +116,15 @@ def check_claims_file(current: str, suite: int) -> list[str]:
         return []
     text = open(path, encoding="utf-8").read()
     problems = []
-    version_row = re.search(r"\| version \| ([0-9.]+) \|", text)
-    if version_row and version_row.group(1) != current:
+    versions = re.findall(r"\| version \| ([0-9.]+) \|", text)
+    if not versions:
+        problems.append("%s has no version row" % CLAIMS_FILE)
+    elif len(set(versions)) > 1:
+        problems.append("%s has several version rows: %s"
+                        % (CLAIMS_FILE, ", ".join(sorted(set(versions)))))
+    elif versions[0] != current:
         problems.append("%s says version %s, pyproject says %s"
-                        % (CLAIMS_FILE, version_row.group(1), current))
+                        % (CLAIMS_FILE, versions[0], current))
     # collected is checked against the suite; passing is checked against the
     # README promise, so a stale number in either place is caught without
     # running the whole suite inside this fast gate
@@ -122,11 +134,35 @@ def check_claims_file(current: str, suite: int) -> list[str]:
     elif suite > 0 and int(collected.group(1)) != suite:
         problems.append("%s says %s collected, suite has %d"
                         % (CLAIMS_FILE, collected.group(1), suite))
-    failed = re.search(r"\| tests failed \| (\d+) \|", text)
+    failed = re.findall(r"\| tests failed \| (\d+) \|", text)
     if not failed:
         problems.append("%s has no 'tests failed' row" % CLAIMS_FILE)
-    elif int(failed.group(1)) != 0:
-        problems.append("%s says %s tests failed" % (CLAIMS_FILE, failed.group(1)))
+    elif len(set(failed)) > 1:
+        problems.append("%s has several 'tests failed' rows" % CLAIMS_FILE)
+    elif int(failed[0]) != 0:
+        problems.append("%s says %s tests failed" % (CLAIMS_FILE, failed[0]))
+    # dependency-free and lint-clean are claims with commands; check them too
+    pyproject = open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8").read()
+    deps = re.search(r"^dependencies = \[(?P<body>[^\]]*)\]", pyproject, re.M)
+    runtime = len([x for x in (deps.group("body").split(",") if deps else [])
+                   if x.strip()])
+    dep_row = re.search(r"\| runtime dependencies \| (\d+) \|", text)
+    if not dep_row:
+        problems.append("%s has no 'runtime dependencies' row" % CLAIMS_FILE)
+    elif int(dep_row.group(1)) != runtime:
+        problems.append("%s says %s runtime dependencies, pyproject has %d"
+                        % (CLAIMS_FILE, dep_row.group(1), runtime))
+    lint_row = re.search(r"\| policy lints clean \| (\w+) \|", text)
+    if not lint_row:
+        problems.append("%s has no 'policy lints clean' row" % CLAIMS_FILE)
+    else:
+        from mandate import core as _core
+        from mandate import policy_tools as _pt
+        result = _pt.lint(_core.load_policy())
+        answer = "yes" if result.get("ok") else "no"
+        if lint_row.group(1) != answer:
+            problems.append("%s says policy lints %s, lint says %s"
+                            % (CLAIMS_FILE, lint_row.group(1), answer))
     return problems
 
 

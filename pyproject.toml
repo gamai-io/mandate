@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gama-mandate"
-version = "0.68.4"
+version = "0.68.5"
 description = "Signed, verifiable business commitments for AI agents: canonical commitment, off-host Ed25519 grant, one-shot redemption, hash-chained receipts."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,8 +13,15 @@ license-files = ["LICENSE"]
 authors = [{name = "Renato Šuster", email = "renato@gamatrade.ba"}]
 keywords = ["ai-agents", "trust", "approval", "commitment", "ed25519", "audit"]
 classifiers = [
-  "Programming Language :: Python :: 3",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Financial and Insurance Industry",
   "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Security",
   "Topic :: Office/Business",
 ]

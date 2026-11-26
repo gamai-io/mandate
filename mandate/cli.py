@@ -152,13 +152,26 @@ def _cmd_log(args) -> int:
                        "note": "pass a signed --sth; a proof checked against its "
                                "own root is self-consistent, not evidence"}, None)
                 return 2
-            sth = _read(args.sth)
+            try:
+                sth = _read(args.sth)
+                entry = _read(args.entry)
+                proof = _read(args.proof)
+            except (OSError, ValueError) as exc:
+                _emit({"valid": False, "error": "Unreadable",
+                       "message": str(exc)[:200]}, None)
+                return 2
             signature_ok = mlog.verify_sth(sth, args.signers,
                                            revoked_path=args.revoked)
-            root = (sth.get("sth") or {}).get("root_hash")
-            size = (sth.get("sth") or {}).get("tree_size")
-            inclusion = mlog.verify_inclusion_proof(
-                _read(args.entry), _read(args.proof), root=root, size=size)
+            payload = sth.get("sth") if isinstance(sth, dict) else {}
+            root = (payload or {}).get("root_hash")
+            size = (payload or {}).get("tree_size")
+            if not isinstance(root, str) or not isinstance(size, int):
+                _emit({"valid": False, "error": "SthIncomplete",
+                       "message": "the signed tree head has no root_hash/tree_size",
+                       "sth_verified": signature_ok}, None)
+                return 1
+            inclusion = mlog.verify_inclusion_proof(entry, proof,
+                                                    root=root, size=size)
             _emit({"valid": bool(signature_ok and inclusion),
                    "inclusion": inclusion, "sth_verified": signature_ok}, None)
             return 0 if (signature_ok and inclusion) else 1
@@ -279,7 +292,8 @@ def _cmd_approver(args) -> int:
             rp_id=getattr(args, "rp_id", "127.0.0.1"),
             origin=getattr(args, "origin", "") or
                    "http://127.0.0.1:%d" % args.port,
-            require_passkey=getattr(args, "require_passkey", False))
+            require_passkey=getattr(args, "require_passkey", False),
+            policy_path=getattr(args, "policy", None))
         host, port = server.server_address[:2]
         print("mandate approval page on http://%s:%s (approver=%s) - open it in a "
               "browser on this host" % (host, port, args.approver), flush=True)
@@ -1307,10 +1321,14 @@ def main(argv=None) -> int:
             ok = core.verify_receipt(
                 receipt, _read(args.intent), _read(args.grant),
                 args.signers, revoked_path=args.revoked)
-            decision = str((receipt.get("body") or {}).get("decision") or "")
+            body = receipt.get("body") or {}
+            decision = str(body.get("decision") or "")
             _emit({"valid": ok, "decision": decision or None,
-                   "executed": decision == "executed",
-                   "observed": decision == "observe"}, None)
+                   # a tampered receipt must not look executed just because its
+                   # body still says so
+                   "executed": bool(ok and decision == "executed"),
+                   "observed": bool(ok and decision == "observe"),
+                   "signed": bool(body.get("signature"))}, None)
             return 0 if ok else 1
 
         if args.cmd == "chain":

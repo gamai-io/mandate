@@ -60,7 +60,7 @@ class ApprovalPage:
                  ledger: str = "", signers: str = "",
                  passkeys_path: str = "", rp_id: str = "127.0.0.1",
                  origin: str = "", require_passkey: bool = False,
-                 require_uv: bool = True):
+                 require_uv: bool = True, policy_path: str | None = None):
         self.key_path = key_path
         self.approver_name = approver_name
         self.audience = audience
@@ -77,6 +77,7 @@ class ApprovalPage:
         self.origin = origin
         self.require_passkey = require_passkey
         self.require_uv = require_uv
+        self.policy_path = policy_path
         self.passkeys: dict[str, dict] = self._load_passkeys()
         self.challenges: dict[str, dict] = {}
 
@@ -236,7 +237,8 @@ class ApprovalPage:
             render_hash=item.proposal["render_hash"],
             agent=str(item.intent["actor"].get("agent") or ""),
             audience=item.audience,
-            policy_fingerprint=core.policy_digest(core.load_policy()))
+            policy_fingerprint=core.policy_digest(
+                core.load_policy(self.policy_path)))
         grant = core.make_grant(grant_core, self.key_path)
         item.decision = "approved"
         item.result = {"ok": True, "grant": grant, "intent": item.intent,
@@ -536,13 +538,17 @@ def serve(key_path: str, approver_name: str, host: str = "127.0.0.1",
           wait_s: float = 300, token: str = "", ledger: str = "",
           allow_remote: bool = False, passkeys_path: str = "",
           rp_id: str = "127.0.0.1", origin: str = "",
-          require_passkey: bool = False) -> ThreadingHTTPServer:
+          require_passkey: bool = False,
+          policy_path: str | None = None) -> ThreadingHTTPServer:
     if host not in ("127.0.0.1", "localhost", "::1") and not allow_remote:
         raise SystemExit("refusing to bind %s: the approval page is loopback-only "
                          "unless --allow-remote is given" % host)
+    policy = core.load_policy(policy_path)   # fail at startup, not after approval
     page = ApprovalPage(key_path, approver_name, audience, ttl, wait_s, token,
                         ledger, passkeys_path=passkeys_path, rp_id=rp_id,
-                        origin=origin, require_passkey=require_passkey)
+                        origin=origin, require_passkey=require_passkey,
+                        policy_path=policy_path)
+    page.policy = policy
     server = ThreadingHTTPServer((host, int(port)), make_handler(page))
     server.daemon_threads = True
     server.page = page          # type: ignore[attr-defined]

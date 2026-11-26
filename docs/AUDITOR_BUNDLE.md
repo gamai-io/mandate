@@ -1,12 +1,14 @@
 # Auditor bundle
 
-An auditor bundle is one portable JSON that proves a single business action:
+An auditor bundle is one portable JSON that *records* a single business action,
+and one signature that binds those records together:
 
 - the exact **intent** and the human-signed **grant**,
 - the hash-chained **receipt**,
 - a Merkle **inclusion proof**,
 - the signed tree head (**STH**),
-- the **witness state** that *claims* the STH was pinned on another host.
+- the **witness state** that *claims* the STH was pinned on another host (a
+  claim, see the honest limit below).
 
 The bundle is signed by the approver (OpenSSH SSHSIG, namespace
 `mandate-export`). Verification checks the envelope signature, the receipt/grant

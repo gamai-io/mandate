@@ -46,6 +46,7 @@ def _parse_line(line: str) -> dict | None:
     except (ValueError, TypeError):
         return None
     return {
+        "raw": raw,
         "principal": tokens[0],
         "keytype": tokens[idx],
         "key": tokens[idx + 1],
@@ -118,15 +119,22 @@ def load_revoked(revoked_path: str | None) -> set[str]:
     return out
 
 
-def authorize_signer(name: str, signers_path: str, namespace: str,
-                     now: float | None = None, revoked_path: str | None = None,
-                     require_namespace: bool = True) -> bool:
+def _allowed_lines(name: str, signers_path: str, namespace: str,
+                   now: float | None = None, revoked_path: str | None = None,
+                   require_namespace: bool = True) -> list[str]:
+    """The lines that may actually sign for `name`; revoked ones are removed.
+
+    Returning the *lines* (not a boolean) matters: `ssh-keygen -Y verify` reads
+    the whole file and accepts any matching key, so a revoked key would pass if
+    the same principal had a second, valid key in the same file.
+    """
     moment = time.time() if now is None else float(now)
     revoked = load_revoked(revoked_path)
+    out: list[str] = []
     try:
         fh = open(signers_path, encoding="utf-8")
     except OSError:
-        return False
+        return out
     with fh:
         for line in fh:
             entry = _parse_line(line)
@@ -143,8 +151,15 @@ def authorize_signer(name: str, signers_path: str, namespace: str,
                 continue
             if entry["fingerprint"] in revoked:
                 continue
-            return True
-    return False
+            out.append(entry["raw"])
+    return out
+
+
+def authorize_signer(name: str, signers_path: str, namespace: str,
+                     now: float | None = None, revoked_path: str | None = None,
+                     require_namespace: bool = True) -> bool:
+    return bool(_allowed_lines(name, signers_path, namespace, now,
+                               revoked_path, require_namespace))
 
 
 def sign(payload: str, key_path: str, namespace: str = DEFAULT_NAMESPACE) -> str:
@@ -173,16 +188,20 @@ def verify(payload: str, name: str, signature: str, signers_path: str,
            require_namespace: bool = True) -> bool:
     if not signature or not signers_path or not os.path.exists(signers_path):
         return False
-    if not authorize_signer(name, signers_path, namespace, now, revoked_path,
-                            require_namespace):
+    allowed = _allowed_lines(name, signers_path, namespace, now, revoked_path,
+                             require_namespace)
+    if not allowed:
         return False
     with tempfile.TemporaryDirectory() as td:
+        filtered = os.path.join(td, "signers")
+        with open(filtered, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(allowed) + "\n")
         sig = os.path.join(td, "payload.sig")
         with open(sig, "w", encoding="utf-8") as fh:
             fh.write(signature)
         try:
             proc = subprocess.run(
-                ["ssh-keygen", "-Y", "verify", "-f", signers_path, "-I", str(name),
+                ["ssh-keygen", "-Y", "verify", "-f", filtered, "-I", str(name),
                  "-n", namespace, "-s", sig],
                 input=payload + "\n", capture_output=True, text=True, timeout=20)
         except (OSError, subprocess.SubprocessError):

@@ -74,6 +74,9 @@ class Approver:
                 audience if audience is not None else self.audience_default or "")
             ttl_s = min(max(int(ttl if ttl is not None else self.ttl_default), 30),
                         3600)
+            # resolve and validate the policy *before* asking a human: a broken
+            # policy path after approval is a dropped request, not a decision
+            fingerprint = core.policy_digest(core.load_policy(self.policy_path))
             if self.notifier is not None:
                 text = ("MANDATE approval requested\n"
                         "effect: %s\nagent: %s\nbroker: %s\ncommitment: %s\n\n"
@@ -95,8 +98,7 @@ class Approver:
                 proposal["commitment"], self.approver_name, ttl_s=ttl_s,
                 render_hash=proposal["render_hash"], agent=agent,
                 audience=bound_audience,
-                policy_fingerprint=core.policy_digest(
-                    core.load_policy(self.policy_path)))
+                policy_fingerprint=fingerprint)
             grant = core.make_grant(grant_core, self.key_path)
             return {
                 "ok": True,

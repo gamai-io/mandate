@@ -25,7 +25,7 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 450 tests collected; 0 failed. On a host with Node and bubblewrap 446
+**Status:** 454 tests collected; 0 failed. On a host with Node and bubblewrap 450
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 
@@ -80,7 +80,12 @@ mandate redeem --intent examples/intent.json --grant grant.json --ledger ledger.
 mandate verify --receipt receipt.json --intent examples/intent.json --grant grant.json
 ```
 
-Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
+Expected:
+`{"valid": true, "decision": "executed", "executed": true, "observed": false, "signed": false}`.
+`valid` is the cryptographic check; `executed` says the **grant was spent** and
+the receipt records it. It is not a bank confirmation: the broker executes and
+reports, and without `--key` on `redeem` the receipt is unsigned (tamper-evident
+only through the ledger). Repeat the `redeem` line and it fails with
 `GrantReplayed` — the grant is one-shot per nonce store, by construction (the
 shared store section below covers multiple hosts or directories).
 
@@ -325,7 +330,7 @@ authorising an effect on its own.
 
 The incident list is full of non-payment effects: a package published to a
 registry, a database written to. Both are now effects the broker owns, with the
-same grant, one-shot nonce and receipt:
+same grant, a one-shot nonce (per store) and a receipt:
 
 ```json
 {"kind": "sql.write",       "params": {"sql": "INSERT INTO invoices(id,paid) VALUES(:id,1)",
@@ -1015,8 +1020,8 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.68.4** — canonical commitment, Ed25519
-grant bound to the executing agent, one-shot redeem under a file lock,
+**v0.68.5** — canonical commitment, Ed25519
+grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
 reconciliation, read-only ERP (SQLite/MSSQL/pymssql) checks, SMTP, Merkle

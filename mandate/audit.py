@@ -21,8 +21,6 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
         "inclusion": False,
         "witness": False,
         "decision": (receipt.get("body") or {}).get("decision"),
-        "executed": (receipt.get("body") or {}).get("decision") == "executed",
-        "observed": (receipt.get("body") or {}).get("decision") == "observe",
     }
     sth = (bundle or {}).get("sth")
     if not isinstance(sth, dict):
@@ -45,6 +43,9 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
             result["witness"] = False
     result["valid"] = bool(envelope.get("valid") and result["sth"]
                            and result["inclusion"] and result["witness"])
+    decision = result.get("decision")
+    result["executed"] = bool(result["valid"] and decision == "executed")
+    result["observed"] = bool(result["valid"] and decision == "observe")
     return result
 
 
