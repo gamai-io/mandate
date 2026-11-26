@@ -25,7 +25,7 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 463 tests collected; 0 failed. On a host with Node and bubblewrap 458
+**Status:** 464 tests collected; 0 failed. On a host with Node and bubblewrap 459
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 
@@ -508,7 +508,10 @@ mandate redeem ...           # real execution; if the policy changed -> PolicyDe
   observation receipt cannot be mistaken for something that happened. It is
   cryptographically valid (it is a real receipt for a real observation) but it did
   not spend the grant and nothing executed.
-- `--audience` on `redeem` is a **label the broker repeats**, not a credential; see
+- `redeem --signer-cmd` can sign with an HSM: `tools/mandate-pkcs11-sign.py` is a
+PKCS#11 adapter tested against SoftHSM2 (Ed25519); the key never enters this
+process. See `docs/HSM.md`.
+`--audience` on `redeem` is a **label the broker repeats**, not a credential; see
   `docs/BROKER.md`. Agent identity is proven by `--svid` or mTLS.
 
 ## Short-lived identity and delegation
@@ -1024,7 +1027,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.68.8** — canonical commitment, Ed25519
+**v0.68.9** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

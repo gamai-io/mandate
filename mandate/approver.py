@@ -66,51 +66,48 @@ class Approver:
 
     def request(self, intent: dict, audience: str | None = None,
                 ttl: int | None = None) -> dict:
-        if True:      # no lock across the human prompt: a slow approval must not
-            # block every other request thread
-            intent = core.normalize_intent(intent)
-            proposal = core.propose(intent)
-            agent = str(intent["actor"].get("agent") or "")
-            bound_audience = str(
-                audience if audience is not None else self.audience_default or "")
-            ttl_s = min(max(int(ttl if ttl is not None else self.ttl_default), 30),
-                        3600)
-            # resolve and validate the policy *before* asking a human: a broken
-            # policy path after approval is a dropped request, not a decision
-            fingerprint = core.policy_digest(core.load_policy(self.policy_path))
-            if self.notifier is not None:
-                text = ("MANDATE approval requested\n"
-                        "effect: %s\nagent: %s\nbroker: %s\ncommitment: %s\n\n"
-                        "Confirm on the approver host's terminal. "
-                        "This message is advisory only."
-                        % (proposal["render"]["summary"], agent or "-",
-                           bound_audience or "(unbound)",
-                           proposal["commitment"]))
-                try:
-                    self.notifier.send(text)
-                except Exception as exc:
-                    print("notify failed: %s" % str(exc)[:120], file=sys.stderr)
-            approved = self.confirm(proposal["render"]["summary"],
-                                    proposal["commitment"], agent,
-                                    bound_audience)
-            if not approved:
-                raise ApprovalRejected("approver rejected the request")
-            grant_core = core.build_grant_core(
-                proposal["commitment"], self.approver_name, ttl_s=ttl_s,
-                render_hash=proposal["render_hash"], agent=agent,
-                audience=bound_audience,
-                policy_fingerprint=fingerprint)
-            grant = core.make_grant(grant_core, self.key_path)
-            return {
-                "ok": True,
-                "grant": grant,
-                "intent": intent,
-                "commitment": proposal["commitment"],
-                "render_hash": proposal["render_hash"],
-                "render": proposal["render"],
-                "agent": agent,
-                "audience": bound_audience,
-            }
+        # No lock across the human prompt: a slow approval must not block every
+        # other request thread. Signing is safe concurrently.
+        intent = core.normalize_intent(intent)
+        proposal = core.propose(intent)
+        agent = str(intent["actor"].get("agent") or "")
+        bound_audience = str(
+            audience if audience is not None else self.audience_default or "")
+        ttl_s = min(max(int(ttl if ttl is not None else self.ttl_default), 30),
+                    3600)
+        # resolve and validate the policy *before* asking a human: a broken
+        # policy path after approval is a dropped request, not a decision
+        fingerprint = core.policy_digest(core.load_policy(self.policy_path))
+        if self.notifier is not None:
+            text = ("MANDATE approval requested\n"
+                    "effect: %s\nagent: %s\nbroker: %s\ncommitment: %s\n\n"
+                    "Confirm on the approver host's terminal. "
+                    "This message is advisory only."
+                    % (proposal["render"]["summary"], agent or "-",
+                       bound_audience or "(unbound)", proposal["commitment"]))
+            try:
+                self.notifier.send(text)
+            except Exception as exc:
+                print("notify failed: %s" % str(exc)[:120], file=sys.stderr)
+        approved = self.confirm(proposal["render"]["summary"],
+                                proposal["commitment"], agent, bound_audience)
+        if not approved:
+            raise ApprovalRejected("approver rejected the request")
+        grant_core = core.build_grant_core(
+            proposal["commitment"], self.approver_name, ttl_s=ttl_s,
+            render_hash=proposal["render_hash"], agent=agent,
+            audience=bound_audience, policy_fingerprint=fingerprint)
+        grant = core.make_grant(grant_core, self.key_path)
+        return {
+            "ok": True,
+            "grant": grant,
+            "intent": intent,
+            "commitment": proposal["commitment"],
+            "render_hash": proposal["render_hash"],
+            "render": proposal["render"],
+            "agent": agent,
+            "audience": bound_audience,
+        }
 
     def status(self) -> dict:
         return {"ok": True, "service": "mandate-approver",

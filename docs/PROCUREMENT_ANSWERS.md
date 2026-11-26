@@ -4,7 +4,7 @@ Pre-filled answers to the questions a bank's security/procurement process asks.
 Every "no" is a real gap with a plan; a questionnaire that answers "yes" to
 everything is the first thing a reviewer distrusts.
 
-Product: `gama-mandate` 0.68.8 and the four companion packages (`gamai-trust`,
+Product: `gama-mandate` 0.68.9 and the four companion packages (`gamai-trust`,
 `gamai-guard`, `gamai-plugins`, `gama-l`). Vendor: GAMA TRADE d.o.o. / gamAI,
 Usora, Bosnia and Herzegovina.
 
@@ -35,7 +35,7 @@ Usora, Bosnia and Herzegovina.
 | Question | Answer |
 |---|---|
 | Algorithms | Ed25519 signatures (SSH key format), SHA-256, RFC 8785 canonical JSON, RFC 3161 timestamps. |
-| Key generation / storage | `ssh-keygen` file keys or `sk-` hardware keys; **HSM/KMS through `--signer-cmd`** — the bank's adapter signs the canonical payload, our process never holds the key. A native in-process PKCS#11 provider is not shipped. |
+| Key generation / storage | `ssh-keygen` file keys or `sk-` hardware keys; **HSM/KMS through `--signer-cmd`** — the bank's adapter signs the canonical payload, our process never holds the key. A PKCS#11 adapter ships (`tools/mandate-pkcs11-sign.py`) and is tested against **SoftHSM2** Ed25519; a vendor HSM has the same API but is not tested here. |
 | Key rotation | `allowed_signers` supports multiple keys; remove the old one, add the new one, record it with `change record`. No automated rotation tooling. |
 | Where are private keys? | Never in the repository or the ledger; the approver's environment only. We never see them. |
 | Crypto library | None — the code calls `ssh-keygen`/`openssl`. No home-grown primitives in the signing path (Ed25519 comes from OpenSSH); the offline verifier does implement Ed25519 in pure Python, and that is stated where it matters. |

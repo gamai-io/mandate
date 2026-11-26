@@ -78,6 +78,9 @@ class ApprovalPage:
         self.require_passkey = require_passkey
         self.require_uv = require_uv
         self.policy_path = policy_path
+        # one snapshot: the digest signed later must be the policy the page ran
+        # with, even if the file changes while a human is deciding
+        self.policy = core.load_policy(policy_path)
         self.passkeys: dict[str, dict] = self._load_passkeys()
         self.challenges: dict[str, dict] = {}
 
@@ -237,8 +240,7 @@ class ApprovalPage:
             render_hash=item.proposal["render_hash"],
             agent=str(item.intent["actor"].get("agent") or ""),
             audience=item.audience,
-            policy_fingerprint=core.policy_digest(
-                core.load_policy(self.policy_path)))
+            policy_fingerprint=core.policy_digest(self.policy))
         grant = core.make_grant(grant_core, self.key_path)
         item.decision = "approved"
         item.result = {"ok": True, "grant": grant, "intent": item.intent,

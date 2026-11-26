@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.68.9 — 2026-11-26
+- **HSM path is tested, not just documented.** `tools/mandate-pkcs11-sign.py` is a
+  PKCS#11 `--signer-cmd` adapter (Ed25519, `EC_EDWARDS`) that builds the SSHSIG
+  itself; the key never enters the process. `tests/test_pkcs11.py` creates a
+  SoftHSM2 token, generates a non-exportable key, signs and verifies with
+  `ssh-keygen -Y verify`. CI installs softhsm2/opensc/python3-pkcs11 on 3.12 so the
+  test runs instead of skipping.
+- `docs/HSM.md` states the limit: same API as a vendor HSM, not the same device;
+  FIPS/PIN policy/vendor audit are outside this repository.
+- The approval page signs with one policy snapshot taken at startup, not a
+  re-read after the human clicks.
+
 ## 0.68.8 — 2026-11-26
 Fifth review (RT5).
 
