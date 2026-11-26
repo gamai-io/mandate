@@ -154,6 +154,22 @@ diff, not an inline edit.
 
 ---
 
+## 9. Records were not shipped to the SIEM
+
+**Means:** `mandate ship` exits 4 (`SIEM rejected batch`), or the state file has no
+entry for this ledger. The offset only advances when the SIEM accepted the batch,
+so a failure is repeated, not lost.
+
+**First:** `mandate ship --ledger L --url ... --dry-run` prints how many records are
+pending: `{"records": N, "sent": N, "dry_run": true}`.
+
+**Do:** check the SIEM token and reachability. If the ledger was rotated, the next
+run reports `"rotated": true` and starts from the top of the new file — that is
+expected, not a duplicate. Never delete the `.shipstate` file to "restart": it would
+re-send history.
+
+**Evidence:** the ship result JSON per run, and the SIEM's own ingest timestamps.
+
 ## Tripwire: inbound behaviour
 
 | alert | first action |

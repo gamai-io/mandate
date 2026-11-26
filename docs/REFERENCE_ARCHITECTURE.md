@@ -1,6 +1,6 @@
 # Reference architecture
 
-Status: 2026-11-25, `gama-mandate` 0.67.0. This document describes how the pieces
+Status: 2026-11-25, `gama-mandate` 0.68.0. This document describes how the pieces
 fit in a bank, what is shipped, and what is a gap. It is written for a platform
 team that has to schedule work, not for a quickstart reader.
 

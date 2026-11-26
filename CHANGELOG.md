@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.68.0 — 2026-11-26
+- **`mandate ship` keeps one offset per ledger.** By default each ledger gets
+  `<ledger>.shipstate`; a shared `--offset` file now keys by absolute ledger path,
+  so shipping a second ledger no longer starts at the first one's byte count. Re-run
+  after a rotation reports `"rotated": true` and restarts at the top of the new
+  file instead of silently sending nothing.
+- `packaging/mandate-ship.service|.timer`: a oneshot unit every minute with the HEC
+  token in an environment file, so a SIEM feed is an operation and not a library
+  call.
+- `docs/RUNBOOK.md` gains the "records were not shipped" event.
+- 6 ship tests; 438 pass, 4 documented skips.
+
 ## 0.67.0 — 2026-11-26
 Operational readiness (blue-team review):
 - **`docs/RUNBOOK.md`**: first action for eight events — refusal, expired

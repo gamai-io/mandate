@@ -1,0 +1,11 @@
+[Unit]
+Description=Ship the mandate ledger to the SIEM every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=mandate-ship.service
+
+[Install]
+WantedBy=timers.target

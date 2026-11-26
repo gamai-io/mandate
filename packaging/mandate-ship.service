@@ -1,0 +1,26 @@
+# Ship new ledger records to the bank's SIEM every minute.
+# Install: cp packaging/mandate-ship.* /etc/systemd/system/ && systemctl enable --now mandate-ship.timer
+[Unit]
+Description=Mandate: ship ledger records to the SIEM
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=mandate
+# HEC token in the environment file, never on the command line
+EnvironmentFile=/etc/mandate/ship.env
+ExecStart=/usr/local/bin/mandate ship \
+  --ledger /var/lib/mandate/ledger.jsonl \
+  --url ${SIEM_URL} --token ${SIEM_TOKEN} \
+  --batch 200
+# 0 = sent (possibly nothing), 4 = refused by the SIEM and the offset did not move
+SuccessExitStatus=0
+Restart=no
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/mandate
+
+[Install]
+WantedBy=multi-user.target

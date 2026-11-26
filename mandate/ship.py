@@ -63,14 +63,40 @@ def _post(url: str, token: str, payload: list[dict], timeout: int = 20) -> None:
         raise ShipError("SIEM unreachable: %s" % str(exc)[:120]) from exc
 
 
+def _load_offsets(path: str) -> dict:
+    """State is per ledger: two ledgers must never share one byte counter."""
+    if not path or not os.path.exists(path):
+        return {}
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if isinstance(data, dict) and isinstance(data.get("offsets"), dict):
+        return {str(k): int(v) for k, v in data["offsets"].items()}
+    return {}
+
+
+def _save_offsets(path: str, offsets: dict) -> None:
+    directory = os.path.dirname(os.path.abspath(path))
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump({"version": 1, "offsets": offsets}, fh, indent=1, sort_keys=True)
+    os.replace(tmp, path)
+
+
 def ship(ledger_path: str, url: str, token: str = "", offset_path: str | None = None,
          batch: int = 200, dry_run: bool = False) -> dict:
-    offset = 0
-    if offset_path and os.path.exists(offset_path):
-        try:
-            offset = int(open(offset_path).read().strip() or 0)
-        except ValueError:
-            offset = 0
+    ledger_key = os.path.abspath(ledger_path)
+    state_path = offset_path or (ledger_path + ".shipstate")
+    offsets = _load_offsets(state_path)
+    offset = offsets.get(ledger_key, 0)
+    rotated = False
+    if os.path.exists(ledger_path) and offset and \
+            os.path.getsize(ledger_path) < offset:
+        offset = 0          # the file was rotated or replaced: start from the top
+        rotated = True
     records, new_offset = _read(ledger_path, offset)
     sent = 0
     for start in range(0, len(records), max(1, batch)):
@@ -80,9 +106,9 @@ def ship(ledger_path: str, url: str, token: str = "", offset_path: str | None = 
             continue
         _post(url, token, chunk)
         sent += len(chunk)
-    if offset_path and not dry_run:
-        os.makedirs(os.path.dirname(os.path.abspath(offset_path)), exist_ok=True)
-        with open(offset_path, "w") as fh:
-            fh.write(str(new_offset))
-    return {"records": len(records), "sent": sent, "offset": new_offset,
+    if not dry_run:
+        offsets[ledger_key] = new_offset
+        _save_offsets(state_path, offsets)
+    return {"ledger": ledger_key, "records": len(records), "sent": sent,
+            "offset": new_offset, "rotated": rotated, "state": state_path,
             "dry_run": dry_run}

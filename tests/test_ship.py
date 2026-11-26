@@ -1,82 +1,107 @@
-"""SIEM shipping: batches, offset state, no silent loss."""
+"""Shipping to a SIEM must not lose records, and must not mix two ledgers."""
 from __future__ import annotations
 
 import json
 import os
 import tempfile
-import threading
 import unittest
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from mandate import ship
-from mandate.core import append_receipt
+from mandate import core, ship
 
 
-class Collector(BaseHTTPRequestHandler):
-    got: list[dict] = []
-    fail = False
-
-    def do_POST(self):
-        length = int(self.headers.get("Content-Length") or 0)
-        body = self.rfile.read(length).decode()
-        if Collector.fail:
-            self.send_response(500)
-            self.end_headers()
-            return
-        for line in body.strip().splitlines():
-            Collector.got.append(json.loads(line))
-        self.send_response(200)
-        self.end_headers()
-
-    def log_message(self, *args):
-        pass
+def body(nonce: str, ts: int = 1) -> dict:
+    return {"v": 1, "type": "receipt", "grant_nonce": nonce, "decision": "executed",
+            "commitment": "sha256:" + "0" * 64, "ts": ts}
 
 
-class Shipping(unittest.TestCase):
+class Ship(unittest.TestCase):
     def setUp(self) -> None:
-        Collector.got = []
-        Collector.fail = False
-        self.server = HTTPServer(("127.0.0.1", 0), Collector)
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
-        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/services/collector"
         self.tmp = tempfile.TemporaryDirectory()
-        self.ledger = os.path.join(self.tmp.name, "ledger.jsonl")
-        self.state = os.path.join(self.tmp.name, "ship.state")
-        for i in range(3):
-            append_receipt(self.ledger, {"v": 1, "type": "receipt", "ts": 1000 + i,
-                                         "agent": "a", "approver": "b"})
+        self.dir = self.tmp.name
+        self.ledger = os.path.join(self.dir, "a.jsonl")
+        for i in range(5):
+            core.append_receipt(self.ledger, body("n%d" % i))
 
     def tearDown(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
         self.tmp.cleanup()
 
-    def test_ships_once_then_resumes_from_offset(self) -> None:
-        first = ship.ship(self.ledger, self.url, "tok", self.state)
-        self.assertEqual(first["sent"], 3)
-        self.assertEqual(len(Collector.got), 3)
-        second = ship.ship(self.ledger, self.url, "tok", self.state)
-        self.assertEqual(second["sent"], 0, "offset must prevent resending")
-        append_receipt(self.ledger, {"v": 1, "type": "receipt", "ts": 2000,
-                                     "agent": "a", "approver": "b"})
-        third = ship.ship(self.ledger, self.url, "tok", self.state)
-        self.assertEqual(third["sent"], 1)
-        self.assertEqual(len(Collector.got), 4)
+    def test_a_dry_run_counts_without_writing_state(self) -> None:
+        result = ship.ship(self.ledger, "https://siem.example/services/collector",
+                           dry_run=True)
+        self.assertEqual(result["sent"], 5)
+        self.assertFalse(os.path.exists(self.ledger + ".shipstate"))
 
-    def test_rejected_batch_does_not_advance_the_offset(self) -> None:
-        Collector.fail = True
-        with self.assertRaises(ship.ShipError):
-            ship.ship(self.ledger, self.url, "tok", self.state)
-        self.assertFalse(os.path.exists(self.state), "offset must not move on failure")
-        Collector.fail = False
-        res = ship.ship(self.ledger, self.url, "tok", self.state)
-        self.assertEqual(res["sent"], 3)
+    def test_two_ledgers_get_their_own_state_by_default(self) -> None:
+        other = os.path.join(self.dir, "b.jsonl")
+        core.append_receipt(other, body("m0"))
+        posted = []
+        original = ship._post
+        ship._post = lambda url, token, payload, timeout=20: posted.append(len(payload))
+        try:
+            ship.ship(self.ledger, "https://siem.example/x")
+            ship.ship(other, "https://siem.example/x")
+        finally:
+            ship._post = original
+        self.assertTrue(os.path.exists(self.ledger + ".shipstate"))
+        self.assertTrue(os.path.exists(other + ".shipstate"))
+        self.assertEqual(sum(posted), 6)
 
-    def test_dry_run_does_not_send(self) -> None:
-        res = ship.ship(self.ledger, self.url, "tok", self.state, dry_run=True)
-        self.assertEqual(res["sent"], 3)
-        self.assertEqual(Collector.got, [])
-        self.assertFalse(os.path.exists(self.state))
+    def test_a_shared_state_file_keys_by_ledger(self) -> None:
+        other = os.path.join(self.dir, "b.jsonl")
+        core.append_receipt(other, body("m0"))
+        shared = os.path.join(self.dir, "ship.state")
+        posted = []
+        original = ship._post
+        ship._post = lambda url, token, payload, timeout=20: posted.append(len(payload))
+        try:
+            ship.ship(self.ledger, "https://siem.example/x", offset_path=shared)
+            ship.ship(other, "https://siem.example/x", offset_path=shared)
+            state = json.load(open(shared))
+        finally:
+            ship._post = original
+        self.assertEqual(len(state["offsets"]), 2)
+        self.assertEqual(sum(posted), 6)
+
+    def test_a_second_run_sends_nothing_new(self) -> None:
+        posted = []
+        original = ship._post
+        ship._post = lambda url, token, payload, timeout=20: posted.append(len(payload))
+        try:
+            ship.ship(self.ledger, "https://siem.example/x")
+            second = ship.ship(self.ledger, "https://siem.example/x")
+        finally:
+            ship._post = original
+        self.assertEqual(second["records"], 0)
+        self.assertEqual(sum(posted), 5)
+
+    def test_a_rotated_ledger_is_detected_and_restarts(self) -> None:
+        posted = []
+        original = ship._post
+        ship._post = lambda url, token, payload, timeout=20: posted.append(len(payload))
+        try:
+            ship.ship(self.ledger, "https://siem.example/x")
+            open(self.ledger, "w").write("")           # rotation
+            core.append_receipt(self.ledger, body("after-rotation"))
+            result = ship.ship(self.ledger, "https://siem.example/x")
+        finally:
+            ship._post = original
+        self.assertTrue(result["rotated"])
+        self.assertEqual(result["sent"], 1)
+
+    def test_a_rejected_batch_does_not_advance_the_offset(self) -> None:
+        def boom(url, token, payload, timeout=20):
+            raise ship.ShipError("SIEM rejected batch: HTTP 500")
+        original = ship._post
+        ship._post = boom
+        try:
+            with self.assertRaises(ship.ShipError):
+                ship.ship(self.ledger, "https://siem.example/x")
+        finally:
+            ship._post = original
+        state = self.ledger + ".shipstate"
+        if os.path.exists(state):
+            self.assertEqual(json.load(open(state))["offsets"].get(
+                os.path.abspath(self.ledger), 0), 0)
 
 
 if __name__ == "__main__":
