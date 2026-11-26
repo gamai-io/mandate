@@ -5,9 +5,9 @@ reproduces it does not belong in a sales conversation.
 
 | claim | value | command |
 |---|---|---|
-| version | 0.68.3 | `python3 tools/claims.py --version` |
-| tests collected | 444 | `python3 -m pytest -q --collect-only tests/` |
-| tests passing | 440 | `python3 -m pytest -q tests/` |
+| version | 0.68.4 | `python3 tools/claims.py --version` |
+| tests collected | 450 | `python3 -m pytest -q --collect-only tests/` |
+| tests passing | 446 | `python3 -m pytest -q tests/` |
 | runtime dependencies | 0 | `grep -A2 '^dependencies' pyproject.toml` |
 | policy lints clean | yes | `mandate policy lint` |
 | supported python | >=3.9 | `grep requires-python pyproject.toml` |

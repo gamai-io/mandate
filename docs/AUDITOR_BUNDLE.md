@@ -6,7 +6,7 @@ An auditor bundle is one portable JSON that proves a single business action:
 - the hash-chained **receipt**,
 - a Merkle **inclusion proof**,
 - the signed tree head (**STH**),
-- the **witness state** that pinned that STH on another host.
+- the **witness state** that *claims* the STH was pinned on another host.
 
 The bundle is signed by the approver (OpenSSH SSHSIG, namespace
 `mandate-export`). Verification checks the envelope signature, the receipt/grant
@@ -34,8 +34,15 @@ mandate --signers trust/allowed_signers audit verify \
 envelope is `mandate-export`); `--log-signers` must contain the log key
 (`namespaces="mandate-log"`).
 
-Output: `{valid, envelope, sth, inclusion, witness}` — `valid` is true only if
-all four checks pass.
+Output: `{valid, envelope, sth, inclusion, witness, decision, executed, observed}`
+— `valid` is true only if the envelope, STH, inclusion and witness checks pass.
+
+**Honest limit:** `witness_state` is a JSON file, not a signature by the witness
+host. `audit verify` checks that it matches the STH, not that another machine
+produced it. If the bundle builder fabricates a state and re-signs the bundle,
+`witness` is still true. A witness you do not trust is not a witness: the
+independent check is running `mandate witness verify` on the witness host against
+its own state file.
 
 ## Cross-host flow
 

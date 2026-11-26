@@ -30,6 +30,20 @@ Measured in the suite (5 tests, ~3.5 s):
 python3 -m pytest -q tests/test_broker_custody.py -v
 ```
 
+## The `--audience` label is not a credential
+
+A grant can be bound to a broker name (`grant --audience local-broker`). The
+redeeming caller must repeat that name (`redeem --audience local-broker` or, in
+code, `audience=`). This is a **label, not authentication**: any process that can
+run `redeem` can type the same string. What makes the binding matter is that the
+broker is the only place with the payment credential; the agent has nothing to
+redeem *with* unless the operator runs `redeem` on the broker host.
+
+If you need the caller's identity to be proven, use the agent token (`--svid`)
+or mTLS — those are checked cryptographically. Do not rely on `--audience` for
+that; it prevents a grant meant for broker A from being presented to broker B by
+accident, not by an attacker who already runs your CLI.
+
 ## What this boundary does and does not buy
 
 **Buys:** a compromised agent cannot pay by reading its own environment, because

@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.68.4 — 2026-11-26
+Third adversarial review (RT3). Two real bugs and four honesty fixes.
+
+- **The approver daemon now binds the policy.** `Approver.request` minted grants
+  with `policy_digest: ""`, so a grant from the co-sign path redeemed under any
+  policy while the README said a changed policy invalidates old grants. It now
+  records the digest; `approver serve --policy` selects the file, and a test
+  asserts `PolicyDenied` after an edit.
+- **`mandate verify` distinguishes observation from execution.** Output now has
+  `decision`, `executed` and `observed`. An `--observe` receipt was already a
+  valid receipt (it is), but a reader could take `valid: true` for "the payment
+  happened"; now the fields say which.
+- **`mandate log verify-inclusion` requires a signed tree head.** Without a
+  signature it was verifying a proof against its own root and printing
+  `valid: true`; with an unsigned `--sth` it copied the root without checking the
+  signature. It now returns `SthRequired` (exit 2) without `--sth`, and `valid`
+  requires `sth_verified`.
+- **`audit verify` exposes the decision** (`decision`, `executed`, `observed`) and
+  `docs/AUDITOR_BUNDLE.md` states the limit: `witness_state` is a claim in an
+  unsigned JSON file, not a signature by the witness host; a fabricated state
+  re-signed by the bundle key still shows `witness: true`.
+- **The claims gate now sees `CLAIMS.md`.** Its regex looked for a `| tests |`
+  row that no longer existed, and it never compared the passing count. It now
+  checks both rows, cross-checks README's passing promise, and `CLAIMS_FULL=1`
+  (set in CI) runs the suite once to prove the number.
+- **Release integrity:** the release workflow refuses a tag that is not
+  `v<pyproject version>`, and the GitHub release now waits for the PyPI publish.
+- The quickstart says one-shot is per nonce store; `--audience` is documented as
+  a label the broker repeats, not a credential (README + `docs/BROKER.md`).
+- The pilot-kit generator no longer hardcodes timings or calls two same-author
+  verifiers "independent"; it points at `06-performance.md` instead.
+
 ## 0.68.3 — 2026-11-26
 - `docs/PERFORMANCE.md` now carries a run of `tools/bench_ledger.py` from this
   host (8.9 ms per receipt at 10k, chain 1.85 s, pack 0.71 s) and says the

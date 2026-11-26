@@ -88,6 +88,16 @@ def check_versions() -> list[str]:
             problems.append(line)
         else:
             print("warn: %s (fine in a checkout, a problem in a release)" % line)
+    # the fast gate compares the two documents to each other; only a full run
+    # proves the number is the suite's real pass count
+    if os.environ.get("CLAIMS_FULL") == "1" and os.path.exists(
+            os.path.join(ROOT, CLAIMS_FILE)):
+        text = open(os.path.join(ROOT, CLAIMS_FILE), encoding="utf-8").read()
+        row = re.search(r"\| tests passing \| (\d+) \|", text)
+        actual = count_passed()
+        if row and actual >= 0 and int(row.group(1)) != actual:
+            problems.append("%s says %s passing, the suite reports %d"
+                            % (CLAIMS_FILE, row.group(1), actual))
     return problems
 
 
@@ -102,10 +112,28 @@ def check_claims_file(current: str, suite: int) -> list[str]:
     if version_row and version_row.group(1) != current:
         problems.append("%s says version %s, pyproject says %s"
                         % (CLAIMS_FILE, version_row.group(1), current))
-    tests_row = re.search(r"\| tests \| (\d+) \|", text)
-    if tests_row and suite > 0 and int(tests_row.group(1)) != suite:
-        problems.append("%s says %s tests, suite has %d"
-                        % (CLAIMS_FILE, tests_row.group(1), suite))
+    # collected is checked against the suite; passing is checked against the
+    # README promise, so a stale number in either place is caught without
+    # running the whole suite inside this fast gate
+    collected = re.search(r"\| tests collected \| (\d+) \|", text)
+    if not collected:
+        problems.append("%s has no 'tests collected' row" % CLAIMS_FILE)
+    elif suite > 0 and int(collected.group(1)) != suite:
+        problems.append("%s says %s collected, suite has %d"
+                        % (CLAIMS_FILE, collected.group(1), suite))
+    passing = re.search(r"\| tests passing \| (\d+) \|", text)
+    if not passing:
+        problems.append("%s has no 'tests passing' row" % CLAIMS_FILE)
+    readme_path = os.path.join(ROOT, "README.md")
+    if os.path.exists(readme_path):
+        promised = re.search(r"(\d+) pass\b",
+                             open(readme_path, encoding="utf-8").read())
+        if not promised:
+            problems.append("README.md states no passing count")
+        elif passing and int(passing.group(1)) != int(promised.group(1)):
+            problems.append("%s says %s passing, README promises %s"
+                            % (CLAIMS_FILE, passing.group(1),
+                               promised.group(1)))
     return problems
 
 

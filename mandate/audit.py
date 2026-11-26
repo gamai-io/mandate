@@ -13,12 +13,16 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
                   revoked_path: str | None = None) -> dict:
     envelope = export.verify_bundle(bundle, signers_path,
                                     revoked_path=revoked_path)
+    receipt = (bundle or {}).get("receipt") or {}
     result = {
         "valid": False,
         "envelope": envelope,
         "sth": False,
         "inclusion": False,
         "witness": False,
+        "decision": (receipt.get("body") or {}).get("decision"),
+        "executed": (receipt.get("body") or {}).get("decision") == "executed",
+        "observed": (receipt.get("body") or {}).get("decision") == "observe",
     }
     sth = (bundle or {}).get("sth")
     if not isinstance(sth, dict):
@@ -27,7 +31,6 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
     result["sth"] = mlog.verify_sth(sth, log_signers_path,
                                     revoked_path=revoked_path)
     proof = (bundle or {}).get("inclusion_proof")
-    receipt = (bundle or {}).get("receipt") or {}
     if isinstance(proof, dict):
         result["inclusion"] = mlog.verify_inclusion_proof(
             receipt, proof, root=payload.get("root_hash"),

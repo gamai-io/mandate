@@ -25,10 +25,13 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 444 tests collected; 440 pass on a host with Node and bubblewrap, and
-the rest skip with a stated reason. `python3 -m pytest -q tests/`. Every number in
-these docs is checked by `tools/claims.py`, which fails CI when a document
-disagrees with the code.
+**Status:** 450 tests collected; 446 pass on a host with Node and bubblewrap, and
+the rest skip with a stated reason. `python3 -m pytest -q tests/`.
+
+`tools/claims.py` fails CI when the version, the changelog section, the collected
+and passing test counts, or any figure in `CLAIMS.md` disagrees with the code. The
+benchmark numbers are not constants: each one names the script that reproduces it,
+because `fsync` and the host change the absolute value.
 
 ## One thing
 
@@ -77,7 +80,8 @@ mandate verify --receipt receipt.json --intent examples/intent.json --grant gran
 ```
 
 Expected: `{"valid": true}`. Repeat the `redeem` line and it fails with
-`GrantReplayed` — the grant is one-shot, by construction.
+`GrantReplayed` — the grant is one-shot per nonce store, by construction (the
+shared store section below covers multiple hosts or directories).
 
 | step | what it proves |
 |---|---|
@@ -150,7 +154,9 @@ is in `dora_roi.json` — the fields a register-of-information entry needs.
 ## Shared nonce store (multi-host)
 
 A grant is one-shot per nonce store. One host needs nothing; several hosts need
-one authority, or each host's local file will say "unused":
+one authority, or each host's local file will say "unused". Two different
+`--ledger` directories on the same host are two stores unless
+`MANDATE_NONCE_URL` points them at one authority:
 
 ```bash
 mandate nonce serve --host 0.0.0.0 --port 8899 --token "$TOKEN" --db /var/lib/mandate/nonces.sqlite
@@ -491,6 +497,12 @@ mandate redeem ...           # real execution; if the policy changed -> PolicyDe
 - `policy.json` may declare `"require_revert": {"payment.send": true}`; a missing
   `revert` step then blocks the effect.
 - Receipts carry `policy_digest`, `binding` and `revert` (`irreversible` when none).
+- `mandate verify` reports `decision`, `executed` and `observed`, so an
+  observation receipt cannot be mistaken for something that happened. It is
+  cryptographically valid (it is a real receipt for a real observation) but it did
+  not spend the grant and nothing executed.
+- `--audience` on `redeem` is a **label the broker repeats**, not a credential; see
+  `docs/BROKER.md`. Agent identity is proven by `--svid` or mTLS.
 
 ## Short-lived identity and delegation
 
@@ -1002,7 +1014,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.68.3** — canonical commitment, Ed25519
+**v0.68.4** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock,
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

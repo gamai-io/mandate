@@ -59,7 +59,7 @@ Open source (MIT), on your infrastructure.</p>
 <tr><td>2. Commitment</td><td>a canonical hash over that exact content, including agent, session and nonce</td></tr>
 <tr><td>3. Grant</td><td>a named person signs it with their own Ed25519 key; the key is not on the agent host</td></tr>
 <tr><td>4. Redeem</td><td>the broker verifies, spends the grant once, executes, appends a receipt to a hash chain</td></tr>
-<tr><td>5. Verify</td><td>anyone checks the receipt offline, without the vendor: two independent verifiers</td></tr>
+<tr><td>5. Verify</td><td>anyone checks the receipt offline, without the vendor: two implementations (Python and Node), both by this author, must agree on the same vectors</td></tr>
 </table>
 
 <h2>What a bank gets</h2>
@@ -67,7 +67,7 @@ Open source (MIT), on your infrastructure.</p>
 <tr><td>Evidence</td><td>hash-chained receipts, optional RFC 3161 anchors, audit pack with inventory and changes</td></tr>
 <tr><td>Containment of the effect</td><td>the agent never holds the payment credential; the broker does</td></tr>
 <tr><td>Approval a human can actually do</td><td>browser page with a passkey, bound to the rendered amount</td></tr>
-<tr><td>Numbers</td><td>10,000 receipts: 9.7 ms each to write, 1.94 s to verify, 0.55 s to pack</td></tr>
+<tr><td>Numbers</td><td>measured, with the method and what is not measured, in <code>06-performance.md</code>; the script that reproduces them ships in the repository</td></tr>
 </table>
 
 <h2>What it is not</h2>

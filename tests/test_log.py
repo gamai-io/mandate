@@ -146,10 +146,27 @@ class LedgerLogTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         entries = core.read_ledger(self.ledger)
         pathlib.Path(entry).write_text(json.dumps(entries[1]), encoding="utf-8")
-        result = run("log", "verify-inclusion", "--entry", entry,
-                     "--proof", proof, "--sth", sth)
+        result = run("--signers", self.signers, "log", "verify-inclusion",
+                     "--entry", entry, "--proof", proof, "--sth", sth)
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertTrue(json.loads(result.stdout)["valid"])
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["valid"])
+        self.assertTrue(payload["sth_verified"])
+
+        # an unsigned tree head must not produce a positive answer
+        unsigned = os.path.join(self.dir, "unsigned.json")
+        pathlib.Path(unsigned).write_text(json.dumps(
+            {"sth": json.loads(pathlib.Path(sth).read_text(encoding="utf-8"))["sth"]}),
+            encoding="utf-8")
+        result = run("--signers", self.signers, "log", "verify-inclusion",
+                     "--entry", entry, "--proof", proof, "--sth", unsigned)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertFalse(json.loads(result.stdout)["valid"])
+
+        result = run("log", "verify-inclusion", "--entry", entry,
+                     "--proof", proof)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertEqual(json.loads(result.stdout).get("error"), "SthRequired")
 
         lines = pathlib.Path(self.ledger).read_text(encoding="utf-8").splitlines()
         old_ledger = os.path.join(self.dir, "old.jsonl")

@@ -51,11 +51,12 @@ class Approver:
     def __init__(self, key_path: str, approver_name: str,
                  audience_default: str = "", ttl_default: int = 900,
                  confirm=None, notifier=None, rate_per_min: float = 0,
-                 rate_burst: float = 0):
+                 rate_burst: float = 0, policy_path: str | None = None):
         self.key_path = key_path
         self.approver_name = approver_name
         self.audience_default = audience_default
         self.ttl_default = int(ttl_default)
+        self.policy_path = policy_path
         self.confirm = confirm or tty_confirm
         self.notifier = notifier
         self.metrics = Registry("mandate_approver")
@@ -93,7 +94,9 @@ class Approver:
             grant_core = core.build_grant_core(
                 proposal["commitment"], self.approver_name, ttl_s=ttl_s,
                 render_hash=proposal["render_hash"], agent=agent,
-                audience=bound_audience)
+                audience=bound_audience,
+                policy_fingerprint=core.policy_digest(
+                    core.load_policy(self.policy_path)))
             grant = core.make_grant(grant_core, self.key_path)
             return {
                 "ok": True,

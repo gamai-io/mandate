@@ -145,15 +145,23 @@ def _cmd_log(args) -> int:
             _emit(mlog.inclusion_proof(leaves, args.index), args.out)
             return 0
         if cmd == "verify-inclusion":
-            sth = _read(args.sth) if args.sth else None
-            root = size = None
-            if sth:
-                root = (sth.get("sth") or {}).get("root_hash")
-                size = (sth.get("sth") or {}).get("tree_size")
-            ok = mlog.verify_inclusion_proof(
+            # an inclusion proof is only meaningful against a *signed* tree
+            # head; verifying against the proof's own root proves nothing
+            if not args.sth:
+                _emit({"valid": False, "error": "SthRequired",
+                       "note": "pass a signed --sth; a proof checked against its "
+                               "own root is self-consistent, not evidence"}, None)
+                return 2
+            sth = _read(args.sth)
+            signature_ok = mlog.verify_sth(sth, args.signers,
+                                           revoked_path=args.revoked)
+            root = (sth.get("sth") or {}).get("root_hash")
+            size = (sth.get("sth") or {}).get("tree_size")
+            inclusion = mlog.verify_inclusion_proof(
                 _read(args.entry), _read(args.proof), root=root, size=size)
-            _emit({"valid": ok}, None)
-            return 0 if ok else 1
+            _emit({"valid": bool(signature_ok and inclusion),
+                   "inclusion": inclusion, "sth_verified": signature_ok}, None)
+            return 0 if (signature_ok and inclusion) else 1
         if cmd == "consistency":
             leaves = mlog.leaves_from_ledger(args.ledger)
             _emit(mlog.consistency_proof(leaves, args.first, args.second),
@@ -291,7 +299,8 @@ def _cmd_approver(args) -> int:
                                   ttl_default=args.ttl,
                                   notifier=notifier,
                                   rate_per_min=args.rate_limit_per_min,
-                                  rate_burst=args.rate_burst)
+                                  rate_burst=args.rate_burst,
+                                  policy_path=getattr(args, "policy", None))
     server = mapprover.make_server(args.host, args.port, approver,
                                    token=args.token)
     host, port = server.server_address[:2]
@@ -774,7 +783,11 @@ def main(argv=None) -> int:
     p_as = appr_sub.add_parser("serve")
     p_as.add_argument("--key", required=True)
     p_as.add_argument("--approver", required=True)
-    p_as.add_argument("--audience", default="")
+    p_as.add_argument("--audience", default="",
+                      help="broker name a grant is bound to (a label the redeem "
+                           "caller must repeat; it is not a credential)")
+    p_as.add_argument("--policy", default=None,
+                      help="policy file whose digest is bound into every grant")
     p_as.add_argument("--ttl", type=int, default=900)
     p_as.add_argument("--host", default="127.0.0.1")
     p_as.add_argument("--port", type=int, default=8897)
@@ -1290,10 +1303,14 @@ def main(argv=None) -> int:
             return 0
 
         if args.cmd == "verify":
+            receipt = _read(args.receipt)
             ok = core.verify_receipt(
-                _read(args.receipt), _read(args.intent), _read(args.grant),
+                receipt, _read(args.intent), _read(args.grant),
                 args.signers, revoked_path=args.revoked)
-            _emit({"valid": ok}, None)
+            decision = str((receipt.get("body") or {}).get("decision") or "")
+            _emit({"valid": ok, "decision": decision or None,
+                   "executed": decision == "executed",
+                   "observed": decision == "observe"}, None)
             return 0 if ok else 1
 
         if args.cmd == "chain":
