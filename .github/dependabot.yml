@@ -21,3 +21,8 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: "deps"
+    ignore:
+      # The build backend is pinned on purpose: the published artefacts were
+      # verified byte-for-byte with setuptools 78.1.0 (docs/REPRODUCIBLE.md), and
+      # 84.x also requires Python >= 3.10 while this project still tests 3.9.
+      - dependency-name: "setuptools"
