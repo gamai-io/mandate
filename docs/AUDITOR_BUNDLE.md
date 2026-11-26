@@ -75,3 +75,28 @@ can be pinned and verified across machines.
 The same pin was repeated on two further hosts on 2026-11-09; both
 witness states produced `valid=true, witness=true`. Three independent hosts
 (vast, host D, host C) now hold the same `root_hash` and `tree_size`.
+
+## Strict parsing (2026-11-27)
+
+A bundle is only as good as the parser that reads it. `{"a": 1, "a": 2}` parses to
+`{"a": 2}` in Python, JavaScript and Go, so a signer and an auditor can disagree about
+what was signed while both report success. Both verifiers therefore refuse, before any
+hash is computed:
+
+| Rejected | Error code |
+|---|---|
+| a key twice in one object | `duplicate_key` |
+| `NaN`, `Infinity`, `-Infinity` | `non_finite` |
+| an integer outside ±2^53−1, or a token longer than 16 digits | `int_range` |
+| a string with a lone UTF-16 surrogate | `lone_surrogate` |
+| nesting deeper than 128 | `depth` |
+| bytes that are not UTF-8 | `invalid_utf8` |
+
+`mandate/strictjson.py` is the package implementation; `spec/verify_offline.py` carries
+its own copy because that script must run standalone (`tests/test_offline_verifier.py`
+enforces it), and `spec/verify_offline.js` implements the same rules for Node. A
+differential test feeds each rejected document to both verifiers and requires the same
+error code from each.
+
+The idea and the rule list follow Tracekit's `format.canon.loads_strict` (MIT); the
+implementation here is ours.

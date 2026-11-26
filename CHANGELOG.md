@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — strict parsing
+- **Both verifiers refuse ambiguous JSON.** `{"a":1,"a":2}`, `NaN`/`Infinity`, integers
+  beyond 2^53−1, lone UTF-16 surrogates, depth > 128 and non-UTF-8 bytes now fail with a
+  stable code (`duplicate_key`, `non_finite`, `int_range`, `lone_surrogate`, `depth`,
+  `invalid_utf8`) before any hash is computed. `mandate/strictjson.py` is the package
+  implementation; `spec/verify_offline.py` keeps a standalone copy and
+  `spec/verify_offline.js` implements the same rules. A differential test requires the
+  same error code from Python and Node. The rule list follows Tracekit's `loads_strict`
+  (MIT); the implementation is ours.
+
 ## 0.68.11 — 2026-11-26
 - **The Node verifier had the RT5 hole.** It ignored `namespaces`, validity and
   revocation, so a key restricted to another namespace (or revoked) authorised a

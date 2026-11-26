@@ -66,8 +66,9 @@ def sha256(text: str) -> str:
 
 
 def load_json(path: str):
-    with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+    """Read JSON that may be signed: duplicates, NaN, big ints and stray surrogates are refused."""
+    from .strictjson import load_strict
+    return load_strict(path)
 
 
 def load_policy(path: str | None = None) -> dict:

@@ -101,6 +101,79 @@ def _number(value):
     return sign + rendered
 
 
+# ---------------------------------------------------------------- strict JSON
+# This file must run on its own: an auditor copies one script and nothing else. The
+# strictness rules are therefore duplicated here instead of imported from the package.
+MAX_DEPTH = 128
+MAX_INT = 2 ** 53 - 1
+
+
+class StrictJSONError(ValueError):
+    def __init__(self, code, detail=""):
+        self.code = code
+        super().__init__(code + (": " + detail if detail else ""))
+
+
+def _no_duplicates(pairs):
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            raise StrictJSONError("duplicate_key", key)
+        obj[key] = value
+    return obj
+
+
+def _no_constants(token):
+    raise StrictJSONError("non_finite", token)
+
+
+def _int_guard(token):
+    if len(token.lstrip("-")) > 16 or abs(int(token)) > MAX_INT:
+        raise StrictJSONError("int_range", token)
+    return int(token)
+
+
+def _walk(value, depth=0):
+    if depth > MAX_DEPTH:
+        raise StrictJSONError("depth", str(depth))
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise StrictJSONError("lone_surrogate", value[:20]) from None
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(key, str):
+                try:
+                    key.encode("utf-8")
+                except UnicodeEncodeError:
+                    raise StrictJSONError("lone_surrogate", key[:20]) from None
+            _walk(item, depth + 1)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _walk(item, depth + 1)
+
+
+def _load(path):
+    """Read a document that may be signed; refuse anything a second parser could read differently."""
+    raw = open(path, "rb").read()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise StrictJSONError("invalid_utf8") from None
+    try:
+        value = json.loads(text, object_pairs_hook=_no_duplicates,
+                           parse_constant=_no_constants, parse_int=_int_guard)
+    except StrictJSONError:
+        raise
+    except json.JSONDecodeError as exc:
+        raise StrictJSONError("syntax", str(exc)[:80]) from None
+    _walk(value)
+    return value
+
+
 def jcs(value):
     if value is None:
         return "null"
@@ -400,7 +473,7 @@ def authorised(entries, principal, blob, namespace, revoked, now):
 # ------------------------------------------------------------------------- CLI
 def verify(grant_path, intent_path, signers_path, receipt_path,
            namespace="mandate", revoked_path=None, revoke_now=None):
-    grant_obj = json.load(open(grant_path, encoding="utf-8"))
+    grant_obj = _load(grant_path)
     checks, errors = [], []
     core = grant_obj.get("grant") or {}
     signature = str(grant_obj.get("sig") or "")
@@ -433,7 +506,7 @@ def verify(grant_path, intent_path, signers_path, receipt_path,
         errors.append(why)
 
     if intent_path:
-        intent = json.load(open(intent_path, encoding="utf-8"))
+        intent = _load(intent_path)
         computed = commitment_of(intent)
         same = computed == core.get("commitment")
         checks.append({"check": "commitment_matches_intent", "ok": same,
@@ -449,7 +522,7 @@ def verify(grant_path, intent_path, signers_path, receipt_path,
             errors.append("render hash does not match the intent")
 
     if receipt_path:
-        receipt = json.load(open(receipt_path, encoding="utf-8"))
+        receipt = _load(receipt_path)
         body = receipt.get("body") or {}
         recomputed = sha256_hex(jcs(body))
         same = recomputed == receipt.get("hash")

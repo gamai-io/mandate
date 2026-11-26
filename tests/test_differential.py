@@ -178,3 +178,42 @@ class ParsersDoNotCrash(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StrictBothVerifiers(unittest.TestCase):
+    """Both verifiers must refuse an ambiguous document, and say which rule."""
+
+    CASES = {
+        "duplicate_key": '{"grant": {"v": 1, "v": 2}, "sig": "x"}',
+        "int_range": '{"grant": {"v": 12345678901234567890}, "sig": "x"}',
+        "lone_surrogate": '{"grant": {"v": "\\ud800"}, "sig": "x"}',
+    }
+
+    def test_python_verifier_refuses(self):
+        from mandate.strictjson import StrictJSONError, loads_strict
+        for code, text in self.CASES.items():
+            with self.subTest(code=code):
+                with self.assertRaises(StrictJSONError) as ctx:
+                    loads_strict(text)
+                self.assertEqual(ctx.exception.code, code)
+
+    def test_node_verifier_refuses_with_the_same_code(self):
+        if not shutil_which("node"):
+            self.skipTest("node is not installed")
+        for code, text in self.CASES.items():
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as td:
+                path = pathlib.Path(td) / f"{code}.json"
+                path.write_text(text, encoding="utf-8")
+                done = subprocess.run(
+                    ["node", str(ROOT / "spec" / "verify_offline.js"), "--grant", str(path),
+                     "--intent", str(ROOT / "spec" / "vectors" / "intent.json"),
+                     "--signers", str(ROOT / "spec" / "vectors" / "allowed_signers"),
+                     "--receipt", str(ROOT / "spec" / "vectors" / "receipt.json")],
+                    capture_output=True, text=True)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn(f'"error":"{code}"', done.stderr.replace(" ", ""), done.stderr)
+
+
+def shutil_which(name):
+    import shutil
+    return shutil.which(name)

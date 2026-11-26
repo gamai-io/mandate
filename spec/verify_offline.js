@@ -14,6 +14,75 @@
 const crypto = require("crypto");
 const fs = require("fs");
 
+
+// ------------------------------------------------------- strict JSON
+// A verifier that reads {"a":1,"a":2} as {"a":2} can disagree with the signer about
+// what was signed. Refuse duplicates, integers a double cannot hold, and lone
+// surrogates before any hash is computed (same rules as the Python verifier).
+function strictParse(text) {
+  const stack = [];            // [{keys:Set|null, expectKey:bool}]
+  let i = 0;
+  const n = text.length;
+  let pending = "";
+  while (i < n) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1, out = "";
+      while (j < n) {
+        if (text[j] === "\\") { out += text[j] + text[j + 1]; j += 2; continue; }
+        if (text[j] === '"') break;
+        out += text[j]; j += 1;
+      }
+      if (j >= n) throw new Error("syntax: unterminated string");
+      const raw = text.slice(i, j + 1);
+      const top = stack[stack.length - 1];
+      if (top && top.keys && top.expectKey) {
+        const key = JSON.parse(raw);
+        if (top.keys.has(key)) throw new Error("duplicate_key: " + key);
+        top.keys.add(key);
+        top.expectKey = false;
+      }
+      i = j + 1;
+      continue;
+    }
+    if (c === "{") { stack.push({ keys: new Set(), expectKey: true }); i += 1; continue; }
+    if (c === "[") { stack.push({ keys: null, expectKey: false }); i += 1; continue; }
+    if (c === "}" || c === "]") { stack.pop(); i += 1; continue; }
+    if (c === ",") {
+      const top = stack[stack.length - 1];
+      if (top && top.keys) top.expectKey = true;
+      i += 1; continue;
+    }
+    if (c === ":") { i += 1; continue; }
+    if (c === "-" || (c >= "0" && c <= "9")) {
+      let j = i;
+      while (j < n && /[-+0-9.eE]/.test(text[j])) j += 1;
+      const token = text.slice(i, j);
+      if (/^-?\d+$/.test(token)) {
+        const digits = token.replace("-", "");
+        if (digits.length > 16 || Math.abs(Number(token)) > Number.MAX_SAFE_INTEGER) {
+          throw new Error("int_range: " + token);
+        }
+      }
+      i = j; continue;
+    }
+    i += 1;
+  }
+  const value = JSON.parse(text);            // rejects NaN/Infinity and bad syntax
+  const bad = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  const walk = (v) => {
+    if (typeof v === "string") { if (bad.test(v)) throw new Error("lone_surrogate"); return; }
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    if (v && typeof v === "object") Object.values(v).forEach(walk);
+  };
+  walk(value);
+  return value;
+}
+
+function readJson(path) {
+  return strictParse(fs.readFileSync(path, "utf8"));
+}
+
 // ------------------------------------------------------------------ JCS
 function jcs(value) {
   if (value === null) return "null";
@@ -241,7 +310,7 @@ function main() {
     checks.push({ check: name, ok, detail });
     if (!ok) errors.push(detail);
   };
-  const grantObj = JSON.parse(fs.readFileSync(grantPath, "utf8"));
+  const grantObj = readJson(grantPath);
   const core = grantObj.grant || {};
 
   const [sigOk, sigWhy] = verifySig(grantObj.sig || "", jcs(core) + "\n", "mandate");
@@ -261,12 +330,12 @@ function main() {
   check("signer_authorised", authorised, why);
 
   if (process.env.MANDATE_DEBUG) {
-    const i = JSON.parse(fs.readFileSync(arg("--intent"), "utf8"));
+    const i = readJson(arg("--intent"));
     console.error("CORE=" + jcs(intentCore(i)));
   }
   const intentPath = arg("--intent");
   if (intentPath) {
-    const intent = JSON.parse(fs.readFileSync(intentPath, "utf8"));
+    const intent = readJson(intentPath);
     const computed = commitmentOf(intent);
     check("commitment_matches_intent", computed === core.commitment,
           `computed ${computed}, grant says ${core.commitment}`);
@@ -278,7 +347,7 @@ function main() {
 
   const receiptPath = arg("--receipt");
   if (receiptPath) {
-    const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+    const receipt = readJson(receiptPath);
     const body = receipt.body || {};
     check("receipt_hash", sha256hex(jcs(body)) === receipt.hash,
           `receipt hash ${sha256hex(jcs(body))} vs body`);
@@ -290,4 +359,11 @@ function main() {
   return errors.length === 0 ? 0 : 1;
 }
 
-process.exitCode = main();
+try {
+  process.exitCode = main();
+} catch (exc) {
+  // A document that cannot be parsed strictly is a refusal, not a crash: say which rule.
+  const code = String(exc && exc.message || exc).split(":")[0];
+  console.error(JSON.stringify({ ok: false, error: code, detail: String(exc && exc.message || exc) }));
+  process.exitCode = 1;
+}
