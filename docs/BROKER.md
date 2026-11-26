@@ -65,7 +65,7 @@ tr '\0' '\n' < /proc/$(pgrep -f mandate-broker | head -1)/environ | grep -c PAY_
 The journal is `executing → executed → receipted`. On start the broker recovers:
 a committed effect without a receipt gets one; a claimed grant with no effect is
 abandoned; a duplicate `execute` returns the original receipt instead of charging
-again. `mandate broker recover` runs the same pass by hand.
+again. `mandate-broker` runs the same pass by hand on start (it has no separate recover verb).
 
 ## Several agents, one broker
 

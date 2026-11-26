@@ -33,6 +33,8 @@ ANCHORS = [
     ("CHANGELOG.md", r"## (?P<v>\d+\.\d+\.\d+) —", "release section"),
 ]
 
+CLAIMS_FILE = "CLAIMS.md"
+
 TEST_COUNT_ANCHORS = [
     ("README.md", r"(?P<n>\d+) tests"),
     ("README.md", r"(?P<n>\d+) testova"),
@@ -89,6 +91,43 @@ def check_versions() -> list[str]:
     return problems
 
 
+def check_claims_file(current: str, suite: int) -> list[str]:
+    """CLAIMS.md is generated; if it is stale it lies with authority."""
+    path = os.path.join(ROOT, CLAIMS_FILE)
+    if not os.path.exists(path):
+        return []
+    text = open(path, encoding="utf-8").read()
+    problems = []
+    version_row = re.search(r"\| version \| ([0-9.]+) \|", text)
+    if version_row and version_row.group(1) != current:
+        problems.append("%s says version %s, pyproject says %s"
+                        % (CLAIMS_FILE, version_row.group(1), current))
+    tests_row = re.search(r"\| tests \| (\d+) \|", text)
+    if tests_row and suite > 0 and int(tests_row.group(1)) != suite:
+        problems.append("%s says %s tests, suite has %d"
+                        % (CLAIMS_FILE, tests_row.group(1), suite))
+    return problems
+
+
+def check_init_fallback(current: str) -> list[str]:
+    path = os.path.join(ROOT, "mandate", "__init__.py")
+    if not os.path.exists(path):
+        return []
+    text = open(path, encoding="utf-8").read()
+    match = re.search(r'__version__ = "([0-9.]+)"', text)
+    if match and match.group(1) != current:
+        return ["mandate/__init__.py falls back to %s, pyproject says %s"
+                % (match.group(1), current)]
+    return []
+
+
+def count_passed() -> int:
+    out = subprocess.run([sys.executable, "-m", "pytest", "-q", "tests/"], cwd=ROOT,
+                         capture_output=True, text=True)
+    match = re.search(r"(\d+) passed", out.stdout + out.stderr)
+    return int(match.group(1)) if match else -1
+
+
 def count_tests() -> int:
     """pytest when available, otherwise count the unittest methods.
 
@@ -133,7 +172,9 @@ def write_claims() -> str:
             "reproduces it does not belong in a sales conversation.", "",
             "| claim | value | command |", "|---|---|---|",
             "| version | %s | `python3 tools/claims.py --version` |" % current,
-            "| tests | %d | `python3 -m pytest -q tests/` |" % count_tests(),
+            "| tests collected | %d | `python3 -m pytest -q --collect-only tests/` |"
+            % count_tests(),
+            "| tests passing | %d | `python3 -m pytest -q tests/` |" % count_passed(),
             "| runtime dependencies | 0 | `grep -A2 '^dependencies' pyproject.toml` |",
             "| policy lints clean | yes | `mandate policy lint` |",
             "| supported python | %s | `grep requires-python pyproject.toml` |"
@@ -173,7 +214,9 @@ def main() -> int:
     if args.write:
         print(write_claims())
         return 0
-    problems = check_versions() + check_tests()
+    problems = (check_versions() + check_tests()
+                + check_claims_file(version(), count_tests())
+                + check_init_fallback(version()))
     if problems:
         for problem in problems:
             print("DRIFT:", problem)

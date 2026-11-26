@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.68.1 — 2026-11-26
+- The claims gate now also checks `CLAIMS.md` and the `__version__` fallback in
+  `mandate/__init__.py`; both had drifted (CLAIMS said 0.56.0 / 370 tests while the
+  code was 0.68.0 / 442). `CLAIMS.md` separates collected from passing tests.
+- `docs/BROKER.md` no longer invents a `mandate broker` subcommand: the broker is
+  the `mandate-broker` console script.
+
 ## 0.68.0 — 2026-11-26
 - **`mandate ship` keeps one offset per ledger.** By default each ledger gets
   `<ledger>.shipstate`; a shared `--offset` file now keys by absolute ledger path,
