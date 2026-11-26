@@ -1,18 +1,21 @@
 # Measured performance
 
 One machine, one disk, Python 3.12, nothing mocked: the same `core` functions the
-broker uses. Numbers are medians of one run; the point is the shape, not the third
-digit.
+broker uses. Reproduced with `tools/bench_ledger.py` on 2026-11-26; numbers are
+one run, and `fsync` makes the absolute value a property of the disk, so read the
+shape rather than the third digit.
 
 ## Append a receipt
 
+Run on 2026-11-26 by `tools/bench_ledger.py` (this host, ext4, Python 3.12):
+
 | receipts | total | per receipt | ledger size |
 |---|---|---|---|
-| 250 | 5.5 s | 22.1 ms | 0.2 MB |
-| 500 | 7.0 s | 14.1 ms | 0.4 MB |
-| 1,000 | 12.0 s | 12.0 ms | 0.8 MB |
-| 2,000 | 19.0 s | 9.5 ms | 1.6 MB |
-| 10,000 | 97.3 s | 9.7 ms | 8.1 MB |
+| 250 | 1.7 s | 6.8 ms | 0.2 MB |
+| 500 | 3.5 s | 6.9 ms | 0.4 MB |
+| 1,000 | 8.8 s | 8.8 ms | 0.8 MB |
+| 2,000 | 14.6 s | 7.3 ms | 1.6 MB |
+| 10,000 | 89.0 s | 8.9 ms | 8.2 MB |
 
 Flat per-receipt cost is the point: `append_receipt` writes the line, `fsync`s it,
 and rewrites `.head`. Until 0.51.2 it also read the **whole ledger** on every
@@ -20,15 +23,17 @@ append, so the tenth thousand receipt cost a thousand times the first. The test
 `tests/test_append.py` grows the ledger four times and fails if the cost grows
 with it.
 
-The ~10 ms is `fsync`, not parsing. That is the price of a receipt that survives a
-power cut; batching would trade it away.
+The per-receipt cost is `fsync`, not parsing. It depends on the disk: the same
+script gave **5.75 ms** on a faster host and **9.7 ms** on the slowest one here, so
+treat the figure as a range (6-10 ms), not a constant. That is the price of a
+receipt that survives a power cut; batching would trade it away.
 
 ## Verify and package
 
 | operation | 10,000 receipts |
 |---|---|
-| `verify_chain` (hash chain + `.head`, no anchor fetch) | **1.94 s** |
-| `mandate pack` (inventory, changes, DORA row, hashes) | **0.55 s**, 6 files |
+| `verify_chain` (hash chain + `.head`, no anchor fetch) | **1.85 s** |
+| `mandate pack` (inventory, changes, DORA row, hashes) | **0.71 s**, 7 files |
 
 Verification is linear in the number of entries and needs no network. A bank that
 keeps seven years of receipts should expect roughly 0.2 ms per receipt per

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.68.3 — 2026-11-26
+- `docs/PERFORMANCE.md` now carries a run of `tools/bench_ledger.py` from this
+  host (8.9 ms per receipt at 10k, chain 1.85 s, pack 0.71 s) and says the
+  per-receipt cost is `fsync`-bound and varies by disk (5.75-9.7 ms here), instead
+  of quoting one old number as if it were the constant.
+
 ## 0.68.2 — 2026-11-26
 - **The quickstart now runs as written.** `grant --audience local-broker` binds the
   grant to a broker, but `redeem` had no way to name it, so the documented flow
