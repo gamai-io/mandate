@@ -25,8 +25,9 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 450 tests collected; 446 pass on a host with Node and bubblewrap, and
-the rest skip with a stated reason. `python3 -m pytest -q tests/`.
+**Status:** 450 tests collected; 0 failed. On a host with Node and bubblewrap 446
+pass; the rest skip with a stated reason, and CI skips more where those tools are
+absent. `python3 -m pytest -q tests/`.
 
 `tools/claims.py` fails CI when the version, the changelog section, the collected
 and passing test counts, or any figure in `CLAIMS.md` disagrees with the code. The

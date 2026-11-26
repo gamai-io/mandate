@@ -129,17 +129,18 @@ class ClaimsGateSeesItsOwnRows(unittest.TestCase):
         module.ROOT = str(root)
         module.STRICT[0] = True
         module.count_tests = lambda: 10
-        module.count_passed = lambda: 8
+        module.count_summary = lambda: {"exit": 0, "passed": 7, "failed": 0,
+                                        "skipped": 3}
         return module
 
-    def _tree(self, collected=10, passing=8, readme_pass=8):
+    def _tree(self, collected=10, failed=0, readme_pass=8):
         td = tempfile.TemporaryDirectory()
         root = pathlib.Path(td.name)
         (root / "pyproject.toml").write_text('version = "1.2.3"\n',
                                              encoding="utf-8")
         (root / "CLAIMS.md").write_text(
             "| version | 1.2.3 |\n| tests collected | %d |\n"
-            "| tests passing | %d |\n" % (collected, passing), encoding="utf-8")
+            "| tests failed | %d |\n" % (collected, failed), encoding="utf-8")
         (root / "README.md").write_text("%d pass\n" % readme_pass,
                                         encoding="utf-8")
         return td, root
@@ -152,24 +153,26 @@ class ClaimsGateSeesItsOwnRows(unittest.TestCase):
             td.cleanup()
         self.assertTrue(any("collected" in p for p in problems), problems)
 
-    def test_a_stale_passing_row_fails(self):
-        td, root = self._tree(passing=4)
+    def test_a_failed_row_fails(self):
+        td, root = self._tree(failed=3)
         try:
             problems = self._module(root).check_claims_file("1.2.3", 10)
         finally:
             td.cleanup()
-        self.assertTrue(any("passing" in p for p in problems), problems)
+        self.assertTrue(any("failed" in p for p in problems), problems)
 
-    def test_two_documents_agreeing_on_a_wrong_number_fail_the_full_gate(self):
-        td, root = self._tree(passing=4, readme_pass=4)
+    def test_the_full_gate_requires_every_test_to_be_accounted_for(self):
+        td, root = self._tree()
         try:
             module = self._module(root)
+            module.count_summary = lambda: {"exit": 0, "passed": 5, "failed": 0,
+                                            "skipped": 1}
             os.environ["CLAIMS_FULL"] = "1"
             problems = module.check_versions()
         finally:
             os.environ.pop("CLAIMS_FULL", None)
             td.cleanup()
-        self.assertTrue(any("suite reports" in p for p in problems), problems)
+        self.assertTrue(any("accounted" in p for p in problems), problems)
 
 
 if __name__ == "__main__":

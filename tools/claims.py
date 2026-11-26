@@ -90,14 +90,15 @@ def check_versions() -> list[str]:
             print("warn: %s (fine in a checkout, a problem in a release)" % line)
     # the fast gate compares the two documents to each other; only a full run
     # proves the number is the suite's real pass count
-    if os.environ.get("CLAIMS_FULL") == "1" and os.path.exists(
-            os.path.join(ROOT, CLAIMS_FILE)):
-        text = open(os.path.join(ROOT, CLAIMS_FILE), encoding="utf-8").read()
-        row = re.search(r"\| tests passing \| (\d+) \|", text)
-        actual = count_passed()
-        if row and actual >= 0 and int(row.group(1)) != actual:
-            problems.append("%s says %s passing, the suite reports %d"
-                            % (CLAIMS_FILE, row.group(1), actual))
+    if os.environ.get("CLAIMS_FULL") == "1":
+        summary = count_summary()
+        if summary.get("exit") != 0 or summary.get("failed", 1) != 0:
+            problems.append("the suite reports %d failed"
+                            % summary.get("failed", -1))
+        elif summary.get("passed", 0) + summary.get("skipped", 0) != count_tests():
+            problems.append("pytest accounted for %d of %d collected tests"
+                            % (summary.get("passed", 0) + summary.get("skipped", 0),
+                               count_tests()))
     return problems
 
 
@@ -121,19 +122,11 @@ def check_claims_file(current: str, suite: int) -> list[str]:
     elif suite > 0 and int(collected.group(1)) != suite:
         problems.append("%s says %s collected, suite has %d"
                         % (CLAIMS_FILE, collected.group(1), suite))
-    passing = re.search(r"\| tests passing \| (\d+) \|", text)
-    if not passing:
-        problems.append("%s has no 'tests passing' row" % CLAIMS_FILE)
-    readme_path = os.path.join(ROOT, "README.md")
-    if os.path.exists(readme_path):
-        promised = re.search(r"(\d+) pass\b",
-                             open(readme_path, encoding="utf-8").read())
-        if not promised:
-            problems.append("README.md states no passing count")
-        elif passing and int(passing.group(1)) != int(promised.group(1)):
-            problems.append("%s says %s passing, README promises %s"
-                            % (CLAIMS_FILE, passing.group(1),
-                               promised.group(1)))
+    failed = re.search(r"\| tests failed \| (\d+) \|", text)
+    if not failed:
+        problems.append("%s has no 'tests failed' row" % CLAIMS_FILE)
+    elif int(failed.group(1)) != 0:
+        problems.append("%s says %s tests failed" % (CLAIMS_FILE, failed.group(1)))
     return problems
 
 
@@ -150,10 +143,25 @@ def check_init_fallback(current: str) -> list[str]:
 
 
 def count_passed() -> int:
+    return count_summary().get("passed", -1)
+
+
+def count_summary() -> dict:
+    """Run the suite once and return the counts, not just the pass number.
+
+    The pass count is host-dependent (Node, bubblewrap, /dev/kvm); the invariant
+    that must hold everywhere is "nothing failed and every test was accounted for".
+    """
     out = subprocess.run([sys.executable, "-m", "pytest", "-q", "tests/"], cwd=ROOT,
                          capture_output=True, text=True)
-    match = re.search(r"(\d+) passed", out.stdout + out.stderr)
-    return int(match.group(1)) if match else -1
+    text = out.stdout + out.stderr
+
+    def number(word: str) -> int:
+        match = re.search(r"(\d+) %s" % word, text)
+        return int(match.group(1)) if match else 0
+
+    return {"exit": out.returncode, "passed": number("passed"),
+            "failed": number("failed"), "skipped": number("skipped")}
 
 
 def count_tests() -> int:
@@ -208,7 +216,7 @@ def write_claims() -> str:
             "| version | %s | `python3 tools/claims.py --version` |" % current,
             "| tests collected | %d | `python3 -m pytest -q --collect-only tests/` |"
             % count_tests(),
-            "| tests passing | %d | `python3 -m pytest -q tests/` |" % count_passed(),
+            "| tests failed | 0 | `python3 -m pytest -q tests/` (failures must be 0) |",
             "| runtime dependencies | 0 | `grep -A2 '^dependencies' pyproject.toml` |",
             "| policy lints clean | yes | `mandate policy lint` |",
             "| supported python | %s | `grep requires-python pyproject.toml` |"

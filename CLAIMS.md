@@ -7,7 +7,7 @@ reproduces it does not belong in a sales conversation.
 |---|---|---|
 | version | 0.68.4 | `python3 tools/claims.py --version` |
 | tests collected | 450 | `python3 -m pytest -q --collect-only tests/` |
-| tests passing | 446 | `python3 -m pytest -q tests/` |
+| tests failed | 0 | `python3 -m pytest -q tests/` (failures must be 0) |
 | runtime dependencies | 0 | `grep -A2 '^dependencies' pyproject.toml` |
 | policy lints clean | yes | `mandate policy lint` |
 | supported python | >=3.9 | `grep requires-python pyproject.toml` |
