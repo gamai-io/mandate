@@ -33,3 +33,15 @@ jobs:
         run: python -m pytest -q tests/test_examples.py
       - name: Build and check
         run: python -m pip install build twine && python -m build && twine check dist/*
+      - name: Install the wheel and run the demo
+        if: matrix.python-version == '3.12'
+        run: |
+          python -m venv /tmp/whl
+          /tmp/whl/bin/pip install -q dist/*.whl
+          /tmp/whl/bin/mandate version
+          /tmp/whl/bin/mandate demo --dir /tmp/whl-demo > /dev/null
+          python - <<'PY'
+          import json
+          assert json.load(open("/tmp/whl-demo/demo.json"))["ok"] is True
+          print("wheel demo ok")
+          PY
