@@ -570,8 +570,9 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
     spec = (policy_obj.get("effects") or {}).get(
         str(intent["effect"]["kind"])) or {}
     if isinstance(spec, dict) and spec.get("require_hardware_key"):
-        keytype = sign.keytype_for(str(grant_core.get("approver") or ""),
-                                   signers_path, namespace)
+        keytype = sign.keytype_for_signature(
+            str(grant_core.get("approver") or ""), str(grant_obj.get("sig") or ""),
+            signers_path, namespace, revoked_path=revoked_path, now=moment)
         if not sign.is_hardware_key(keytype):
             raise HardwareKeyRequired(
                 "approver key is not a hardware key (sk-ssh-ed25519)")

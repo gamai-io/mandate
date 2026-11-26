@@ -38,9 +38,13 @@ def _parse_line(line: str) -> dict | None:
     idx = next((i for i, tok in enumerate(tokens) if _KEYTYPE.match(tok)), None)
     if idx is None or idx + 1 >= len(tokens):
         return None
-    ns = re.search(r'namespaces\s*=\s*"([^"]*)"', raw)
-    va = re.search(r'valid-after\s*=\s*"([^"]*)"', raw)
-    vb = re.search(r'valid-before\s*=\s*"([^"]*)"', raw)
+    # options are parsed from the part before the key: `# namespaces="mandate"`
+    # in a comment must not count as an authorisation
+    position = raw.find(tokens[idx])
+    options = raw[:position].split("#")[0] if position > 0 else ""
+    ns = re.search(r'namespaces\s*=\s*"([^"]*)"', options)
+    va = re.search(r'valid-after\s*=\s*"([^"]*)"', options)
+    vb = re.search(r'valid-before\s*=\s*"([^"]*)"', options)
     try:
         fp = fingerprint(tokens[idx + 1])
     except (ValueError, TypeError):
@@ -113,7 +117,8 @@ def load_revoked(revoked_path: str | None) -> set[str]:
             for line in fh:
                 line = line.strip()
                 if line and not line.startswith("#"):
-                    out.add(line.split()[0])
+                    token = line.split()[0].strip().lower()
+                    out.add(token.replace("sha256:", ""))
     except OSError:
         pass
     return out
@@ -149,7 +154,7 @@ def _allowed_lines(name: str, signers_path: str, namespace: str,
                 continue
             if not _validity_ok(entry, moment):
                 continue
-            if entry["fingerprint"] in revoked:
+            if entry["fingerprint"].lower().replace("sha256:", "") in revoked:
                 continue
             out.append(entry["raw"])
     return out
@@ -229,6 +234,60 @@ def keytype_for(name: str, signers_path: str,
                 continue
             if namespace in entry["namespaces"]:
                 return entry["keytype"]
+    return ""
+
+
+def _sshsig_public_key(armored: str) -> bytes:
+    """The public key blob embedded in an SSHSIG, so we know which line signed."""
+    lines = [line for line in str(armored or "").splitlines()
+             if line and not line.startswith("-----")]
+    if not lines:
+        return b""
+    try:
+        blob = base64.b64decode("".join(lines) + "=" * (-len("".join(lines)) % 4))
+    except (ValueError, TypeError):
+        return b""
+    if not blob.startswith(b"SSHSIG"):
+        return b""
+    offset = 6
+    if len(blob) < offset + 4:
+        return b""
+
+    def take(data: bytes, at: int):
+        if at + 4 > len(data):
+            raise ValueError("short")
+        size = int.from_bytes(data[at:at + 4], "big")
+        start = at + 4
+        if start + size > len(data):
+            raise ValueError("short")
+        return data[start:start + size], start + size
+
+    try:
+        offset += 4                      # version
+        key, offset = take(blob, offset)  # public key
+        return key
+    except ValueError:
+        return b""
+
+
+def keytype_for_signature(name: str, signature: str, signers_path: str,
+                          namespace: str = DEFAULT_NAMESPACE,
+                          revoked_path: str | None = None,
+                          now: float | None = None) -> str:
+    """The keytype of the line that actually made this signature.
+
+    `keytype_for` returns the first matching line, so a revoked hardware key
+    followed by any software key would satisfy `require_hardware_key`.
+    """
+    key = _sshsig_public_key(signature)
+    if not key:
+        return ""
+    wanted = fingerprint(base64.b64encode(key).decode())
+    allowed = _allowed_lines(name, signers_path, namespace, now, revoked_path)
+    for line in allowed:
+        entry = _parse_line(line)
+        if entry and entry["fingerprint"] == wanted:
+            return entry["keytype"]
     return ""
 
 

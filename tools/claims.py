@@ -128,12 +128,14 @@ def check_claims_file(current: str, suite: int) -> list[str]:
     # collected is checked against the suite; passing is checked against the
     # README promise, so a stale number in either place is caught without
     # running the whole suite inside this fast gate
-    collected = re.search(r"\| tests collected \| (\d+) \|", text)
+    collected = re.findall(r"\| tests collected \| (\d+) \|", text)
     if not collected:
         problems.append("%s has no 'tests collected' row" % CLAIMS_FILE)
-    elif suite > 0 and int(collected.group(1)) != suite:
+    elif len(set(collected)) > 1:
+        problems.append("%s has several 'tests collected' rows" % CLAIMS_FILE)
+    elif suite > 0 and int(collected[0]) != suite:
         problems.append("%s says %s collected, suite has %d"
-                        % (CLAIMS_FILE, collected.group(1), suite))
+                        % (CLAIMS_FILE, collected[0], suite))
     failed = re.findall(r"\| tests failed \| (\d+) \|", text)
     if not failed:
         problems.append("%s has no 'tests failed' row" % CLAIMS_FILE)
@@ -146,23 +148,27 @@ def check_claims_file(current: str, suite: int) -> list[str]:
     deps = re.search(r"^dependencies = \[(?P<body>[^\]]*)\]", pyproject, re.M)
     runtime = len([x for x in (deps.group("body").split(",") if deps else [])
                    if x.strip()])
-    dep_row = re.search(r"\| runtime dependencies \| (\d+) \|", text)
+    dep_row = re.findall(r"\| runtime dependencies \| (\d+) \|", text)
     if not dep_row:
         problems.append("%s has no 'runtime dependencies' row" % CLAIMS_FILE)
-    elif int(dep_row.group(1)) != runtime:
+    elif len(set(dep_row)) > 1:
+        problems.append("%s has several 'runtime dependencies' rows" % CLAIMS_FILE)
+    elif int(dep_row[0]) != runtime:
         problems.append("%s says %s runtime dependencies, pyproject has %d"
-                        % (CLAIMS_FILE, dep_row.group(1), runtime))
-    lint_row = re.search(r"\| policy lints clean \| (\w+) \|", text)
+                        % (CLAIMS_FILE, dep_row[0], runtime))
+    lint_row = re.findall(r"\| policy lints clean \| (\w+) \|", text)
     if not lint_row:
         problems.append("%s has no 'policy lints clean' row" % CLAIMS_FILE)
+    elif len(set(lint_row)) > 1:
+        problems.append("%s has several 'policy lints clean' rows" % CLAIMS_FILE)
     else:
         from mandate import core as _core
         from mandate import policy_tools as _pt
         result = _pt.lint(_core.load_policy())
         answer = "yes" if result.get("ok") else "no"
-        if lint_row.group(1) != answer:
+        if lint_row[0] != answer:
             problems.append("%s says policy lints %s, lint says %s"
-                            % (CLAIMS_FILE, lint_row.group(1), answer))
+                            % (CLAIMS_FILE, lint_row[0], answer))
     return problems
 
 

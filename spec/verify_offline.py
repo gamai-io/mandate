@@ -26,6 +26,7 @@ import base64
 import hashlib
 import json
 import math
+import time
 from decimal import Decimal
 
 MAX_SAFE = 2 ** 53 - 1
@@ -317,23 +318,88 @@ def commitment_of(intent):
     return "sha256:" + sha256_hex(jcs(intent_core(intent)))
 
 
+def _norm_time(text):
+    text = str(text or "").strip()
+    if len(text) == 8:
+        text += "000000"
+    elif len(text) == 12:
+        text += "00"
+    return text if len(text) == 14 and text.isdigit() else None
+
+
+def _valid_now(entry, now):
+    moment = time.strftime("%Y%m%d%H%M%S", time.gmtime(now))
+    after, before = _norm_time(entry.get("after")), _norm_time(entry.get("before"))
+    if entry.get("after") and after is None:
+        return False
+    if entry.get("before") and before is None:
+        return False
+    if after and moment < after:
+        return False
+    if before and moment >= before:
+        return False
+    return True
+
+
 def allowed_keys(path):
-    keys = {}
+    """Every authorised line, with its namespace and validity options."""
+    import re
+    entries = []
     for line in open(path, encoding="utf-8"):
-        tokens = line.split()
-        if len(tokens) < 3 or line.strip().startswith("#"):
+        raw = line.strip()
+        if len(raw) < 3 or raw.startswith("#"):
             continue
+        tokens = raw.split()
         principal = tokens[0]
-        key_type = next((t for t in tokens if t.startswith("ssh-")), None)
+        key_type = next((t for t in tokens if t.startswith(("ssh-", "ecdsa-", "sk-"))), None)
         if key_type is None:
             continue
-        blob = tokens[tokens.index(key_type) + 1]
-        keys[principal] = base64.b64decode(blob + "=" * (-len(blob) % 4))
-    return keys
+        idx = tokens.index(key_type)
+        if idx + 1 >= len(tokens):
+            continue
+        options = " ".join(tokens[:idx])
+        blob = tokens[idx + 1]
+        ns = re.search(r'namespaces\s*=\s*"([^"]*)"', options)
+        va = re.search(r'valid-after\s*=\s*"([^"]*)"', options)
+        vb = re.search(r'valid-before\s*=\s*"([^"]*)"', options)
+        entries.append({
+            "principal": principal,
+            "patterns": [p.strip() for p in principal.split(",") if p.strip()],
+            "namespaces": ([x.strip() for x in ns.group(1).split(",") if x.strip()]
+                           if ns else []),
+            "after": va.group(1) if va else None,
+            "before": vb.group(1) if vb else None,
+            "key": base64.b64decode(blob + "=" * (-len(blob) % 4)),
+        })
+    return entries
+
+
+def fingerprint(blob):
+    return "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+
+
+def authorised(entries, principal, blob, namespace, revoked, now):
+    """True only if this exact key is allowed for the principal right now."""
+    import fnmatch
+    stamp = fingerprint(blob).replace("SHA256:", "").lower()
+    if stamp in revoked:
+        return False, "key is revoked"
+    for entry in entries:
+        if not any(fnmatch.fnmatchcase(principal, p) for p in entry["patterns"]):
+            continue
+        if entry["key"] != blob:
+            continue
+        if namespace not in entry["namespaces"]:
+            continue
+        if not _valid_now(entry, now):
+            continue
+        return True, "signature key is authorised for %r" % principal
+    return False, "signature key is not authorised for %r (namespace/validity/revocation)" % principal
 
 
 # ------------------------------------------------------------------------- CLI
-def verify(grant_path, intent_path, signers_path, receipt_path, namespace="mandate"):
+def verify(grant_path, intent_path, signers_path, receipt_path,
+           namespace="mandate", revoked_path=None, revoke_now=None):
     grant_obj = json.load(open(grant_path, encoding="utf-8"))
     checks, errors = [], []
     core = grant_obj.get("grant") or {}
@@ -344,24 +410,27 @@ def verify(grant_path, intent_path, signers_path, receipt_path, namespace="manda
     if not ok:
         errors.append(why)
 
-    keys = allowed_keys(signers_path)
+    entries = allowed_keys(signers_path)
     approver = str(core.get("approver") or "")
-    expected = keys.get(approver)
-    if expected is None:
-        checks.append({"check": "signer_authorised", "ok": False,
-                       "detail": "%r is not in %s" % (approver, signers_path)})
-        errors.append("signer not authorised")
-    else:
+    entries_all = entries
+    revoked = set()
+    if revoked_path:
         try:
-            embedded = parse_sshsig(signature)["public_blob"]
-        except ValueError:
-            embedded = b""
-        same = embedded == expected
-        checks.append({"check": "signer_authorised", "ok": same,
-                       "detail": "signature key %s the allowed_signers entry"
-                                 % ("matches" if same else "does not match")})
-        if not same:
-            errors.append("signature was made with a different key")
+            for line in open(revoked_path, encoding="utf-8"):
+                line = line.strip().lower()
+                if line and not line.startswith("#"):
+                    revoked.add(line.split()[0].replace("sha256:", ""))
+        except OSError:
+            revoked = set()
+    try:
+        embedded = parse_sshsig(signature)["public_blob"]
+    except ValueError:
+        embedded = b""
+    ok, why = authorised(entries_all, approver, embedded, namespace, revoked,
+                         time.time() if revoke_now is None else revoke_now)
+    checks.append({"check": "signer_authorised", "ok": ok, "detail": why})
+    if not ok:
+        errors.append(why)
 
     if intent_path:
         intent = json.load(open(intent_path, encoding="utf-8"))
@@ -401,13 +470,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Verify a Mandate grant and receipt offline.")
     ap.add_argument("--grant", required=True)
     ap.add_argument("--signers", required=True)
+    ap.add_argument("--revoked", default=None,
+                    help="revoked key fingerprints (one per line)")
     ap.add_argument("--intent", default=None)
     ap.add_argument("--receipt", default=None)
     ap.add_argument("--namespace", default="mandate")
     args = ap.parse_args(argv)
     try:
         result = verify(args.grant, args.intent, args.signers, args.receipt,
-                        args.namespace)
+                        namespace=args.namespace, revoked_path=args.revoked)
     except (OSError, ValueError, KeyError) as exc:
         print(json.dumps({"ok": False, "errors": [str(exc)]}, indent=1))
         return 1

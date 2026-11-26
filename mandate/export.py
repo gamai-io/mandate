@@ -83,10 +83,21 @@ def verify_bundle(bundle: dict, signers_path: str,
     except (core.MandateError, OSError, ValueError):
         result["receipt"] = False
     proof = bundle.get("inclusion_proof")
+    sth = bundle.get("sth") or {}
+    payload = sth.get("sth") if isinstance(sth, dict) else {}
+    root = (payload or {}).get("root_hash")
+    size = (payload or {}).get("tree_size")
     if isinstance(proof, dict):
-        result["inclusion"] = mlog.verify_inclusion_proof(receipt, proof)
+        if isinstance(root, str) and isinstance(size, int):
+            result["inclusion"] = mlog.verify_inclusion_proof(
+                receipt, proof, root=root, size=size)
+        else:
+            # a proof checked against its own root proves nothing
+            result["inclusion"] = False
     result["valid"] = bool(result["signature"] and result["receipt"]
                            and (result["inclusion"] is not False))
+    if isinstance(proof, dict) and result["inclusion"] is False:
+        result["inclusion_detail"] = "proof does not match the signed tree head"
     return result
 
 

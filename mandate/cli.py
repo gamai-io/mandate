@@ -361,10 +361,18 @@ def _cmd_request(args) -> int:
 def _cmd_export(args) -> int:
     from . import export as mexport
     if args.cmd == "export":
+        if args.proof and not args.sth:
+            _emit({"error": "SthRequired",
+                   "message": "a proof must be checked against a signed tree "
+                              "head; pass --sth"}, None)
+            return 2
         bundle = mexport.build_bundle(
             _read(args.receipt), _read(args.intent), _read(args.grant),
             _read(args.proof) if args.proof else None,
-            key_path=args.key, signer=args.signer)
+            key_path=args.key, signer=args.signer,
+            sth=_read(args.sth) if args.sth else None,
+            witness_state=(_read(args.witness_state)
+                           if args.witness_state else None))
         _emit(bundle, args.out)
         return 0
     result = mexport.verify_bundle_file(args.bundle, args.signers,
@@ -830,6 +838,10 @@ def main(argv=None) -> int:
     p_exp.add_argument("--intent", required=True)
     p_exp.add_argument("--grant", required=True)
     p_exp.add_argument("--proof", default=None)
+    p_exp.add_argument("--sth", default=None,
+                       help="signed tree head; required with --proof, because a "
+                            "proof checked against its own root proves nothing")
+    p_exp.add_argument("--witness-state", dest="witness_state", default=None)
     p_exp.add_argument("--key", required=True)
     p_exp.add_argument("--signer", default=None)
     p_exp.add_argument("--out", default=None)
@@ -896,6 +908,8 @@ def main(argv=None) -> int:
     for _sp in (p_check, p_redeem, p_verify):
         _sp.add_argument("--signers", default=os.environ.get(
             "MANDATE_SIGNERS", "trust/allowed_signers"))
+    p_verify.add_argument("--ledger", default=None,
+                          help="check an unsigned receipt against this ledger")
 
     args = parser.parse_args(argv)
     if not args.cmd:
@@ -1323,7 +1337,16 @@ def main(argv=None) -> int:
                 args.signers, revoked_path=args.revoked)
             body = receipt.get("body") or {}
             decision = str(body.get("decision") or "")
-            _emit({"valid": ok, "decision": decision or None,
+            signed = bool(body.get("signature"))
+            authentic = signed
+            if not signed and getattr(args, "ledger", None):
+                try:
+                    authentic = any(entry.get("hash") == receipt.get("hash")
+                                    for entry in core.read_ledger(args.ledger))
+                except (OSError, core.MandateError):
+                    authentic = False
+            _emit({"valid": ok, "authentic": bool(ok and authentic),
+                   "decision": decision or None,
                    # a tampered receipt must not look executed just because its
                    # body still says so
                    "executed": bool(ok and decision == "executed"),

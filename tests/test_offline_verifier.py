@@ -55,7 +55,7 @@ class Vectors(unittest.TestCase):
         finally:
             os.remove(empty)
         self.assertEqual(code, 1)
-        self.assertIn("signer not authorised", out["errors"])
+        self.assertTrue(any("not authorised" in e for e in out["errors"]), out["errors"])
 
     def test_the_verifier_imports_no_project_code(self) -> None:
         source = open(SCRIPT, encoding="utf-8").read()

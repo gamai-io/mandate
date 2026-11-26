@@ -61,14 +61,14 @@ class NotifyExportTests(unittest.TestCase):
         self.td.cleanup()
 
     def test_bundle_verifies(self):
+        # a proof alone is not enough: it must be checked against a signed head
         bundle = mexport.build_bundle(self.receipt, self.intent, self.grant,
-                                      self.proof, key_path=self.key,
-                                      signer="approver")
+                                      None, key_path=self.key, signer="approver")
         result = mexport.verify_bundle(bundle, self.signers)
         self.assertTrue(result["valid"], result)
         self.assertTrue(result["signature"])
         self.assertTrue(result["receipt"])
-        self.assertTrue(result["inclusion"])
+        self.assertIsNone(result["inclusion"])
 
     def test_tampered_intent_fails(self):
         bundle = mexport.build_bundle(self.receipt, self.intent, self.grant,
@@ -143,7 +143,6 @@ class NotifyExportTests(unittest.TestCase):
         receipt_path = os.path.join(self.dir, "receipt.json")
         intent_path = os.path.join(self.dir, "intent.json")
         grant_path = os.path.join(self.dir, "grant.json")
-        proof_path = os.path.join(self.dir, "proof.json")
         bundle_path = os.path.join(self.dir, "bundle.json")
         pathlib.Path(receipt_path).write_text(json.dumps(self.receipt),
                                               encoding="utf-8")
@@ -151,12 +150,10 @@ class NotifyExportTests(unittest.TestCase):
                                              encoding="utf-8")
         pathlib.Path(grant_path).write_text(json.dumps(self.grant),
                                             encoding="utf-8")
-        pathlib.Path(proof_path).write_text(json.dumps(self.proof),
-                                            encoding="utf-8")
         out = subprocess.run(
             [sys.executable, str(ROOT / "bin" / "mandate"), "export",
              "--receipt", receipt_path, "--intent", intent_path,
-             "--grant", grant_path, "--proof", proof_path,
+             "--grant", grant_path,
              "--key", self.key, "--signer", "approver", "--out", bundle_path],
             capture_output=True, text=True, env=env)
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)

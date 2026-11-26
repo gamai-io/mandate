@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.68.8 — 2026-11-26
+Fifth review (RT5).
+
+- **A bundle proof is now checked against the signed STH.** `export-verify` passed
+  the proof's own root, so a proof that matched nothing the log signed still
+  returned `valid: true`. `export` refuses `--proof` without `--sth`, and
+  `export-verify` reports `inclusion: false` when the STH is missing or mismatched.
+- **The offline verifier enforces `namespaces`, validity and revocation.** It
+  accepted a key restricted to another namespace (or revoked) while the package
+  refused it, and it ignored multiple keys per principal. It now matches the
+  signature's embedded key against the authorised line.
+- **`require_hardware_key` checks the key that actually signed.** A revoked `sk-`
+  line followed by a software key satisfied it because the first matching line was
+  inspected; the check now uses the signature's public key.
+- **`setuptools==78.1.0` is really pinned** (the previous note claimed a pin that
+  was not in `pyproject.toml`), so `verify_pypi.py` matches PyPI byte-for-byte.
+- **Signer options are parsed before the key**, so `# namespaces="mandate"` in a
+  comment no longer authorises; revoked fingerprints are normalised
+  (`SHA256:`/case).
+- **`verify` adds `authentic`**: an unsigned receipt is only authentic if its hash
+  is in the ledger you pass with `--ledger`; `valid` alone stays "internally
+  consistent".
+- The claims gate refuses duplicate `tests collected`/`runtime dependencies`/
+  `policy lints clean` rows instead of reading the first.
+
 ## 0.68.7 — 2026-11-26
 - **Reproducible artifacts.** `setuptools==78.1.0` is pinned in `[build-system]`;
   the release build sets `SOURCE_DATE_EPOCH` to the commit time and normalises the
