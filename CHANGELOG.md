@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.68.7 — 2026-11-26
+- **Reproducible artifacts.** `setuptools==78.1.0` is pinned in `[build-system]`;
+  the release build sets `SOURCE_DATE_EPOCH` to the commit time and normalises the
+  sdist headers (`tools/normalize_sdist.py`). `tools/verify_pypi.py` rebuilds the
+  tag and compares SHA-256 per file with PyPI. CI checks that two builds are
+  byte-identical. The claim is "byte-identical with the pinned toolchain";
+  who-built-it remains the PEP 740 attestation.
+- The release attaches a CycloneDX SBOM (`mandate sbom`) as a release asset.
+
 ## 0.68.6 — 2026-11-26
 - **The offline examples now run in CI.** `tests/test_examples.py` executes 01, 02,
   05, 09, 12 and 13 (06 needs a public TSA, so it stays out) on one matrix job

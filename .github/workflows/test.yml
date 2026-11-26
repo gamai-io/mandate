@@ -26,6 +26,16 @@ jobs:
         run: python3 tools/claims.py --check --strict
       - name: Tests
         run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Reproducible wheel (3.12 only)
+        if: matrix.python-version == '3.12'
+        run: |
+          rm -rf /tmp/r1 /tmp/r2
+          SOURCE_DATE_EPOCH=1795600000 python -m build --outdir /tmp/r1 > /dev/null
+          SOURCE_DATE_EPOCH=1795600000 python -m build --outdir /tmp/r2 > /dev/null
+          SOURCE_DATE_EPOCH=1795600000 python3 tools/normalize_sdist.py /tmp/r1/*.tar.gz /tmp/r2/*.tar.gz > /dev/null
+          cmp /tmp/r1/*.whl /tmp/r2/*.whl
+          cmp /tmp/r1/*.tar.gz /tmp/r2/*.tar.gz
+          echo "wheel and sdist are reproducible with SOURCE_DATE_EPOCH"
       - name: Offline examples (3.12 only)
         if: matrix.python-version == '3.12'
         env:

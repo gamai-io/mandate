@@ -29,6 +29,7 @@ grant, `redeem` executes it, a replay is refused, a changed amount is refused wi
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 
+Rebuilds are reproducible: `docs/REPRODUCIBLE.md` and `tools/verify_pypi.py`.
 `tools/claims.py` fails CI when the version, the changelog section, the collected
 and passing test counts, or any figure in `CLAIMS.md` disagrees with the code. The
 benchmark numbers are not constants: each one names the script that reproduces it,
@@ -1020,7 +1021,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.68.6** — canonical commitment, Ed25519
+**v0.68.7** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
