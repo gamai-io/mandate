@@ -1,0 +1,101 @@
+name: publish an external gamAI package
+
+# Builds and publishes a package that lives in another gamai-io repository, using the
+# account-wide PYPI_API_TOKEN (the same secret release-plugins.yml uses). This exists
+# because PyPI trusted publishing needs a per-project configuration in the web UI, and
+# these repositories have no release workflow of their own.
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "gamai-io/<repo> to publish"
+        required: true
+      ref:
+        description: "tag or commit to build (must look like v1.2.3 or a 40-hex sha)"
+        required: true
+      expected_version:
+        description: "the version the built wheel must report"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate the inputs
+        env:
+          REPO: ${{ inputs.repository }}
+          REF: ${{ inputs.ref }}
+        run: |
+          case "$REPO" in
+            gamai-io/*) ;;
+            *) echo "repository must be gamai-io/<name>, got: $REPO"; exit 1 ;;
+          esac
+          case "$REF" in
+            v[0-9]*|[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+            *) echo "ref must be a version tag or a commit sha, got: $REF"; exit 1 ;;
+          esac
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          path: src
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Build
+        working-directory: src
+        run: |
+          python -m pip install -q build twine
+          python -m build
+          test -n "$(ls -A dist)" || { echo "dist/ is empty"; exit 1; }
+          python -m twine check dist/*
+      - name: Version must match the input and the tag
+        working-directory: src
+        env:
+          EXPECTED: ${{ inputs.expected_version }}
+          REF: ${{ inputs.ref }}
+        run: |
+          python3 - <<'PY'
+          import glob, os, sys, zipfile
+          expected, ref = os.environ["EXPECTED"], os.environ["REF"]
+          wheel = glob.glob("dist/*.whl")[0]
+          with zipfile.ZipFile(wheel) as zf:
+              meta = [n for n in zf.namelist() if n.endswith("METADATA")][0]
+              text = zf.read(meta).decode()
+          version = [l.split(": ", 1)[1] for l in text.splitlines() if l.startswith("Version: ")][0]
+          if version != expected:
+              sys.exit(f"built {version}, expected {expected}")
+          if ref.startswith("v") and ref != "v" + version:
+              sys.exit(f"tag {ref} != version {version}")
+          print(f"version {version} matches")
+          PY
+      - name: Secret / internal-data scan
+        working-directory: src
+        run: |
+          if [ -f tools/prepublish_scan.py ]; then
+            python3 tools/prepublish_scan.py dist/*.tar.gz dist/*.whl
+          else
+            echo "no prepublish_scan.py in this repository; scanning for the usual patterns"
+            python3 - <<'PY'
+          import glob, sys, zipfile
+          bad = (b"BEGIN RSA PRIVATE KEY", b"BEGIN OPENSSH PRIVATE KEY", b"pypi-AgEI",
+                 b"ghp_", b"github_pat_", b"AKIA")
+          for path in glob.glob("dist/*.whl"):
+              with zipfile.ZipFile(path) as zf:
+                  for name in zf.namelist():
+                      data = zf.read(name)
+                      for marker in bad:
+                          if marker in data:
+                              sys.exit(f"{name}: found {marker!r}")
+          print("scan clean")
+          PY
+          fi
+      - name: Publish
+        working-directory: src
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload --non-interactive dist/*
