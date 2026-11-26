@@ -42,11 +42,20 @@ class Warden(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.counter = os.path.join(self.tmp.name, "counter")
         self.ledger = os.path.join(self.tmp.name, "ledger.jsonl")
-        self.proc = spawn(self.counter)
-        deadline = time.time() + 5
-        while counter(self.counter) < 3 and time.time() < deadline:
-            time.sleep(0.02)
-        self.assertGreaterEqual(counter(self.counter), 3, "child did not start")
+        # On a loaded runner the child process can take seconds to reach its loop; give it
+        # room, retry once, and say what happened instead of just "0".
+        for attempt in (1, 2):
+            self.proc = spawn(self.counter)
+            deadline = time.time() + 20
+            while counter(self.counter) < 3 and time.time() < deadline:
+                time.sleep(0.02)
+            if counter(self.counter) >= 3:
+                break
+            exit_code = self.proc.poll()
+            if attempt == 1 and exit_code is None:
+                continue
+            self.fail(f"child did not start (attempt {attempt}, exit={exit_code}, "
+                      f"counter={counter(self.counter)})")
 
     def tearDown(self) -> None:
         try:
