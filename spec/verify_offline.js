@@ -139,19 +139,87 @@ function intentCore(intent) {
 
 const commitmentOf = (intent) => "sha256:" + sha256hex(jcs(intentCore(intent)));
 
-function allowedKeys(path) {
-  const keys = {};
+function allowedEntries(path) {
+  const entries = [];
   for (const line of fs.readFileSync(path, "utf8").split("\n")) {
-    const tokens = line.trim().split(/\s+/);
-    if (tokens.length < 3 || line.trim().startsWith("#")) continue;
+    const raw = line.trim();
+    if (raw.length < 3 || raw.startsWith("#")) continue;
+    const tokens = raw.split(/\s+/);
     const index = tokens.findIndex((t) => t.startsWith("ssh-") || t.startsWith("sk-"));
     if (index < 0 || index + 1 >= tokens.length) continue;
+    const options = raw.slice(0, raw.indexOf(tokens[index])).split("#")[0];
+    const ns = /namespaces\s*=\s*"([^"]*)"/.exec(options);
+    const va = /valid-after\s*=\s*"([^"]*)"/.exec(options);
+    const vb = /valid-before\s*=\s*"([^"]*)"/.exec(options);
     const blob = Buffer.from(tokens[index + 1], "base64");
     const [type] = readString(blob, 0);
-    const [raw] = readString(blob, 4 + type.length);
-    keys[tokens[0]] = raw;                  // raw 32-byte Ed25519 key
+    const [key] = readString(blob, 4 + type.length);
+    entries.push({
+      principal: tokens[0],
+      key,
+      fingerprint: "SHA256:" + crypto.createHash("sha256").update(blob).digest("base64").replace(/=+$/, ""),
+      namespaces: ns ? ns[1].split(",").map((x) => x.trim()).filter(Boolean) : [],
+      after: va ? va[1] : null,
+      before: vb ? vb[1] : null,
+    });
   }
-  return keys;
+  return entries;
+}
+
+function normFingerprint(value) {
+  return String(value || "").trim().toLowerCase().replace(/^sha256:/, "");
+}
+
+function loadRevoked(path) {
+  const out = new Set();
+  if (!path || !fs.existsSync(path)) return out;
+  for (const line of fs.readFileSync(path, "utf8").split("\n")) {
+    if (line.trim() && !line.trim().startsWith("#")) {
+      out.add(normFingerprint(line.trim().split(/\s+/)[0]));
+    }
+  }
+  return out;
+}
+
+function principalMatches(field, name) {
+  return String(field).split(",").some((pattern) => {
+    const escaped = pattern.trim().replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*");
+    return escaped && new RegExp("^" + escaped + "$").test(name);
+  });
+}
+
+function stamp(value) {
+  let text = String(value || "").trim();
+  if (!text) return null;
+  if (text.length === 8) text += "000000";
+  else if (text.length === 12) text += "00";
+  return /^\d{14}$/.test(text) ? text : "invalid";
+}
+
+function validNow(entry, now) {
+  const moment = new Date(now * 1000).toISOString().replace(/[-:T]/g, "").slice(0, 14);
+  const after = stamp(entry.after);
+  const before = stamp(entry.before);
+  if (after === "invalid" || before === "invalid") return false;
+  if (after && moment < after) return false;
+  if (before && moment >= before) return false;
+  return true;
+}
+
+function authorized(entries, approver, embedded, namespace, revoked) {
+  const now = Date.now() / 1000;
+  const fp = normFingerprint("SHA256:" + crypto.createHash("sha256")
+    .update(embedded).digest("base64").replace(/=+$/, ""));
+  if (revoked.has(fp)) return [false, "the signature key is revoked"];
+  for (const entry of entries) {
+    if (!principalMatches(entry.principal, approver)) continue;
+    if (!entry.key.equals(embedded)) continue;
+    if (!entry.namespaces.includes(namespace)) continue;
+    if (!validNow(entry, now)) continue;
+    return [true, "signature key is authorised"];
+  }
+  return [false, "signature key is not authorised (namespace/validity/revocation)"];
 }
 
 // --------------------------------------------------------------------- CLI
@@ -179,17 +247,18 @@ function main() {
   const [sigOk, sigWhy] = verifySig(grantObj.sig || "", jcs(core) + "\n", "mandate");
   check("grant_signature", sigOk, sigWhy);
 
-  const keys = allowedKeys(signersPath);
+  const entries = allowedEntries(signersPath);
   const approver = core.approver || "";
-  if (!keys[approver]) {
-    check("signer_authorised", false, `'${approver}' is not in ${signersPath}`);
-  } else {
-    const embedded = parseSshsig(grantObj.sig || "").publicKey;
-    check("signer_authorised", embedded.equals(keys[approver]),
-          embedded.equals(keys[approver])
-            ? "signature key matches the allowed_signers entry"
-            : "signature was made with a different key");
+  let embedded;
+  try {
+    embedded = parseSshsig(grantObj.sig || "").publicKey;
+  } catch (exc) {
+    embedded = null;
   }
+  const [authorised, why] = embedded
+    ? authorized(entries, approver, embedded, "mandate", loadRevoked(arg("--revoked")))
+    : [false, "grant signature is missing or unreadable"];
+  check("signer_authorised", authorised, why);
 
   if (process.env.MANDATE_DEBUG) {
     const i = JSON.parse(fs.readFileSync(arg("--intent"), "utf8"));

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.68.11 — 2026-11-26
+- **The Node verifier had the RT5 hole.** It ignored `namespaces`, validity and
+  revocation, so a key restricted to another namespace (or revoked) authorised a
+  grant there while the Python verifier refused it. Both now parse the options
+  before the key, match the key embedded in the signature, check validity and a
+  `--revoked` file.
+- `tests/test_cross_verifier.py` runs both verifiers on the published vectors and
+  on tampered/namespace-restricted cases; a divergence fails the suite.
+
 ## 0.68.10 — 2026-11-26
 - **Differential test between the two verifiers.** The same grant/intent/receipt
   cases (valid, tampered, wrong namespace, revoked) must produce the same answer

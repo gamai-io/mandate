@@ -25,7 +25,7 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 468 tests collected; 0 failed. On a host with Node and bubblewrap 463
+**Status:** 472 tests collected; 0 failed. On a host with Node and bubblewrap 467
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 
@@ -1027,7 +1027,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.68.10** — canonical commitment, Ed25519
+**v0.68.11** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
