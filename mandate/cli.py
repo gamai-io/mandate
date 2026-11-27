@@ -714,11 +714,20 @@ def main(argv=None) -> int:
     p_warden.add_argument("--verify", action="store_true")
     p_warden.add_argument("--signers", default=argparse.SUPPRESS)
 
+    p_ctl = sub.add_parser("controls", help="the twelve-row control matrix, as data")
+    p_ctl.add_argument("--framework", default="", choices=("", "dora", "ai_act", "all"))
+    p_ctl.add_argument("--status", default="", choices=("", "have", "partial", "gap"))
+    p_ctl.add_argument("--summary", action="store_true")
+    p_ctl.add_argument("--out", "-o", default=None)
+
     p_anchor = sub.add_parser("anchor")
     p_anchor.add_argument("--ledger", default="ledger.jsonl")
     p_anchor.add_argument("--tsa", action="append", default=None)
     p_anchor.add_argument("--out", default="anchors")
     p_anchor.add_argument("--ca", default=None)
+    p_anchor.add_argument("--status", action="store_true",
+                          help="report anchor age and whether it covers the current head")
+    p_anchor.add_argument("--max-age-hours", dest="max_age_hours", type=float, default=24.0)
 
     p_anchor_verify = sub.add_parser("anchor-verify")
     p_anchor_verify.add_argument("--ledger", default="ledger.jsonl")
@@ -1696,7 +1705,25 @@ def main(argv=None) -> int:
             _emit(res, None)
             return 0 if res.get("verified", True) else 5
 
+        if args.cmd == "controls":
+            from . import controls as controls_mod
+            if args.summary:
+                _emit(controls_mod.summary(args.framework), None)
+                return 0
+            text = controls_mod.render(args.framework, args.status)
+            if args.out:
+                pathlib.Path(args.out).write_text(text + "\n", encoding="utf-8")
+                _emit({"ok": True, "out": args.out,
+                       **controls_mod.summary(args.framework)}, None)
+            else:
+                print(text)
+            return 0
+
         if args.cmd == "anchor":
+            if getattr(args, "status", False):
+                res = anchor.status(args.ledger, args.out, args.max_age_hours)
+                _emit(res, None)
+                return 0 if res.get("ok") else 4
             servers = args.tsa or [anchor.DEFAULT_TSA]
             res = anchor.anchor(args.ledger, servers[0], args.out, args.ca, tsas=servers)
             _emit(res, None)

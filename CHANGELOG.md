@@ -1,4 +1,18 @@
 # Changelog
+## 1.0.1 — 2026-11-27
+
+### The two questions a bank asks first, answered by a command
+- **`mandate controls [--framework dora] [--status have|partial|gap] [--summary] [-o FILE]`**:
+  the twelve-row control matrix as data (`mandate/data/controls.json`): control, the artifact
+  that exists today, the blunt status, **what is still missing** and who owns it, plus the
+  DORA hooks (Art. 12(2)(d), 21(2)(c), 23(3)). It is the file a supplier questionnaire can be
+  filled from, and a test keeps it in step with `docs/BANK_CONTROL_MATRIX.md`.
+- **`mandate anchor --status [--max-age-hours 24]`**: reports the newest anchor's age, whether
+  it covers the current head, and exits 4 with `no_anchor` / `stale` / `behind` when it does
+  not. A hash chain without a recent external anchor is tamper-evident only against someone
+  who cannot rewrite the disk; the command says so instead of calling the log sealed.
+- Neither command claims compliance: `not_claimed` is shipped inside the data.
+
 ## 1.0.0 — 2026-11-27
 
 ### What 1.0 means, concretely

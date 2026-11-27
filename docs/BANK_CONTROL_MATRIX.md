@@ -23,6 +23,12 @@ retention into its existing financial-sector documentation.
 
 ## Matrix
 
+The same twelve rows are shipped as data: `mandate controls [--framework dora] [--status have]`
+prints them, and `mandate controls --summary --framework dora` gives the counts plus the DORA
+hooks. That is the artifact to paste into a supplier questionnaire — it cannot drift from this
+page without failing a test (`tests/test_controls.py`).
+
+
 Legend: **have** = shipped and tested; **partial** = exists but not to the standard
 an auditor would accept; **gap** = not built.
 

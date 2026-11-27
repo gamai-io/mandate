@@ -35,9 +35,9 @@ is how to hand an auditor a redacted record that still proves it is the same rec
 and an honest comparison with the strongest open agent firewall; [`docs/TLS_INTERCEPT.md`](docs/TLS_INTERCEPT.md)
 is the optional TLS interception, including what a local CA costs you.
 
-**v1.0.0** — canonical commitment, Ed25519 grant, one-shot redeem, hash-chained receipt.
+**v1.0.1** — canonical commitment, Ed25519 grant, one-shot redeem, hash-chained receipt.
 
-**Status:** 644 tests collected; 0 failed. On a host with Node and bubblewrap 639
+**Status:** 656 tests collected; 0 failed. On a host with Node and bubblewrap 651
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 

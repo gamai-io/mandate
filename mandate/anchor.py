@@ -236,6 +236,53 @@ def anchor(ledger_path: str, tsa: str | None = None, out_dir: str | None = None,
     return sidecar
 
 
+def status(ledger_path: str, anchors_dir: str = "anchors",
+           max_age_hours: float = 24.0, now: float | None = None) -> dict:
+    """How old is the newest anchor, and does it still cover the current head?
+
+    A hash chain without a recent external anchor is tamper-*evident* only against
+    someone who cannot rewrite the whole file: whoever holds the disk can truncate to
+    the last anchor and re-sign nothing, because nothing outside records it. This
+    reports the window honestly instead of calling the log sealed.
+    """
+    moment = float(now if now is not None else time.time())
+    head = ledger_head(ledger_path) if os.path.exists(ledger_path) else ""
+    newest = None
+    for name in sorted(os.listdir(anchors_dir)) if os.path.isdir(anchors_dir) else []:
+        if not name.endswith(".tsr.json"):
+            continue
+        path = os.path.join(anchors_dir, name)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                side = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        when = side.get("gen_time_ms") or side.get("pinned_at") or 0
+        try:
+            when = float(when) / (1000.0 if when > 1e11 else 1.0)
+        except (TypeError, ValueError):
+            when = 0.0
+        if not when:
+            when = os.path.getmtime(path)
+        if newest is None or when > newest["when"]:
+            newest = {"when": when, "path": path, "head": str(side.get("head") or ""),
+                      "tsa": str(side.get("tsa") or "")}
+    if newest is None:
+        return {"ok": False, "code": "no_anchor", "head": head, "anchors": 0,
+                "message": "no anchor found: the chain is only as strong as the local disk",
+                "max_age_hours": max_age_hours}
+    age_hours = round((moment - newest["when"]) / 3600.0, 2)
+    stale = age_hours > float(max_age_hours)
+    covers = newest["head"] == head and bool(head)
+    return {"ok": (not stale) and covers, "code": ("ok" if (not stale) and covers
+                                                   else ("stale" if stale else "behind")),
+            "head": head, "anchors": 1, "anchor_head": newest["head"],
+            "anchor_path": newest["path"], "tsa": newest["tsa"],
+            "age_hours": age_hours, "max_age_hours": max_age_hours,
+            "covers_current_head": covers,
+            "entries_since_anchor": (None if covers else "head moved since the anchor")}
+
+
 def extract_token(raw: bytes) -> bytes:
     """Return the CMS TimeStampToken (second child of TimeStampResp) as raw DER."""
     outer = list(_children(raw, 0, len(raw)))
