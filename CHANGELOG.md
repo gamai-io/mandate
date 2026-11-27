@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased — hybrid witness note
+## 0.68.12 — 2026-11-27
+
+### Witness pin is now signed and post-quantum ready
 - **Ed25519 + ML-DSA-65, both required.** `mandate pq keygen` writes a 32-byte ML-DSA-65
   seed (0600); `witness accept --pq-key` adds a hybrid block to the note;
   `audit verify --pq-witness-keys` requires both signatures and refuses to downgrade to
   Ed25519 alone (reported as `no_downgrade`). Ed25519-only notes keep working.
 
-## Unreleased — attack evaluation
+### attack evaluation
 - **Eleven attacks, eleven caught, reproducible.** `tools/attack_eval.py` performs each
   attack on a fresh valid record and reports which check caught it: edited receipt,
   changed amount, swapped proof, forged witness pin, claim-only witness, foreign signing
@@ -14,7 +16,7 @@
   stolen log key. `tests/test_attacks.py` runs the list in CI; the table is
   `docs/ATTACKS.md`.
 
-## Unreleased — signed witness note
+### signed witness note
 - **The witness signs the pin.** `mandate witness accept --key …` stores an SSHSIG note
   over `log`, `log_id`, `tree_size`, `root_hash`, `pinned_at`; `audit verify
   --witness-signers` checks that signature and that every field matches the STH, and
@@ -23,14 +25,14 @@
 - Conformance kit grew two cases: `witness_claim_only` (state file, no note) and
   `witness_note_forged` (note edited, bundle re-signed). 8/8 against our verifier.
 
-## Unreleased — conformance kit
+### conformance kit
 - **`tools/kit.py` scores any verifier.** Seven cases (one valid, six rejections), and for
   a rejection it names the first check that must fail. Three cases tamper and re-sign so
   the `sth`, `inclusion` and `witness` checks are actually reached. `tools/kit_build.py`
   regenerates `spec/kit/`; `tests/test_kit.py` proves our verifier passes all seven and a
   verifier that always says yes fails at least five.
 
-## Unreleased — strict parsing
+### strict parsing
 - **Both verifiers refuse ambiguous JSON.** `{"a":1,"a":2}`, `NaN`/`Infinity`, integers
   beyond 2^53−1, lone UTF-16 surrogates, depth > 128 and non-UTF-8 bytes now fail with a
   stable code (`duplicate_key`, `non_finite`, `int_range`, `lone_surrogate`, `depth`,
