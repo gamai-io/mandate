@@ -1036,7 +1036,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.70.0** — canonical commitment, Ed25519
+**v0.70.1** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

@@ -1144,12 +1144,29 @@ def main(argv=None) -> int:
         if args.cmd == "firewall":
             from . import firewall as fw
             if args.action == "selftest":
-                import subprocess as _sp
-                done = _sp.run([sys.executable, str(pathlib.Path(__file__).resolve().parents[1]
-                                                    / "tools" / "firewall_eval.py"), "--json"],
-                               capture_output=True, text=True)
-                _emit({"ok": done.returncode == 0, "report": json.loads(done.stdout or "{}")}, None)
-                return 0 if done.returncode == 0 else 1
+                # bez subprocess-a i bez repo fajlova: korpus je u paketu
+                corpus = json.loads((pathlib.Path(__file__).resolve().parent
+                                     / "data" / "firewall_corpus.json").read_text(encoding="utf-8"))
+                tp = fn = fp = tn = 0
+                for case in corpus["outbound"]:
+                    r = fw.scan_outbound(case["text"])
+                    hit = (not r["ok"]) or bool(r["redactable"])
+                    tp += hit and case["expect"]
+                    fn += (not hit) and case["expect"]
+                    fp += hit and not case["expect"]
+                    tn += (not hit) and not case["expect"]
+                for case in corpus["inbound"]:
+                    r = fw.scan_inbound(case["text"])
+                    hit = (not r["ok"]) or bool(r["flagged"])
+                    tp += hit and case["expect"]
+                    fn += (not hit) and case["expect"]
+                    fp += hit and not case["expect"]
+                    tn += (not hit) and not case["expect"]
+                report = {"tp": tp, "fn": fn, "fp": fp, "tn": tn, "total": tp + fn + fp + tn,
+                          "recall": round(tp / (tp + fn), 3) if tp + fn else 0.0,
+                          "precision": round(tp / (tp + fp), 3) if tp + fp else 0.0}
+                _emit({"ok": fn == 0 and fp == 0, "report": report}, None)
+                return 0 if (fn == 0 and fp == 0) else 1
             text = args.text
             if text is None and args.file:
                 text = pathlib.Path(args.file).read_text(encoding="utf-8", errors="replace")

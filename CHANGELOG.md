@@ -1,4 +1,12 @@
 # Changelog
+## 0.70.1 — 2026-11-27
+
+### Fixed
+- **`mandate firewall selftest` works from an installed package.** It shelled out to
+  `tools/firewall_eval.py`, which is not in the wheel, so a user who installed from PyPI got
+  `{"ok": false, "report": {}}`. The corpus now ships as `mandate/data/firewall_corpus.json`
+  and the command scores it in-process: `27 caught, 0 missed, 0 false positives of 45`.
+
 ## 0.70.0 — 2026-11-27
 
 ### Firewall: content gate on top of the egress proxy

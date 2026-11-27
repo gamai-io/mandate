@@ -21,7 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from mandate import firewall  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "spec" / "firewall" / "corpus.json"
+CORPUS = ROOT / "mandate" / "data" / "firewall_corpus.json"   # isti fajl, ali ide u wheel
 
 
 def run() -> dict:
