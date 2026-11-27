@@ -12,14 +12,19 @@ import unittest
 
 from mandate import warden
 
+# WARDEN_CHILD_ATOMIC_V1: piši u tmp pa os.replace. Sa `open(path, "w")` čitač može
+# zateći prazan fajl između truncate i write — na opterećenom CI runneru to je izgledalo
+# kao "proces je stao" i test je padао bez stvarnog kvara.
 CHILD = """
 import os, sys, time
 path = sys.argv[1]
 i = 0
 while True:
     i += 1
-    with open(path, "w") as fh:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as fh:
         fh.write(str(i))
+    os.replace(tmp, path)
     time.sleep(0.01)
 """
 
@@ -31,10 +36,14 @@ def spawn(counter_path: str) -> subprocess.Popen:
 
 
 def counter(path: str) -> int:
-    try:
-        return int(open(path).read() or 0)
-    except (OSError, ValueError):
-        return 0
+    """Read the counter, tolerating a single torn read (the child replaces atomically)."""
+    for _ in range(5):
+        try:
+            value = int(open(path).read() or 0)
+            return value
+        except (OSError, ValueError):
+            time.sleep(0.01)
+    return 0
 
 
 class Warden(unittest.TestCase):

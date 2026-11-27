@@ -1,4 +1,13 @@
 # Changelog
+## 0.73.1 — 2026-11-27
+
+### Fixed
+- **`test_warden` was flaky under load, and failed the 0.73.0 `tests` job.** The child wrote
+  its counter with `open(path, "w")`, so a reader could see the empty file between truncate
+  and write on a busy runner — it looked like "the process stopped". The child now writes to
+  a temp file and `os.replace`s it (atomic), and `counter()` tolerates a torn read. Six runs
+  of the file in a row, plus the full suite, are green.
+
 ## 0.73.0 — 2026-11-27
 
 ### TLS interception, with the trade-off written down
