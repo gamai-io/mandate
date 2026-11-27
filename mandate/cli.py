@@ -209,7 +209,9 @@ def _cmd_witness(args) -> int:
             proof = _read(args.proof) if args.proof else None
             out = mwit.accept(sth, proof, args.signers, args.state,
                               revoked_path=args.revoked,
-                              dry_run=(cmd == "verify"))
+                              dry_run=(cmd == "verify"),
+                              key_path=getattr(args, "key", None),
+                              signer=getattr(args, "signer", "witness"))
             _emit(out, None)
             return 0
         if cmd == "show":
@@ -776,6 +778,9 @@ def main(argv=None) -> int:
     p_wa.add_argument("--state", required=True)
     p_wa.add_argument("--sth", required=True)
     p_wa.add_argument("--proof", default=None)
+    p_wa.add_argument("--key", default=None,
+                      help="witness signing key; without it the state is a claim, not a note")
+    p_wa.add_argument("--signer", default="witness")
     p_wv = wit_sub.add_parser("verify")
     p_wv.add_argument("--state", required=True)
     p_wv.add_argument("--sth", required=True)
@@ -902,6 +907,8 @@ def main(argv=None) -> int:
     p_av = audit_sub.add_parser("verify")
     p_av.add_argument("--bundle", required=True)
     p_av.add_argument("--log-signers", dest="log_signers", required=True)
+    p_av.add_argument("--witness-signers", dest="witness_signers", default=None,
+                      help="allowed witness keys; without it a witness state is only a claim")
 
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
@@ -1448,7 +1455,8 @@ def main(argv=None) -> int:
                 if getattr(args, "audit_cmd", None) == "verify":
                     result = maudit.verify_bundle_file(
                         args.bundle, args.signers, args.log_signers,
-                        revoked_path=args.revoked)
+                        revoked_path=args.revoked,
+                        witness_signers_path=getattr(args, "witness_signers", None))
                     _emit(result, None)
                     return 0 if result.get("valid") else 1
             except (core.MandateError, OSError, ValueError) as exc:

@@ -11,7 +11,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 KIT = ROOT / "tools" / "kit.py"
 # the {bundle}/{signers}/{log_signers} placeholders belong to the kit, not to str.format
 VERIFIER = (sys.executable + " -m mandate --signers {signers} audit verify "
-            "--bundle {bundle} --log-signers {log_signers}")
+            "--bundle {bundle} --log-signers {log_signers} "
+            "--witness-signers {witness_signers}")
 
 
 class Kit(unittest.TestCase):
@@ -36,7 +37,8 @@ class Kit(unittest.TestCase):
         manifest = json.loads((ROOT / "spec" / "kit" / "cases.json").read_text())
         names = {case["name"] for case in manifest["cases"]}
         for required in ("valid", "tampered_signature", "sth_bad_signature",
-                         "proof_tampered", "witness_mismatch", "unknown_signer"):
+                         "proof_tampered", "witness_claim_only",
+                         "witness_note_forged", "unknown_signer"):
             self.assertIn(required, names)
 
 

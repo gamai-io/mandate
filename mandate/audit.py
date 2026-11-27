@@ -10,7 +10,8 @@ class AuditError(core.MandateError):
 
 
 def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
-                  revoked_path: str | None = None) -> dict:
+                  revoked_path: str | None = None,
+                  witness_signers_path: str | None = None) -> dict:
     envelope = export.verify_bundle(bundle, signers_path,
                                     revoked_path=revoked_path)
     receipt = (bundle or {}).get("receipt") or {}
@@ -34,7 +35,18 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
             receipt, proof, root=payload.get("root_hash"),
             size=payload.get("tree_size"))
     state = (bundle or {}).get("witness_state")
-    if isinstance(state, dict):
+    note = (bundle or {}).get("witness_note")
+    result["witness_signed"] = False
+    if isinstance(note, dict) and witness_signers_path:
+        from . import witness_note
+        checked = witness_note.verify(note, witness_signers_path,
+                                      (bundle or {}).get("sth"),
+                                      revoked_path=revoked_path)
+        result["witness"] = bool(checked["valid"])
+        result["witness_signed"] = bool(checked["note"])
+        result["witness_note"] = checked
+    elif isinstance(state, dict):
+        # a state file only claims the pin; it is not a signature by the witness
         try:
             result["witness"] = (
                 str(state.get("root_hash")) == str(payload.get("root_hash"))
@@ -50,6 +62,8 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
 
 
 def verify_bundle_file(path: str, signers_path: str, log_signers_path: str,
-                       revoked_path: str | None = None) -> dict:
+                       revoked_path: str | None = None,
+                       witness_signers_path: str | None = None) -> dict:
     return verify_bundle(core.load_json(path), signers_path,
-                         log_signers_path, revoked_path=revoked_path)
+                         log_signers_path, revoked_path=revoked_path,
+                         witness_signers_path=witness_signers_path)

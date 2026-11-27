@@ -2,6 +2,7 @@
  "format": "mandate-conformance-kit/1",
  "signers": "spec/kit/signers",
  "log_signers": "spec/kit/log_signers",
+ "witness_signers": "spec/kit/witness_signers",
  "cases": [
   {
    "name": "valid",
@@ -39,8 +40,14 @@
    "fails": "inclusion"
   },
   {
-   "name": "witness_mismatch",
-   "bundle": "spec/kit/cases/witness_mismatch.json",
+   "name": "witness_claim_only",
+   "bundle": "spec/kit/cases/witness_claim_only.json",
+   "valid": false,
+   "fails": "witness"
+  },
+  {
+   "name": "witness_note_forged",
+   "bundle": "spec/kit/cases/witness_note_forged.json",
    "valid": false,
    "fails": "witness"
   }

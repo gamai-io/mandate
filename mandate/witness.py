@@ -52,14 +52,16 @@ def save_state(path: str, state: dict) -> None:
 
 
 def accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
-           revoked_path: str | None = None, dry_run: bool = False) -> dict:
+           revoked_path: str | None = None, dry_run: bool = False,
+           key_path: str | None = None, signer: str = "") -> dict:
     with _LOCK:
         return _accept(sth, proof, signers_path, state_path, revoked_path,
-                       dry_run)
+                       dry_run, key_path, signer)
 
 
 def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
-            revoked_path: str | None = None, dry_run: bool = False) -> dict:
+            revoked_path: str | None = None, dry_run: bool = False,
+            key_path: str | None = None, signer: str = "") -> dict:
     if not mlog.verify_sth(sth, signers_path, revoked_path=revoked_path):
         raise WitnessError("STH signature invalid")
     payload = (sth or {}).get("sth") or {}
@@ -75,6 +77,7 @@ def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
         new_state = {"v": 1, "log_name": log_name, "log_id": log_id,
                      "tree_size": size, "root_hash": root, "sth": sth,
                      "pinned_at": int(time.time() * 1000)}
+        _maybe_sign(new_state, sth, key_path, signer)
         if not dry_run:
             save_state(state_path, new_state)
         return {"ok": True, "first": True, "state": new_state}
@@ -104,10 +107,23 @@ def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
     new_state = {"v": 1, "log_name": log_name, "log_id": log_id,
                  "tree_size": size, "root_hash": root, "sth": sth,
                  "pinned_at": int(time.time() * 1000)}
+    _maybe_sign(new_state, sth, key_path, signer)
     if not dry_run:
         save_state(state_path, new_state)
     return {"ok": True, "advanced": True, "from": old_size, "to": size,
             "state": new_state}
+
+
+def _maybe_sign(state: dict, sth: dict, key_path: str | None, signer: str) -> None:
+    """Attach a note the witness host signed; without a key there is only a claim."""
+    if not key_path:
+        return
+    from . import witness_note
+    try:
+        state["note"] = witness_note.make(sth, key_path, signer or "witness",
+                                          pinned_at=state.get("pinned_at"))
+    except Exception as exc:                       # no note beats a half-written one
+        raise WitnessError("could not sign the witness note") from exc
 
 
 def make_handler(state_path: str, signers_path: str, token: str,

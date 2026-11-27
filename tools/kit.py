@@ -55,13 +55,15 @@ def main(argv: list[str]) -> int:
     manifest = json.loads(pathlib.Path(args.cases).read_text(encoding="utf-8"))
     signers = str((ROOT / manifest["signers"]).resolve())
     log_signers = str((ROOT / manifest["log_signers"]).resolve())
+    witness_signers = str((ROOT / manifest.get("witness_signers", manifest["log_signers"])).resolve())
 
     rows, failures = [], 0
     for case in manifest["cases"]:
         bundle = str((ROOT / case["bundle"]).resolve())
         command = (args.verifier.replace("{bundle}", bundle)
                    .replace("{signers}", signers)
-                   .replace("{log_signers}", log_signers))
+                   .replace("{log_signers}", log_signers)
+                   .replace("{witness_signers}", witness_signers))
         done = subprocess.run(shlex.split(command), capture_output=True, text=True,
                               timeout=120)
         try:

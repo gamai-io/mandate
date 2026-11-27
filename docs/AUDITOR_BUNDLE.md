@@ -39,12 +39,27 @@ envelope is `mandate-export`); `--log-signers` must contain the log key
 Output: `{valid, envelope, sth, inclusion, witness, decision, executed, observed}`
 — `valid` is true only if the envelope, STH, inclusion and witness checks pass.
 
-**Honest limit:** `witness_state` is a JSON file, not a signature by the witness
-host. `audit verify` checks that it matches the STH, not that another machine
-produced it. If the bundle builder fabricates a state and re-signs the bundle,
-`witness` is still true. A witness you do not trust is not a witness: the
-independent check is running `mandate witness verify` on the witness host against
-its own state file.
+**Witness note (2026-11-27).** When the witness host accepts an STH with `--key`, it
+stores a **note it signed** with its own Ed25519 key (SSHSIG, namespace
+`mandate-witness`):
+
+```bash
+mandate witness accept --state witness.json --sth sth.json \
+    --signers trust/log_signers --key ~/.ssh/witness --signer witness1
+
+mandate --signers trust/allowed_signers audit verify --bundle bundle.json \
+    --log-signers trust/log_signers --witness-signers trust/witness_signers
+```
+
+The note is short canonical text (`log`, `log_id`, `tree_size`, `root_hash`,
+`pinned_at`). Verification checks the signature against the witness signers file **and**
+that every field matches the STH in the bundle, so a bundle builder can no longer
+fabricate a pin: it does not hold the witness key.
+
+If `--witness-signers` is not supplied — or the bundle only carries `witness_state` —
+`witness` still means "the state file matches the STH", which is a claim, not a proof.
+`audit verify` reports `witness_signed: true|false` so the difference is visible in the
+output rather than only in this document.
 
 ## Cross-host flow
 

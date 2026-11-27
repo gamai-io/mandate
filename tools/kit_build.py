@@ -42,7 +42,8 @@ def keys(directory: str):
     approver = os.path.join(directory, "approver")
     logkey = os.path.join(directory, "logkey")
     other = os.path.join(directory, "other")
-    for path in (approver, logkey, other):
+    wkey = os.path.join(directory, "witness")
+    for path in (approver, logkey, other, wkey):
         subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", path],
                        check=True)
     signers = os.path.join(directory, "signers")
@@ -55,11 +56,15 @@ def keys(directory: str):
     pathlib.Path(log_signers).write_text(
         'log1 namespaces="mandate-log" {}\n'.format(
             pathlib.Path(logkey + ".pub").read_text().strip()), encoding="utf-8")
-    return approver, logkey, other, signers, log_signers
+    witness_signers = os.path.join(directory, "witness_signers")
+    pathlib.Path(witness_signers).write_text(
+        'witness1 namespaces="mandate-witness" {}\n'.format(
+            pathlib.Path(wkey + ".pub").read_text().strip()), encoding="utf-8")
+    return approver, logkey, other, wkey, signers, log_signers, witness_signers
 
 
 def build(work: str):
-    approver, logkey, other, signers, log_signers = keys(work)
+    approver, logkey, other, wkey, signers, log_signers, witness_signers = keys(work)
     ledger = os.path.join(work, "ledger.jsonl")
     proposal = core.propose(INTENT)
     grant_core = core.build_grant_core(proposal["commitment"], "approver", ttl_s=900,
@@ -73,7 +78,7 @@ def build(work: str):
                                mlog.root_hex(leaves))
     sth = mlog.sign_sth(payload, logkey)
     state_path = os.path.join(work, "witness.json")
-    mwit.accept(sth, None, signers, state_path)
+    mwit.accept(sth, None, signers, state_path, key_path=wkey, signer="witness1")
     state = mwit.load_state(state_path)
 
     def clone(value):
@@ -122,23 +127,35 @@ def build(work: str):
     cases["proof_tampered"] = dict(bundle=resigned(proof=bad_proof["inclusion_proof"]),
                                    expect={"valid": False, "fails": "inclusion"})
 
-    bad_witness = bundle()
-    bad_witness["witness_state"]["tree_size"] = 999
-    cases["witness_mismatch"] = dict(bundle=resigned(witness_state=bad_witness["witness_state"]),
-                                     expect={"valid": False, "fails": "witness"})
+    # a state file with no signed note is only a claim: an auditor who requires witness
+    # signatures must refuse it, and must refuse it at the witness check
+    claim_only = clone(state)
+    claim_only.pop("note", None)
+    claim_only["tree_size"] = 999
+    cases["witness_claim_only"] = dict(bundle=resigned(witness_state=claim_only),
+                                       expect={"valid": False, "fails": "witness"})
 
-    return cases, signers, log_signers
+    forged = bundle()
+    note = dict(forged["witness_note"])
+    note["text"] = note["text"].replace(f"tree_size: {int(payload['tree_size'])}",
+                                        f"tree_size: {int(payload['tree_size']) + 1}")
+    forged["witness_note"] = note
+    cases["witness_note_forged"] = dict(bundle=resigned(witness_note=note),
+                                        expect={"valid": False, "fails": "witness"})
+
+    return cases, wkey, signers, log_signers, witness_signers
 
 
 def main() -> int:
     work = tempfile.mkdtemp(prefix="mandate-kit-")
     try:
-        cases, signers, log_signers = build(work)
+        cases, wkey, signers, log_signers, witness_signers = build(work)
         if KIT.exists():
             shutil.rmtree(KIT)
         (KIT / "cases").mkdir(parents=True)
         shutil.copyfile(signers, KIT / "signers")
         shutil.copyfile(log_signers, KIT / "log_signers")
+        shutil.copyfile(witness_signers, KIT / "witness_signers")
     finally:
         shutil.rmtree(work, ignore_errors=True)
     manifest = []
@@ -152,6 +169,7 @@ def main() -> int:
         {"format": "mandate-conformance-kit/1",
          "signers": str((KIT / "signers").relative_to(ROOT)),
          "log_signers": str((KIT / "log_signers").relative_to(ROOT)),
+         "witness_signers": str((KIT / "witness_signers").relative_to(ROOT)),
          "cases": manifest}, indent=1) + "\n", encoding="utf-8")
     print(f"wrote {len(manifest)} cases to {KIT}")
     return 0

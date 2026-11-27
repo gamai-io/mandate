@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — signed witness note
+- **The witness signs the pin.** `mandate witness accept --key …` stores an SSHSIG note
+  over `log`, `log_id`, `tree_size`, `root_hash`, `pinned_at`; `audit verify
+  --witness-signers` checks that signature and that every field matches the STH, and
+  reports `witness_signed` so a claim is distinguishable from a proof. A bundle builder
+  without the witness key can no longer produce a passing `witness`.
+- Conformance kit grew two cases: `witness_claim_only` (state file, no note) and
+  `witness_note_forged` (note edited, bundle re-signed). 8/8 against our verifier.
+
 ## Unreleased — conformance kit
 - **`tools/kit.py` scores any verifier.** Seven cases (one valid, six rejections), and for
   a rejection it names the first check that must fail. Three cases tamper and re-sign so
