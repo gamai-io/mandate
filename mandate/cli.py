@@ -676,7 +676,7 @@ def main(argv=None) -> int:
 
     p_egress = sub.add_parser("egress")
     p_egress.add_argument("action", choices=("policy", "proxy", "check", "summary",
-                                             "ca", "trust"))
+                                             "ca", "trust", "rules"))
     p_egress.add_argument("target", nargs="?", default=None, help="host:port for action=check")
     p_egress.add_argument("--policy", default=argparse.SUPPRESS)
     p_egress.add_argument("--allow", action="append", default=None)
@@ -690,6 +690,10 @@ def main(argv=None) -> int:
     p_egress.add_argument("--ca-dir", dest="ca_dir", default=None)
     p_egress.add_argument("--upstream-ca", dest="upstream_ca", default=None,
                           help="extra trust anchor for the real origin")
+    p_egress.add_argument("--uid", type=int, default=None, help="uid for action=rules")
+    p_egress.add_argument("--proxy", dest="proxy_addr", default="127.0.0.1:3128")
+    p_egress.add_argument("--check", action="store_true",
+                          help="validate the ruleset with `nft -c` without applying it")
     p_egress.add_argument("--target", dest="target_opt", default=None,
                           help="host:port to test (same as the positional, avoids argparse ambiguity)")
 
@@ -719,6 +723,9 @@ def main(argv=None) -> int:
     p_ctl.add_argument("--status", default="", choices=("", "have", "partial", "gap"))
     p_ctl.add_argument("--summary", action="store_true")
     p_ctl.add_argument("--out", "-o", default=None)
+
+    p_wv = sub.add_parser("worm-verify", help="verify an exported evidence pack offline")
+    p_wv.add_argument("--dir", required=True)
 
     p_anchor = sub.add_parser("anchor")
     p_anchor.add_argument("--ledger", default="ledger.jsonl")
@@ -1555,6 +1562,33 @@ def main(argv=None) -> int:
                 _emit({"ok": True, **info,
                        "next": "mandate egress trust --ca-dir %s" % ca_dir}, None)
                 return 0
+            if args.action == "rules":
+                if args.uid is None:
+                    _emit({"error": "usage", "message": "egress rules --uid N [--allow h:p]"}, None)
+                    return 2
+                text = egress.nft_rules(args.uid, args.proxy_addr,
+                                        [a for a in (args.allow or []) if a])
+                if args.out:
+                    pathlib.Path(args.out).write_text(text, encoding="utf-8")
+                checked = None
+                if args.check:
+                    import shutil as _shutil
+                    nft = _shutil.which("nft")
+                    if not nft:
+                        checked = {"ok": False, "code": "nft_not_available"}
+                    else:
+                        import subprocess as _sp
+                        done = _sp.run([nft, "-c", "-f", "-"], input=text,
+                                       capture_output=True, text=True)
+                        checked = {"ok": done.returncode == 0,
+                                   "code": "ok" if done.returncode == 0 else "nft_check_failed",
+                                   "stderr": (done.stderr or "")[-200:]}
+                _emit({"ok": True, "rules": len(text.splitlines()), "out": args.out,
+                       "check": checked, "text": None if args.out else text}, None)
+                if checked is not None and not checked.get("ok") and checked.get("code") != "nft_not_available":
+                    return 4
+                return 0
+
             if args.action == "policy":
                 pol = egress.default_policy()
                 pol["allow"] = list(args.allow or [])
@@ -1733,6 +1767,11 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "worm-verify":
+            res = anchor.worm_verify(args.dir)
+            _emit(res, None)
+            return 0 if res.get("ok") else 4
 
         if args.cmd == "worm-export":
             res = anchor.worm_export(args.ledger, args.out, args.retention_days, args.anchors)

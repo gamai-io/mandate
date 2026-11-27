@@ -4,7 +4,7 @@ Pre-filled answers to the questions a bank's security/procurement process asks.
 Every "no" is a real gap with a plan; a questionnaire that answers "yes" to
 everything is the first thing a reviewer distrusts.
 
-Product: `gama-mandate` 1.0.1 and the four companion packages (`gamai-trust`,
+Product: `gama-mandate` 1.0.2 and the four companion packages (`gamai-trust`,
 `gamai-guard`, `gamai-plugins`, `gama-l`). Vendor: GAMA TRADE d.o.o. / gamAI,
 Usora, Bosnia and Herzegovina.
 

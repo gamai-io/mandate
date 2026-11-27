@@ -283,6 +283,73 @@ def status(ledger_path: str, anchors_dir: str = "anchors",
             "entries_since_anchor": (None if covers else "head moved since the anchor")}
 
 
+def worm_verify(export_dir: str) -> dict:
+    """Verify an exported evidence pack without trusting the exporter.
+
+    Checks, in order: the manifest parses, every listed file exists, every sha256 matches,
+    no file in the pack is missing from the manifest, the ledger head inside the pack matches
+    `ledger_head`, and every anchor sidecar in the pack points at that same head. Read-only:
+    it never writes into the pack.
+
+    What it does not do: prove the pack is complete. Whoever exported it can leave out the
+    last entries and re-export; only a fresh anchor from a third party closes that, which is
+    why the pack carries the anchors it had.
+    """
+    manifest_path = os.path.join(export_dir, "manifest.json")
+    try:
+        with open(manifest_path, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "code": "no_manifest", "message": str(exc)[:160]}
+    problems = []
+    checked = 0
+    for rel, meta in sorted((manifest.get("files") or {}).items()):
+        path = os.path.join(export_dir, rel)
+        if not os.path.isfile(path):
+            problems.append("missing: %s" % rel)
+            continue
+        raw = open(path, "rb").read()
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != meta.get("sha256"):
+            problems.append("sha256 mismatch: %s" % rel)
+        elif int(meta.get("bytes") or -1) != len(raw):
+            problems.append("size mismatch: %s" % rel)
+        else:
+            checked += 1
+    listed = {os.path.normpath(rel) for rel in (manifest.get("files") or {})}
+    for root, _dirs, names in os.walk(export_dir):
+        for name in names:
+            rel = os.path.normpath(os.path.relpath(os.path.join(root, name), export_dir))
+            if rel == "manifest.json":
+                continue
+            if rel not in listed:
+                problems.append("not in manifest: %s" % rel)
+    head = ""
+    head_path = os.path.join(export_dir, "ledger.jsonl")
+    if os.path.isfile(head_path):
+        head = ledger_head(head_path)
+        if manifest.get("ledger_head") and head != manifest["ledger_head"]:
+            problems.append("ledger head does not match the manifest")
+    anchors_dir = os.path.join(export_dir, "anchors")
+    if os.path.isdir(anchors_dir):
+        for name in sorted(os.listdir(anchors_dir)):
+            if not name.endswith(".tsr.json"):
+                continue
+            try:
+                side = json.load(open(os.path.join(anchors_dir, name), encoding="utf-8"))
+            except (OSError, ValueError):
+                problems.append("unreadable anchor: %s" % name)
+                continue
+            if head and side.get("head") and side["head"] != head:
+                problems.append("anchor %s does not cover the exported head" % name)
+    return {"ok": not problems, "code": "ok" if not problems else "mismatch",
+            "files_checked": checked, "files_listed": len(listed),
+            "head": head[:16] + "…" if head else "",
+            "retention_until": manifest.get("retention_until"),
+            "exported_at": manifest.get("exported_at"),
+            "problems": problems[:10]}
+
+
 def extract_token(raw: bytes) -> bytes:
     """Return the CMS TimeStampToken (second child of TimeStampResp) as raw DER."""
     outer = list(_children(raw, 0, len(raw)))

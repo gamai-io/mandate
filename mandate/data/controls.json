@@ -13,18 +13,102 @@
   ]
  },
  "rows": [
-  {"n": 1, "control": "Agent inventory, owner, model version", "artifact": "mandate inventory (per agent: effects, kinds, approvers, scopes, first/last seen, amount total; JSON + CSV)", "status": "partial", "missing": "reconcile against IdP/cloud inventory; model version per agent", "owner": "us"},
-  {"n": 2, "control": "Unique non-human identity, no shared credentials", "artifact": "mandate svid (per-agent Ed25519 token, TTL <= 1 h, audience- and scope-bound; redeem refuses stale/foreign)", "status": "partial", "missing": "issuance from the bank IdP/SPIFFE; revocation wiring; rotation", "owner": "bank+us"},
-  {"n": 3, "control": "Delegation chain with attenuated scopes", "artifact": "mandate svid delegate + capability chains (child scopes subset of parent, shorter life, no self-delegation)", "status": "partial", "missing": "originator as a verified natural person rather than a service name", "owner": "bank+us"},
-  {"n": 4, "control": "Human approval of a specific effect, attributable", "artifact": "Ed25519 grant over the canonical commitment, one-shot nonce, receipt with approver + render hash, four-eyes refused", "status": "have", "missing": "hardware approver device (sk- keys exist; policy can require them)", "owner": "bank+us"},
-  {"n": 5, "control": "Kill switch with tested time-to-halt and a safe state", "artifact": "mandate warden tier 2 (cgroup v2 freeze observed via cgroup.events, cgroup.kill, signed stop evidence with --verify), tier 1 SIGSTOP/kill", "status": "partial", "missing": "VM pause needs a KVM host; proof of a safe state beyond 'process not running'", "owner": "bank+us"},
-  {"n": 6, "control": "Policy outside the model, deterministic", "artifact": "gamai-plugins trust plugin (deny wins, fail-closed, exit codes) and mandate policy with policy_digest in every receipt", "status": "have", "missing": "joined decision log per tool call with the policy version", "owner": "us"},
-  {"n": 7, "control": "Software-enforced limits (spend, velocity, volume)", "artifact": "policy limits: effects/hour, amount, runtime, currency - enforced at redeem, refusals written to the ledger", "status": "have", "missing": "per-tool data-volume caps; cost accounting", "owner": "us"},
-  {"n": 8, "control": "Egress control", "artifact": "mandate egress (deny-all proxy, token, allowlist, SSRF/metadata guard, every decision in the ledger) plus firewall content gate and optional TLS interception", "status": "partial", "missing": "enforcement at the network layer so a raw socket cannot bypass the proxy", "owner": "bank+us"},
-  {"n": 9, "control": "Tamper-evident, agent-inaccessible log with retention and clock evidence", "artifact": "hash chain + .head + mandate chain; mandate anchor (RFC 3161, verified with openssl ts); mandate worm-export (0444 + manifest + retention + clock snapshot); anchor status reports age and staleness", "status": "partial", "missing": "bank-held HSM key; object-lock storage instead of local chmod; third-party attested clock", "owner": "bank+us"},
-  {"n": 10, "control": "Change control over prompts, models and permissions", "artifact": "mandate change record (file sha256 + Ed25519 signature + reason), change list --signers verifies each", "status": "partial", "missing": "link a change to a ticket id; model version pinning", "owner": "us"},
-  {"n": 11, "control": "Third-party register and due diligence", "artifact": "mandate pack (inventory, changes, dora_roi.json, controls.md, index.json with per-file sha256 and the ledger head)", "status": "partial", "missing": "contract clause template, subprocessor list, dated due-diligence answers", "owner": "bank+us"},
-  {"n": 12, "control": "Detection and reporting of agent incidents", "artifact": "mandate detect (human-credential use, self-approval, velocity, amount ceiling, off-hours, scope not granted, untrusted input, weak coverage; --write puts the alert in the hash chain)", "status": "partial", "missing": "tool-sequence anomalies (needs tool-level events); SIEM export; incident classification per DORA Art. 18", "owner": "bank+us"}
+  {
+   "n": 1,
+   "control": "Agent inventory, owner, model version",
+   "artifact": "mandate inventory (per agent: effects, kinds, approvers, scopes, first/last seen, amount total; JSON + CSV)",
+   "status": "partial",
+   "missing": "reconcile against IdP/cloud inventory; model version per agent",
+   "owner": "us"
+  },
+  {
+   "n": 2,
+   "control": "Unique non-human identity, no shared credentials",
+   "artifact": "mandate svid (per-agent Ed25519 token, TTL <= 1 h, audience- and scope-bound; redeem refuses stale/foreign)",
+   "status": "partial",
+   "missing": "issuance from the bank IdP/SPIFFE; revocation wiring; rotation",
+   "owner": "bank+us"
+  },
+  {
+   "n": 3,
+   "control": "Delegation chain with attenuated scopes",
+   "artifact": "mandate svid delegate + capability chains (child scopes subset of parent, shorter life, no self-delegation)",
+   "status": "partial",
+   "missing": "originator as a verified natural person rather than a service name",
+   "owner": "bank+us"
+  },
+  {
+   "n": 4,
+   "control": "Human approval of a specific effect, attributable",
+   "artifact": "Ed25519 grant over the canonical commitment, one-shot nonce, receipt with approver + render hash, four-eyes refused",
+   "status": "have",
+   "missing": "hardware approver device (sk- keys exist; policy can require them)",
+   "owner": "bank+us"
+  },
+  {
+   "n": 5,
+   "control": "Kill switch with tested time-to-halt and a safe state",
+   "artifact": "mandate warden tier 2 (cgroup v2 freeze observed via cgroup.events, cgroup.kill, signed stop evidence with --verify), tier 1 SIGSTOP/kill",
+   "status": "partial",
+   "missing": "VM pause needs a KVM host; proof of a safe state beyond 'process not running'",
+   "owner": "bank+us"
+  },
+  {
+   "n": 6,
+   "control": "Policy outside the model, deterministic",
+   "artifact": "gamai-plugins trust plugin (deny wins, fail-closed, exit codes) and mandate policy with policy_digest in every receipt",
+   "status": "have",
+   "missing": "joined decision log per tool call with the policy version",
+   "owner": "us"
+  },
+  {
+   "n": 7,
+   "control": "Software-enforced limits (spend, velocity, volume)",
+   "artifact": "policy limits: effects/hour, amount, runtime, currency - enforced at redeem, refusals written to the ledger",
+   "status": "have",
+   "missing": "per-tool data-volume caps; cost accounting",
+   "owner": "us"
+  },
+  {
+   "n": 8,
+   "control": "Egress control",
+   "artifact": "mandate egress (deny-all proxy, token, allowlist, SSRF/metadata guard, every decision in the ledger) plus firewall content gate, optional TLS interception, and mandate egress rules --uid N (nftables: one uid has no path except the proxy)",
+   "status": "partial",
+   "missing": "applying the rules needs root; per-container network namespaces stay the customer's part",
+   "owner": "bank+us"
+  },
+  {
+   "n": 9,
+   "control": "Tamper-evident, agent-inaccessible log with retention and clock evidence",
+   "artifact": "hash chain + .head + mandate chain; mandate anchor (RFC 3161) and anchor --status (age, stale, behind); mandate worm-export and worm-verify (per-file sha256, nothing outside the manifest, anchors cover the exported head)",
+   "status": "partial",
+   "missing": "bank-held HSM key, object-lock storage instead of local chmod, clock attested by a third party",
+   "owner": "bank+us"
+  },
+  {
+   "n": 10,
+   "control": "Change control over prompts, models and permissions",
+   "artifact": "mandate change record (file sha256 + Ed25519 signature + reason), change list --signers verifies each",
+   "status": "partial",
+   "missing": "link a change to a ticket id; model version pinning",
+   "owner": "us"
+  },
+  {
+   "n": 11,
+   "control": "Third-party register and due diligence",
+   "artifact": "mandate pack (inventory, changes, dora_roi.json, controls.md, index.json with per-file sha256 and the ledger head)",
+   "status": "partial",
+   "missing": "contract clause template, subprocessor list, dated due-diligence answers",
+   "owner": "bank+us"
+  },
+  {
+   "n": 12,
+   "control": "Detection and reporting of agent incidents",
+   "artifact": "mandate detect (human-credential use, self-approval, velocity, amount ceiling, off-hours, scope not granted, untrusted input, weak coverage; --write puts the alert in the hash chain)",
+   "status": "partial",
+   "missing": "tool-sequence anomalies (needs tool-level events); SIEM export; incident classification per DORA Art. 18",
+   "owner": "bank+us"
+  }
  ],
  "not_claimed": [
   "DORA / AI Act compliant or certified - compliance is the bank's obligation",

@@ -1,4 +1,21 @@
 # Changelog
+## 1.0.2 — 2026-11-28
+
+### Two "partial" control rows became checkable
+- **`mandate worm-verify --dir PACK`** (row 9): an outsider re-checks an exported evidence pack
+  without trusting the exporter — every listed file's sha256 and size, no file outside the
+  manifest, the ledger head inside the pack matches, and every anchor in the pack covers that
+  head. Exit 4 with `no_manifest` / `mismatch`. What it does not prove: completeness — whoever
+  exports can leave the tail out; only a fresh third-party anchor closes that.
+- **`mandate egress rules --uid N [--allow host:port] [--check]`** (row 8): generates the
+  nftables ruleset that leaves one uid no path except the proxy, with explicit allow entries
+  (tcp **and** udp, because DNS is usually UDP) and a default drop. `--check` validates it with
+  `nft -c` when nftables is installed and says `nft_not_available` when it is not, rather than
+  pretending the rules were tested. Applying them needs root; per-container namespaces remain
+  the customer's part.
+- `docs/BANK_CONTROL_MATRIX.md` and `mandate/data/controls.json` updated, so `mandate controls`
+  reports the new artifacts instead of the old gap text.
+
 ## 1.0.1 — 2026-11-27
 
 ### The two questions a bank asks first, answered by a command
