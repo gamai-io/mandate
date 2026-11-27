@@ -154,6 +154,10 @@ def normalize_intent(intent: dict) -> dict:
                 not isinstance(covers, list)
                 or any(not isinstance(item, str) for item in covers)):
             raise MandateError("provenance covers must be a list of strings")
+        trust = entry.get("trust")
+        if trust is not None and str(trust).lower() not in TRUST_LEVELS:
+            raise MandateError("provenance trust must be one of %s"
+                               % ", ".join(TRUST_LEVELS))
     out = dict(intent)
     out["nonce"] = str(intent.get("nonce") or uuid.uuid4().hex)
     out["provenance"] = provenance
@@ -249,6 +253,54 @@ def missing_provenance(intent: dict, spec: dict) -> list[str]:
     return missing
 
 
+TRUST_LEVELS = ("trusted", "untrusted", "unknown")
+MATERIAL_FIELDS = ("target", "amount")
+
+
+def provenance_trust(entry: dict) -> str:
+    return str((entry or {}).get("trust") or "unknown").lower()
+
+
+def taint_report(intent: dict) -> dict:
+    """Which effect fields rest on input we do not trust.
+
+    Provenance is a claim by the caller about where a field came from. `trust`
+    turns that claim into something a policy can act on:
+
+      trusted    — from a system of record (ERP, bank file, signed export)
+      untrusted  — a document, an email, a web page, a model's own output
+      unknown    — nobody said (the default; treated as untrusted by a gate)
+
+    A field is tainted when at least one untrusted source covers it and no
+    trusted source does. That is deliberately conservative: one planted
+    sentence in a PDF is enough to make "pay this supplier" untrustworthy even
+    if the supplier number also came from the ERP.
+    """
+    entries = [e for e in (intent.get("provenance") or []) if isinstance(e, dict)]
+    fields = ("kind", "target", "amount", "params")
+    per_field = {f: [] for f in fields}
+    for entry in entries:
+        trust = provenance_trust(entry)
+        covers = entry.get("covers") or list(fields)
+        for field in covers:
+            if field in per_field:
+                per_field[field].append(trust)
+    untrusted_fields = sorted(
+        f for f, labels in per_field.items()
+        if "untrusted" in labels and "trusted" not in labels)
+    unknown_fields = sorted(
+        f for f, labels in per_field.items()
+        if "unknown" in labels and "trusted" not in labels)
+    trusted_fields = sorted(f for f, labels in per_field.items() if "trusted" in labels)
+    return {
+        "untrusted_fields": untrusted_fields,
+        "unknown_fields": unknown_fields,
+        "trusted_fields": trusted_fields,
+        "material_untrusted": [f for f in untrusted_fields if f in MATERIAL_FIELDS],
+        "tainted": bool(untrusted_fields or unknown_fields),
+    }
+
+
 def policy_digest(policy: dict | None) -> str:
     """Stable fingerprint of the policy that authorised an effect."""
     return sha256(jcs(policy or {}))[:32]
@@ -267,6 +319,17 @@ def check(intent: dict, policy: dict | None = None) -> dict:
                 "missing": missing, "provenance_ok": False,
                 "risk": spec.get("risk"), "kind": kind,
                 "render": render(intent)}
+    need_trusted = spec.get("require_trusted")
+    if need_trusted:
+        want = (list(need_trusted) if isinstance(need_trusted, (list, tuple))
+                else list(MATERIAL_FIELDS))
+        taint = taint_report(intent)
+        bad = sorted(set(want) & set(taint["untrusted_fields"] + taint["unknown_fields"]))
+        if bad:
+            return {"decision": "deny", "reason": "untrusted_input", "kind": kind,
+                    "fields": bad, "provenance_ok": True,
+                    "risk": spec.get("risk"), "taint": taint,
+                    "render": render(intent)}
     risk = str(spec.get("risk") or "high")
     value, _currency = _amount(intent)
     if risk == "low":
@@ -768,6 +831,7 @@ def _redeem(intent: dict, grant_obj: dict, signers_path: str,
                             sha256(jcs(intent)), ts=verified["moment"],
                             decision="observe" if observe else "executed",
                             coverage=cov)
+    receipt["taint"] = taint_report(intent)
     if policy is not None:
         receipt["policy_digest"] = policy_digest(policy)
     receipt["binding"] = not observe

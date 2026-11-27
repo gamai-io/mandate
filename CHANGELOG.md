@@ -12,6 +12,25 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Untrusted input can block an effect (taint)
+- **`trust` on provenance entries**: `trusted` (ERP, bank file, signed export),
+  `untrusted` (document, email, web page, model output) or `unknown` (default). Anything
+  else is refused.
+- **`require_trusted` per effect kind** (list of fields or `true` = `["target","amount"]`):
+  `check()` returns `deny / untrusted_input` with the offending fields, and `redeem`
+  records the refusal as a `control` entry. `unknown` counts as untrusted when the policy
+  demands trust — silence is not evidence.
+- **Receipts carry a `taint` block** (`untrusted_fields`, `unknown_fields`,
+  `trusted_fields`, `material_untrusted`) so the evidence says what the gate saw, not only
+  what it decided.
+- A trusted source clears a field even if an untrusted one also covers it; a field with
+  only untrusted/unknown sources is tainted (one planted sentence is enough).
+
+### Detection rules for the new fields
+- `detect` adds `untrusted_input` (high), `weak_coverage` (medium, against
+  `min_coverage`, default `enforced`) and `coverage_missing` (low, opt-in via
+  `report_coverage_missing` so old ledgers stay quiet).
+
 ### DSSE + in-toto: other toolchains can read our receipts
 - **`mandate/dsse.py`**: DSSE envelopes (`pae()` matches the spec vector), signed with the
   same SSH keys as everything else. `mandate dsse sign --receipt F --key K --signer NAME

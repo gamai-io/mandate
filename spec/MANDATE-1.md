@@ -73,6 +73,19 @@ and principal = `approver`.
 ```
 `hash = sha256(jcs(body))`, `body.prev` = previous entry hash (or `GENESIS`).
 
+### `provenance[].trust` — where the field came from
+`trusted` (system of record), `untrusted` (document, email, web page, model output) or
+`unknown` (default). A policy may set `require_trusted: ["target", "amount"]` for an
+effect kind; then a field covered only by untrusted/unknown sources is refused with
+`untrusted_input`, and the refusal is written to the ledger. The receipt records what the
+gate saw:
+
+```json
+"taint": {"untrusted_fields": ["target"], "unknown_fields": [],
+          "trusted_fields": ["amount"], "material_untrusted": ["target"],
+          "tainted": true}
+```
+
 ### `coverage` — how the effect was captured
 Every receipt states the strength of the evidence, in this order:
 

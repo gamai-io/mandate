@@ -13,6 +13,9 @@ Rules (all offline, no model):
   amount            — single effect above the configured ceiling
   off_hours         — effect outside the configured window
   scope_unknown     — effect kind never granted in any supplied agent token
+  untrusted_input   — the receipt says the effect rested on untrusted input
+  weak_coverage     — the receipt was not enforced (observed / self_reported)
+  coverage_missing  — older receipt without a coverage class (informational)
 
 Each finding: {"rule", "severity", "agent", "evidence"}.
 """
@@ -28,6 +31,9 @@ DEFAULTS = {
     "max_amount": 5000,
     "business_hours_utc": [6, 20],
     "human_principals": ["renato", "ops", "owner", "approver"],
+    "min_coverage": "enforced",
+    # stare trake nemaju coverage; javljaj to samo ako korisnik traži
+    "report_coverage_missing": False,
     "window_seconds": 3600,
 }
 
@@ -160,6 +166,36 @@ def detect(ledger_path: str, config: dict | None = None,
                     findings.append({"rule": "scope_unknown", "severity": "medium",
                                      "agent": _agent(r),
                                      "evidence": {"kind": kind, "granted": sorted(granted)}})
+
+    # 7. the effect rested on input we do not trust (prompt-injection shape)
+    for r in receipts:
+        taint = r.get("taint") or {}
+        bad = [f for f in (taint.get("material_untrusted") or []) if f]
+        if bad:
+            findings.append({"rule": "untrusted_input", "severity": "high",
+                             "agent": _agent(r),
+                             "evidence": {"fields": bad, "kind": _kind(r),
+                                          "target": ((r.get("render") or {}).get("fields") or {})
+                                                     .get("target"),
+                                          "ts": _ts(r),
+                                          "grant_nonce": r.get("grant_nonce")}})
+
+    # 8. evidence weaker than the configured floor
+    floor = str(cfg.get("min_coverage") or "").strip().lower()
+    order = {"self_reported": 0, "observed": 1, "enforced": 2}
+    if floor in order:
+        for r in receipts:
+            cov = str(r.get("coverage") or "").strip().lower()
+            if cov and order.get(cov, -1) < order[floor]:
+                findings.append({"rule": "weak_coverage", "severity": "medium",
+                                 "agent": _agent(r),
+                                 "evidence": {"coverage": cov, "floor": floor,
+                                              "kind": _kind(r), "ts": _ts(r)}})
+            elif not cov and cfg.get("report_coverage_missing"):
+                findings.append({"rule": "coverage_missing", "severity": "low",
+                                 "agent": _agent(r),
+                                 "evidence": {"kind": _kind(r), "ts": _ts(r),
+                                              "why": "receipt has no coverage class"}})
 
     by_rule: dict[str, int] = defaultdict(int)
     for f in findings:
