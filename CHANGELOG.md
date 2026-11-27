@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — attack evaluation
+- **Eleven attacks, eleven caught, reproducible.** `tools/attack_eval.py` performs each
+  attack on a fresh valid record and reports which check caught it: edited receipt,
+  changed amount, swapped proof, forged witness pin, claim-only witness, foreign signing
+  key, replay, edited log record, dropped entry, and a rewritten entry re-signed with a
+  stolen log key. `tests/test_attacks.py` runs the list in CI; the table is
+  `docs/ATTACKS.md`.
+
 ## Unreleased — signed witness note
 - **The witness signs the pin.** `mandate witness accept --key …` stores an SSHSIG note
   over `log`, `log_id`, `tree_size`, `root_hash`, `pinned_at`; `audit verify
