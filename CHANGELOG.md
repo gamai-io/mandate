@@ -1,4 +1,34 @@
 # Changelog
+## 1.0.0 — 2026-11-27
+
+### What 1.0 means, concretely
+Not "finished" — **frozen where a bank needs it frozen**:
+
+| frozen at 1.0 | may still change |
+|---|---|
+| the record format: `intent`, `grant`, `receipt`, `control` entries, `spec/MANDATE-1.md` | firewall pattern sets, corpus size |
+| verification semantics: `verify`, `chain`, `audit verify`, the conformance kit's 11 cases | `warden` methods and thresholds |
+| the names used in these docs: `propose`, `grant`, `redeem`, `verify`, `audit bundle`, `replay` | TLS interception flags and limits |
+| the ledger file: hash-chained JSONL with a `.head` anchor, one `control` entry per refusal | optional adapters (payment/ERP/mail) |
+| refusal codes (`CommitmentMismatch`, `GrantReplayed`, `PolicyDenied`, `E_*`) | the CLI's output *fields* beyond those documented |
+
+A receipt issued at 1.0.0 must still verify at 1.9 and at 2.x; if that ever stops being
+true, it is a defect, not a version policy. Deprecations will be announced one minor release
+ahead and will never remove the ability to *verify* an old record.
+
+### Why now
+644 tests (0 failed), the conformance kit 11/11 against our verifier and 8/11 against a liar,
+an attack corpus of 20/20, byte-reproducible releases (`verify_pypi --tag v1.0.0` = 0 files
+differ), and the profile work of this week: a 157-line README with the limits stated, an
+install order, and no empty PyPI pages.
+
+### Carried over from 0.74.0
+- README 1,061 → 157 lines, long form kept verbatim in `docs/REFERENCE.md`.
+- `sigil-profile 0.22.4`: its `pyproject.toml` had no `readme` field, so PyPI showed an empty
+  description; it now ships 10,637 characters.
+- `gamai-plugins 0.2.12`: the "yanking is blocked" contradiction is gone — 0.2.6 must not be
+  used, and the yank is stated as outstanding rather than done.
+
 ## 0.74.0 — 2026-11-27
 
 ### The PyPI page is readable again: README 1,061 → 157 lines

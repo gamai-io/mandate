@@ -1,5 +1,12 @@
 # MANDATE-1
 
+## Stability (1.0)
+
+This format is frozen at 1.0.0. A record produced by any 1.x release must verify under any
+later 1.x, and under 2.x unless a major release says otherwise. Refusal codes are part of the
+format; adding one is a minor change, renaming one is not allowed.
+
+
 ## Canonicalization
 All objects are canonicalised per **RFC 8785 (JCS)**: UTF-16 code-unit key
 ordering, ECMAScript number serialization (`1170.0` → `1170`, `1e-7` → `1e-7`),
