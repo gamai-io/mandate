@@ -26,7 +26,7 @@ patterns do, not that prompt injection is solved. `docs/FIREWALL.md` lists every
 ## What a record looks like
 
 ```bash
-mandate firewall scan --text "key AKIAIOSFODNN7EXAMPLE"
+mandate firewall scan --text "key AKIA…(fake, 20 chars)"   # pravi ključ ide u --text, ne u dokument
 # {"outbound": {"ok": false, "findings": [{"kind": "aws_access_key", "action": "block",
 #  "masked": "AKIA…LE (20 chars)"}], "blocked": 1, ...}}
 ```

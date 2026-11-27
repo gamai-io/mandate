@@ -59,7 +59,10 @@ def markdown(res: dict) -> str:
              "## Every case", "",
              "| side | expected | hit | findings | text |", "|---|---|---|---|---|"]
     for r in res["rows"]:
-        text = r["text"].replace("|", "\\|")
+        # tekst napada se maskira: dokumentacija ne smije nositi literalni ključ
+        shown = (r["text"] if not r["expect"]
+                 else "[hypothetical attack text, %d chars — masked]" % len(r["text"]))
+        text = shown.replace("|", "\\|")
         if len(text) > 70:
             text = text[:67] + "…"
         lines.append("| %s | %s | %s | %s | `%s` |"

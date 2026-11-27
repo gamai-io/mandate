@@ -1,4 +1,15 @@
 # Changelog
+## 0.70.2 — 2026-11-27
+
+### Fixed
+- **The release workflow blocked 0.70.1 at the pre-publish scan**, correctly: the firewall
+  corpus must contain fake credentials, so the wheel and sdist carried strings the scanner
+  refuses. The scan now treats `firewall_corpus.json` (and `spec/firewall/corpus.json`) as a
+  reviewed fixture — every hit is still printed as a warning, and it is the only exception.
+- Documentation no longer quotes the fixture keys: the generated table masks attack texts
+  (`first 24 chars…[N chars]`) and the tests assemble the fake key at runtime instead of
+  parking a literal in a file.
+
 ## 0.70.1 — 2026-11-27
 
 ### Fixed

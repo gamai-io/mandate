@@ -75,6 +75,11 @@ def main() -> int:
             except Exception:
                 continue
             is_test = "/tests/" in name or name.startswith("tests/")
+            # Reviewed fixtures: the firewall corpus must contain fake credentials, otherwise
+            # it cannot test the patterns. It is listed here by name, every hit is still
+            # printed as a warning, and the file is the only exception.
+            is_corpus = name.endswith("firewall_corpus.json") or name.endswith(
+                "spec/firewall/corpus.json")
             is_meta = any(k in name for k in ("pyproject.toml", "PKG-INFO", "METADATA", ".dist-info/", "setup.cfg"))
             for sev, label, rx in RULES:
                 if label == "non-example email" and is_meta:
@@ -82,7 +87,12 @@ def main() -> int:
                 for m in rx.finditer(text):
                     line = text.count("\n", 0, m.start()) + 1
                     snippet = m.group(0)[:80].replace("\n", " ")
-                    eff = MED if (is_test and label == "assigned secret literal") else sev
+                    if is_corpus:
+                        eff = MED
+                    elif is_test and label == "assigned secret literal":
+                        eff = MED
+                    else:
+                        eff = sev
                     print(f"{eff:5} {art}:{name}:{line} [{label}] {snippet}")
                     if eff == HIGH:
                         blocks += 1
