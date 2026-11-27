@@ -548,6 +548,24 @@ def main(argv=None) -> int:
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
 
+    p_cap = sub.add_parser("cap", help="capability tokens that can only narrow")
+    p_cap.add_argument("action", choices=["mint", "attenuate", "verify", "check"])
+    p_cap.add_argument("--kinds", default="", help="comma-separated effect kinds")
+    p_cap.add_argument("--max-amount", dest="max_amount", type=float, default=None)
+    p_cap.add_argument("--currency", default=None)
+    p_cap.add_argument("--targets", default="", help="comma-separated targets")
+    p_cap.add_argument("--ttl", type=int, default=3600)
+    p_cap.add_argument("--max-uses", dest="max_uses", type=int, default=1)
+    p_cap.add_argument("--issuer", default=None)
+    p_cap.add_argument("--subject", default=None)
+    p_cap.add_argument("--parent", default=None)
+    p_cap.add_argument("--token", default=None)
+    p_cap.add_argument("--chain", default="", help="comma-separated token files, root first")
+    p_cap.add_argument("--intent", default=None)
+    p_cap.add_argument("--key", default=None)
+    p_cap.add_argument("--signers", default=argparse.SUPPRESS)
+    p_cap.add_argument("--out", "-o", default=None)
+
     p_disc = sub.add_parser("disclose", help="redacted view of a receipt (selective disclosure)")
     p_disc.add_argument("action", choices=["redact", "verify", "reveal"])
     p_disc.add_argument("--receipt", default=None)
@@ -1105,6 +1123,62 @@ def main(argv=None) -> int:
                 return 4
             _emit(res, None)
             return 0
+
+        if args.cmd == "cap":
+            from . import capability as cap_mod
+            def _scopes():
+                return {
+                    "kinds": ([k.strip() for k in args.kinds.split(",") if k.strip()]
+                              or None),
+                    "max_amount": args.max_amount,
+                    "currency": args.currency,
+                    "targets": ([t.strip() for t in args.targets.split(",") if t.strip()]
+                                or None),
+                }
+            try:
+                if args.action == "mint":
+                    if not (args.key and args.subject):
+                        _emit({"error": "usage",
+                               "message": "cap mint --subject S --key K [--kinds ...]"}, None)
+                        return 2
+                    token = cap_mod.mint(_scopes(), args.key,
+                                         args.issuer or args.subject, args.subject,
+                                         ttl_s=args.ttl, max_uses=args.max_uses)
+                elif args.action == "attenuate":
+                    if not (args.parent and args.key and args.subject):
+                        _emit({"error": "usage",
+                               "message": "cap attenuate --parent F --subject S --key K"}, None)
+                        return 2
+                    parent = core.load_json(args.parent)
+                    token = cap_mod.attenuate(parent, _scopes(), args.key, args.subject,
+                                              ttl_s=args.ttl, max_uses=args.max_uses,
+                                              signers_path=args.signers)
+                elif args.action == "verify":
+                    files = [f.strip() for f in (args.chain or args.token or "").split(",")
+                             if f.strip()]
+                    chain = [core.load_json(f) for f in files]
+                    out = cap_mod.verify_chain(chain, args.signers)
+                    _emit(out, None)
+                    return 0
+                else:                                   # check
+                    token = core.load_json(args.token)
+                    intent = core.load_json(args.intent) if args.intent else {}
+                    cap_mod.verify(token, args.signers)
+                    out = cap_mod.allows(token, intent)
+                    _emit(out, None)
+                    return 0 if out.get("ok") else 1
+                if args.out:
+                    with open(args.out, "w", encoding="utf-8") as fh:
+                        json.dump(token, fh, ensure_ascii=False, indent=2, sort_keys=True)
+                        fh.write("\n")
+                    _emit({"ok": True, "out": args.out, "digest": cap_mod.digest(token),
+                           "scopes": token["scopes"]}, None)
+                else:
+                    _emit(token, None)
+                return 0
+            except cap_mod.CapabilityError as exc:
+                _emit({"ok": False, "error": exc.code, "message": str(exc)}, None)
+                return 1
 
         if args.cmd == "disclose":
             from . import disclose as disc

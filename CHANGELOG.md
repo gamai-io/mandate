@@ -12,6 +12,17 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Capability tokens: delegated authority that can only narrow
+- **`mandate cap mint|attenuate|verify|check`** (`mandate/capability.py`): a signed token
+  with `kinds`, `max_amount`, `currency`, `targets`, `max_uses` and a validity window.
+  A child token may only narrow its parent — raising an amount, adding a kind, *dropping* a
+  restriction, extending the window or the use count are all `E_WIDEN`. Chains verify link
+  by link (`E_CHAIN`), the signature covers the whole token (`E_SIG`), and `mandate cap
+  check` answers "may this agent ask for this effect".
+- Root of trust is the same SSH signer list (namespace `mandate-capability`). A capability
+  token is not an authorisation: `redeem` still binds one specific effect.
+- Attack corpus 19 → 20: delegating more authority than you hold.
+
 ### Selective disclosure: a redacted receipt that still proves something
 - **`mandate disclose redact|verify|reveal`** (`mandate/disclose.py`): hidden fields become
   salted commitments (`sha256("salt:"||salt||":"||jcs(value))`), the view records the hash of

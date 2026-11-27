@@ -320,6 +320,19 @@ def attacks(env: dict) -> list[dict]:
             caught, detail = True, f"{getattr(exc, 'code', 'E_DISCLOSURE')}: {exc}"
         record("18. swap a value in a redacted view", caught, "mandate.disclose", detail)
 
+    # 19 delegate more authority than you hold
+    from mandate import capability as cap_mod
+    root = cap_mod.mint({"kinds": ["payment.send"], "max_amount": 500},
+                        env["keys"]["approver"], "approver", "approver", ttl_s=600,
+                        max_uses=2)
+    try:
+        cap_mod.attenuate(root, {"kinds": ["payment.send"], "max_amount": 5000},
+                          env["keys"]["approver"], "agent@example")
+        caught, detail = False, "a wider child token was minted"
+    except cap_mod.CapabilityError as exc:
+        caught, detail = True, f"{exc.code}: {exc}"
+    record("19. delegate more authority than you hold", caught, "mandate.capability", detail)
+
     return out
 
 
