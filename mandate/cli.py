@@ -560,7 +560,8 @@ def main(argv=None) -> int:
     p_cap.add_argument("--max-amount", dest="max_amount", type=float, default=None)
     p_cap.add_argument("--currency", default=None)
     p_cap.add_argument("--targets", default="", help="comma-separated targets")
-    p_cap.add_argument("--ttl", type=int, default=3600)
+    # bez --ttl: mint uzima 3600 s, attenuate nasljeđuje preostali rok roditelja
+    p_cap.add_argument("--ttl", type=int, default=None)
     p_cap.add_argument("--max-uses", dest="max_uses", type=int, default=1)
     p_cap.add_argument("--issuer", default=None)
     p_cap.add_argument("--subject", default=None)
@@ -1185,7 +1186,7 @@ def main(argv=None) -> int:
                         return 2
                     token = cap_mod.mint(_scopes(), args.key,
                                          args.issuer or args.subject, args.subject,
-                                         ttl_s=args.ttl, max_uses=args.max_uses)
+                                         ttl_s=(args.ttl or 3600), max_uses=args.max_uses)
                 elif args.action == "attenuate":
                     if not (args.parent and args.key and args.subject):
                         _emit({"error": "usage",

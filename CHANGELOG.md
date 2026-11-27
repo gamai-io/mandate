@@ -1,4 +1,16 @@
 # Changelog
+## 0.69.1 — 2026-11-27
+
+### Fixed
+- **Lint in CI.** The `v0.69.0` tag failed the release workflow at `Lint` (seven unused
+  imports in the new modules and tests). `ruff check .` is clean now; no functional change.
+
+### Build
+- **Reproducible artifacts.** Built with `tools/build_release.sh v0.69.1`: the tag archive
+  is extracted, `SOURCE_DATE_EPOCH` is pinned to the tag commit, the sdist is normalised and
+  `twine check` runs. Two independent builds produce identical sha256 sums, which is what
+  `tools/verify_pypi.py --tag v0.69.1` compares after the upload.
+
 ## 0.69.0 — 2026-11-27
 
 ### Coverage classes: a receipt now says how it was captured
