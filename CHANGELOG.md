@@ -1,4 +1,31 @@
 # Changelog
+## 0.72.1 — 2026-11-27
+
+### Fixed
+- **GitHub push protection blocked the 0.72.0 push**: the corpus carried a literal Twilio
+  SID fixture, which is exactly what the pattern must match. Fixtures that a secret scanner
+  flags are now stored as templates (`AC{{hex32}}`) and expanded by
+  `firewall.expand_fixture()` at run time — the corpus stays committable, the pattern is
+  still tested against a realistic value, and the CLI selftest scores the same corpus.
+- 0.72.0 stays on PyPI (it installs and works); this release exists so the tagged source is
+  the one that can be pushed and verified byte for byte.
+
+## 0.72.0 — 2026-11-27
+
+### Firewall: 31 outbound and 18 inbound patterns, each with a case
+- **New outbound**: Azure `AccountKey`, SendGrid (`SG.`), Twilio SID, npm token, PyPI token,
+  DigitalOcean (`dop_v1_`), Hugging Face (`hf_`), Shopify (`shpat_`), Telegram bot token,
+  Discord and Slack webhooks, `aws_secret_access_key`, JMBG (13 digits **with the mod-11
+  check digit and a plausible date**, so ordinary 13-digit references stay clean), passport
+  MRZ.
+- **New inbound**: chat-template markers (`<|im_start|>system`), `[SYSTEM]:` spoof, "you have
+  no restrictions" (narrowed so "no restrictions on file size" is **not** a hit),
+  "pretend you are", "from now on you always", "approve without review", `javascript:`
+  links, "translate then execute".
+- Corpus 45 → **75 cases** (49 attack/leak, 26 benign): `0 missed, 0 false positives`.
+  Two benign lookalikes were added specifically to catch over-broad patterns, and one of
+  them found a real false positive on the first run.
+
 ## 0.71.0 — 2026-11-27
 
 ### The firewall now closes the loop: MCP responses and a taint bridge

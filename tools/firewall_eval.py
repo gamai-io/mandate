@@ -24,8 +24,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "mandate" / "data" / "firewall_corpus.json"   # isti fajl, ali ide u wheel
 
 
+def expand(text: str) -> str:
+    return firewall.expand_fixture(text)
+
+
 def run() -> dict:
     data = json.loads(CORPUS.read_text(encoding="utf-8"))
+    for side in ("outbound", "inbound"):
+        for case in data[side]:
+            case["text"] = expand(case["text"])
     rows = []
     for side, scanner in (("outbound", firewall.scan_outbound),
                           ("inbound", firewall.scan_inbound)):

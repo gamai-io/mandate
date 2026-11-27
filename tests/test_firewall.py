@@ -23,6 +23,9 @@ class Corpus(unittest.TestCase):
 
     def setUp(self):
         self.data = json.loads(CORPUS.read_text(encoding="utf-8"))
+        for side in ("outbound", "inbound"):
+            for case in self.data[side]:
+                case["text"] = firewall.expand_fixture(case["text"])
 
     def test_outbound(self):
         for case in self.data["outbound"]:

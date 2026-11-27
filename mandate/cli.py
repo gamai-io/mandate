@@ -1175,14 +1175,14 @@ def main(argv=None) -> int:
                                      / "data" / "firewall_corpus.json").read_text(encoding="utf-8"))
                 tp = fn = fp = tn = 0
                 for case in corpus["outbound"]:
-                    r = fw.scan_outbound(case["text"])
+                    r = fw.scan_outbound(fw.expand_fixture(case["text"]))
                     hit = (not r["ok"]) or bool(r["redactable"])
                     tp += hit and case["expect"]
                     fn += (not hit) and case["expect"]
                     fp += hit and not case["expect"]
                     tn += (not hit) and not case["expect"]
                 for case in corpus["inbound"]:
-                    r = fw.scan_inbound(case["text"])
+                    r = fw.scan_inbound(fw.expand_fixture(case["text"]))
                     hit = (not r["ok"]) or bool(r["flagged"])
                     tp += hit and case["expect"]
                     fn += (not hit) and case["expect"]
