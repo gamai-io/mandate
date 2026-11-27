@@ -12,6 +12,17 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Hardware-rooted signing: inspection, and what the gate already enforced
+- **`mandate hardware list|check`**: per-signer key type and a `hardware` flag; `check
+  --signature` reports the key that *actually produced* the signature (not the first
+  matching signers line), exiting 0 only when it is an `sk-` key.
+- `docs/HARDWARE.md` separates the two questions that get conflated: a hardware *key*
+  (`require_hardware_key`, already enforced in `redeem`, refusal recorded as a control
+  entry) and a WebAuthn *assertion* (`mandate/webauthn.py`: challenge, origin, rpIdHash,
+  counter — attestation `none` only, so vendor identity is not claimed).
+- No new cryptography: the gate existed since the hardware-key work; what was missing was
+  an inspection surface and a document that states the limits.
+
 ### Capability tokens: delegated authority that can only narrow
 - **`mandate cap mint|attenuate|verify|check`** (`mandate/capability.py`): a signed token
   with `kinds`, `max_amount`, `currency`, `targets`, `max_uses` and a validity window.

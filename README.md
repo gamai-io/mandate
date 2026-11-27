@@ -30,8 +30,9 @@ verified record. [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) is how to run the 
 *your* verifier and publish the record behind the badge. [`docs/DISCLOSURE.md`](docs/DISCLOSURE.md)
 is how to hand an auditor a redacted record that still proves it is the same record.
 [`docs/CAPABILITIES.md`](docs/CAPABILITIES.md) is delegated authority that can only narrow.
+[`docs/HARDWARE.md`](docs/HARDWARE.md) says exactly what a security key proves and what it does not.
 
-**Status:** 608 tests collected; 0 failed. On a host with Node and bubblewrap 603
+**Status:** 612 tests collected; 0 failed. On a host with Node and bubblewrap 607
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 

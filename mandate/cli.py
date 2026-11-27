@@ -548,6 +548,12 @@ def main(argv=None) -> int:
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
 
+    p_hw = sub.add_parser("hardware", help="which signing keys are hardware-backed")
+    p_hw.add_argument("action", choices=["list", "check"], nargs="?", default="list")
+    p_hw.add_argument("--signers", default=argparse.SUPPRESS)
+    p_hw.add_argument("--name", default=None)
+    p_hw.add_argument("--signature", default=None, help="SSHSIG file: check the key that signed")
+
     p_cap = sub.add_parser("cap", help="capability tokens that can only narrow")
     p_cap.add_argument("action", choices=["mint", "attenuate", "verify", "check"])
     p_cap.add_argument("--kinds", default="", help="comma-separated effect kinds")
@@ -1122,6 +1128,42 @@ def main(argv=None) -> int:
                 _emit({"error": "ShipError", "message": str(exc)}, None)
                 return 4
             _emit(res, None)
+            return 0
+
+        if args.cmd == "hardware":
+            from . import sign as sign_mod
+            rows = []
+            path = args.signers
+            try:
+                text = open(path, encoding="utf-8").read()
+            except OSError as exc:
+                _emit({"error": "io", "message": str(exc)}, None)
+                return 2
+            for line in text.splitlines():
+                parts = line.split()
+                if not parts or line.strip().startswith("#"):
+                    continue
+                name = parts[0]
+                alg = next((p for p in parts if p.startswith(("ssh-", "ecdsa-", "sk-"))), "")
+                rows.append({"name": name, "keytype": alg,
+                             "hardware": sign_mod.is_hardware_key(alg)})
+            if args.name:
+                rows = [r for r in rows if r["name"] == args.name]
+            if args.signature:
+                try:
+                    sig = open(args.signature, encoding="utf-8").read()
+                except OSError as exc:
+                    _emit({"error": "io", "message": str(exc)}, None)
+                    return 2
+                name = args.name or (rows[0]["name"] if rows else "")
+                keytype = sign_mod.keytype_for_signature(
+                    name, sig, path, sign_mod.DEFAULT_NAMESPACE, revoked_path=args.revoked)
+                _emit({"ok": True, "signer": name, "signing_keytype": keytype,
+                       "hardware": sign_mod.is_hardware_key(keytype)}, None)
+                return 0 if sign_mod.is_hardware_key(keytype) else 1
+            hardware = [r for r in rows if r["hardware"]]
+            _emit({"ok": True, "signers": rows, "hardware": len(hardware),
+                   "software": len(rows) - len(hardware)}, None)
             return 0
 
         if args.cmd == "cap":
