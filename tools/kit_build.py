@@ -20,7 +20,7 @@ import tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from mandate import audit, core, export  # noqa: E402
+from mandate import core, export  # noqa: E402
 from mandate import log as mlog  # noqa: E402
 from mandate import witness as mwit  # noqa: E402
 
