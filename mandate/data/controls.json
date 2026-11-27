@@ -104,9 +104,9 @@
   {
    "n": 12,
    "control": "Detection and reporting of agent incidents",
-   "artifact": "mandate detect (human-credential use, self-approval, velocity, amount ceiling, off-hours, scope not granted, untrusted input, weak coverage; --write puts the alert in the hash chain)",
+   "artifact": "mandate detect: human-credential use, self-approval, velocity, amount ceiling, off-hours, scope not granted, untrusted input, weak coverage; tool sequences from the MCP ledger (fetch->pay, pay after a blocked response, tool loop); CEF/LEEF/jsonl output for a SIEM; every finding carries a proposed DORA Art. 18 class; --write puts the alert in the hash chain",
    "status": "partial",
-   "missing": "tool-sequence anomalies (needs tool-level events); SIEM export; incident classification per DORA Art. 18",
+   "missing": "the bank's incident process and classification sign-off; per-tenant SIEM routing",
    "owner": "bank+us"
   }
  ],

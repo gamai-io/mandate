@@ -659,6 +659,11 @@ def main(argv=None) -> int:
     p_detect.add_argument("--svid", action="append", default=None)
     p_detect.add_argument("--write", action="store_true",
                           help="append findings as control records (type=alert)")
+    p_detect.add_argument("--mcp-ledger", dest="mcp_ledger", default=None,
+                          help="MCP proxy ledger: enables tool-sequence rules")
+    p_detect.add_argument("--format", dest="fmt", default="json",
+                          choices=("json", "cef", "leef", "jsonl"),
+                          help="output format for the findings (SIEM: cef/leef)")
 
     p_svid = sub.add_parser("svid")
     p_svid.add_argument("action", choices=("issue", "verify", "delegate"))
@@ -1493,7 +1498,7 @@ def main(argv=None) -> int:
             tokens = [svid.load(p) for p in (args.svid or [])]
             res = detect.detect(args.ledger,
                                 detect.load_config(getattr(args, "policy", None)),
-                                tokens=tokens)
+                                tokens=tokens, mcp_ledger=args.mcp_ledger or "")
             if args.write and res["findings"]:
                 core.append_receipt(args.ledger, {"v": 1, "type": "control",
                                                   "action": "alert",
@@ -1501,6 +1506,17 @@ def main(argv=None) -> int:
                                                   "reason": "runtime detection",
                                                   "ts": res["checked_at"],
                                                   "findings": res["findings"]})
+            fmt = getattr(args, "fmt", "json")
+            if fmt in ("cef", "leef"):
+                # SIEM-ovi čitaju linije, ne JSON: jedno nalaz = jedan red
+                render = detect.to_cef if fmt == "cef" else detect.to_leef
+                for finding in res["findings"]:
+                    print(render(finding))
+                return 0 if res["ok"] else 1
+            if fmt == "jsonl":
+                for finding in res["findings"]:
+                    print(json.dumps(finding, ensure_ascii=False, sort_keys=True))
+                return 0 if res["ok"] else 1
             _emit(res, None)
             return 0 if res["ok"] else 1
 

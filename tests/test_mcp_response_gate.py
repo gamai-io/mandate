@@ -80,7 +80,7 @@ class ResponseGate(unittest.TestCase):
         self.assertIn("error", res)
         self.assertEqual(res["error"]["code"], -32005)
         self.assertIn("blocked", res["error"]["message"])
-        entries = [json.loads(x) for x in
+        entries = [json.loads(x).get("body", {}) for x in
                    pathlib.Path(self.ledger).read_text(encoding="utf-8").splitlines() if x]
         blocked = [e for e in entries if e.get("code") == "ResponseBlocked"]
         self.assertTrue(blocked, entries)

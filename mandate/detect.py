@@ -95,8 +95,117 @@ def _is_human(name: str, humans: list[str]) -> bool:
     return base in {h.lower() for h in humans}
 
 
+SEQUENCE_FETCH = ("read", "web_fetch", "fetch", "browse", "search", "scrape", "http_get")
+SEQUENCE_PAY = ("pay", "transfer", "send", "wire", "refund", "payout")
+
+
+def _mcp_events(path: str) -> list[dict]:
+    if not path or not os.path.exists(path):
+        return []
+    out = []
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        body = entry.get("body") if isinstance(entry.get("body"), dict) else entry
+        if not isinstance(body, dict):
+            continue
+        body.setdefault("_ts", body.get("ts") or 0)
+        out.append(body)
+    return out
+
+
+def sequences(mcp_ledger: str, window_s: float = 120.0,
+              repeat_window_s: float = 60.0, repeats: int = 5) -> list[dict]:
+    """Tool-level anomalies a per-receipt view cannot see.
+
+    fetch -> pay inside the window is the shape of an injected instruction that reached the
+    agent and was acted on; pay right after a blocked response is the same attempt with the
+    firewall already firing; the same tool five times in a minute is a loop, not work.
+    """
+    events = [e for e in _mcp_events(mcp_ledger) if e.get("ts")]
+    events.sort(key=lambda e: float(e["ts"]))
+    findings: list[dict] = []
+    for i, event in enumerate(events):
+        tool = str(event.get("tool") or "").lower()
+        if tool in SEQUENCE_FETCH:
+            for later in events[i + 1:]:
+                if float(later["ts"]) - float(event["ts"]) > window_s:
+                    break
+                if str(later.get("tool") or "").lower() in SEQUENCE_PAY:
+                    findings.append({
+                        "rule": "fetch_then_pay", "severity": "high",
+                        "agent": str(later.get("audience") or event.get("audience") or ""),
+                        "evidence": {"fetch": tool, "pay": str(later.get("tool")),
+                                     "gap_s": round(float(later["ts"]) - float(event["ts"]), 1)}})
+                    break
+        # pay_after_block se gleda za SVAKI pay događaj, ne samo kad je prethodni fetch
+        if tool in SEQUENCE_PAY:
+            blockers = [e for e in events[:i] if e.get("code") == "ResponseBlocked"
+                        and float(event["ts"]) - float(e["ts"]) <= 300]
+            if blockers:
+                findings.append({
+                    "rule": "pay_after_block", "severity": "high",
+                    "agent": str(event.get("audience") or ""),
+                    "evidence": {"tool": tool, "blocked_s_before":
+                                 round(float(event["ts"]) - float(blockers[-1]["ts"]), 1)}})
+    buckets: dict[tuple, list[float]] = defaultdict(list)
+    for event in events:
+        buckets[(str(event.get("tool") or ""), str(event.get("audience") or ""))].append(
+            float(event["ts"]))
+    for (tool, audience), stamps in buckets.items():
+        stamps.sort()
+        for start in range(len(stamps)):
+            inside = [t for t in stamps[start:] if t - stamps[start] <= repeat_window_s]
+            if len(inside) >= repeats:
+                findings.append({"rule": "tool_loop", "severity": "medium", "agent": audience,
+                                 "evidence": {"tool": tool, "calls": len(inside),
+                                              "window_s": repeat_window_s}})
+                break
+    return findings
+
+
+def classify(finding: dict) -> dict:
+    """A proposed DORA Art. 18 classification; the bank decides, we do not."""
+    severity = str(finding.get("severity") or "")
+    return {"class": "major" if severity == "high" else "incident",
+            "basis": "severity=%s; proposal only, the bank classifies" % severity}
+
+
+def to_cef(finding: dict) -> str:
+    """ArcSight CEF line. Escapes the delimiters so a target with '|' cannot break the row."""
+    def esc(value) -> str:
+        return (str(value).replace("\\", "\\\\").replace("|", "\\|")
+                .replace("=", "\\=").replace("\n", " "))
+
+    evidence = finding.get("evidence") or {}
+    severity = {"high": 8, "medium": 5, "low": 2}.get(str(finding.get("severity")), 3)
+    return ("CEF:0|gamai|mandate|1.0|%s|%s|%d|src=%s cs1Label=rule cs1=%s "
+            "cs2Label=evidence cs2=%s" % (
+                esc(finding.get("rule")), esc(finding.get("rule")), severity,
+                esc(finding.get("agent") or "-"), esc(finding.get("rule")),
+                esc(json.dumps(evidence, ensure_ascii=False, sort_keys=True)[:400])))
+
+
+def to_leef(finding: dict) -> str:
+    """QRadar LEEF 2.0 line: tab-separated, values tab-escaped."""
+    evidence = finding.get("evidence") or {}
+    severity = {"high": 8, "medium": 5, "low": 2}.get(str(finding.get("severity")), 3)
+    def esc(value) -> str:
+        return str(value).replace("\t", " ").replace("\n", " ")
+    return "LEEF:2.0|gamai|mandate|1.0|%s|^|devTimeFormat=unix\tsev=%d\tcat=%s\tsrc=%s\tevidence=%s" % (
+        esc(finding.get("rule")), severity, esc(finding.get("rule")),
+        esc(finding.get("agent") or "-"),
+        esc(json.dumps(evidence, ensure_ascii=False, sort_keys=True)[:400]))
+
+
 def detect(ledger_path: str, config: dict | None = None,
-           tokens: list[dict] | None = None, now: float | None = None) -> dict:
+           tokens: list[dict] | None = None, now: float | None = None,
+           mcp_ledger: str = "") -> dict:
     cfg = dict(DEFAULTS, **(config or {}))
     now = time.time() if now is None else now
     receipts = _receipts(ledger_path)
@@ -196,6 +305,15 @@ def detect(ledger_path: str, config: dict | None = None,
                                  "agent": _agent(r),
                                  "evidence": {"kind": _kind(r), "ts": _ts(r),
                                               "why": "receipt has no coverage class"}})
+
+    if mcp_ledger:
+        findings.extend(sequences(mcp_ledger,
+                                  float(cfg.get("sequence_window_s") or 120),
+                                  float(cfg.get("repeat_window_s") or 60),
+                                  int(cfg.get("repeats") or 5)))
+
+    for finding in findings:
+        finding["dora"] = classify(finding)
 
     by_rule: dict[str, int] = defaultdict(int)
     for f in findings:

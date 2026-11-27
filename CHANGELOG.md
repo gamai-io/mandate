@@ -1,4 +1,20 @@
 # Changelog
+## 1.0.4 — 2026-11-28
+
+### Detection a SOC can actually consume (row 12)
+- **Tool sequences** (`detect --mcp-ledger mcp.jsonl`): `fetch_then_pay` (a read/fetch tool
+  followed by a pay-like tool inside 120 s — the shape of an injected instruction that landed),
+  `pay_after_block` (a payment attempt within 300 s of a response the firewall already blocked),
+  and `tool_loop` (the same tool five times in a minute — a loop, not work). The MCP proxy now
+  records **every** `tools/call`, not only refusals.
+- **SIEM output**: `detect --format cef|leef|jsonl` renders one line per finding for ArcSight
+  CEF and QRadar LEEF, with the delimiters escaped (a target containing `|` or `=` cannot break
+  the row) and severity mapped to the platform's number.
+- **DORA proposal**: every finding carries `dora: {class, basis}` — `major` for high severity,
+  `incident` otherwise, explicitly labelled a proposal; the bank classifies.
+- Control matrix row 12 updated in `docs/BANK_CONTROL_MATRIX.md` and
+  `mandate/data/controls.json`.
+
 ## 1.0.3 — 2026-11-28
 
 ### Fixed

@@ -173,13 +173,22 @@ def probe(cmd: str, timeout: float = 10, server: str = "",
 
 
 def _record_mcp(ledger_path: str, body: dict) -> None:
-    """Evidence for a mediated decision; never let it hide."""
+    """Evidence for a mediated decision; never let it hide.
+
+    Written through `core.append_receipt`, not as a bare JSON line: the same file is the
+    hash chain that `redeem` uses for its nonce store, and a raw line makes the chain
+    unreadable (`grant rejected (MandateError)`). One ledger, one shape.
+    """
     try:
-        os.makedirs(os.path.dirname(os.path.abspath(ledger_path)), exist_ok=True)
-        with open(ledger_path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(body, ensure_ascii=False, sort_keys=True) + "\n")
-    except OSError:
-        pass
+        from . import core as _core
+        _core.append_receipt(ledger_path, body)
+    except Exception:  # noqa: BLE001
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(ledger_path)), exist_ok=True)
+            with open(ledger_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(body, ensure_ascii=False, sort_keys=True) + "\n")
+        except OSError:
+            pass
 
 
 def proxy(lock: dict, cmd: str, signers_path: str,
@@ -250,7 +259,11 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                 out_stream.write(line)
                 out_stream.flush()
                 continue
-            method = pending.pop(message.get("id"), None)
+            _entry = pending.pop(message.get("id"), None)
+            if isinstance(_entry, tuple):
+                method, _tool_name = _entry
+            else:
+                method, _tool_name = _entry, ""
             if method == "tools/call" and "result" in message:
                 # RESPONSE_GATE_V1: alat vrati dokument/web/red -> skeniraj prije modela
                 from . import firewall as _firewall
@@ -260,7 +273,7 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                                                  + scan["outbound"]["findings"])]
                     _record_mcp(ledger_path, {
                         "v": 1, "type": "control", "action": "refuse",
-                        "code": "ResponseBlocked", "tool": str(method),
+                        "code": "ResponseBlocked", "tool": _tool_name or "tools/call",
                         "findings": kinds[:8], "chars": scan["chars"],
                         "ts": int(time.time())})
                     message = {"jsonrpc": "2.0", "id": message.get("id"),
@@ -311,6 +324,10 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                     if reason:
                         deny(mid, reason)
                         continue
+                _record_mcp(ledger_path, {
+                    "v": 1, "type": "control", "action": "call", "tool": name,
+                    "decision": "allow", "audience": audience,
+                    "ts": int(time.time())})
                 params["arguments"] = arguments
                 message["params"] = params
                 if verify_calls:
@@ -332,7 +349,10 @@ def proxy(lock: dict, cmd: str, signers_path: str,
             # pamtimo metod za SVAKI zahtjev sa id-em: reader mora znati da li odgovor
             # pripada tools/call (tada ga skenira) ili tools/list (tada provjerava lock)
             if mid is not None:
-                pending[mid] = method
+                _pending_tool = ""
+                if method == "tools/call":
+                    _pending_tool = str((message.get("params") or {}).get("name") or "")
+                pending[mid] = (method, _pending_tool)
             proc.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
             proc.stdin.flush()
     finally:

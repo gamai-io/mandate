@@ -37,4 +37,4 @@ try:  # single source of truth: installed distribution metadata
     from importlib.metadata import version as _pkg_version
     __version__ = _pkg_version("gama-mandate")
 except Exception:  # running from a source tree without an installed dist
-    __version__ = "1.0.3"
+    __version__ = "1.0.4"
