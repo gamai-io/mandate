@@ -75,11 +75,13 @@ jobs:
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086
         with:
           attestations: true
+          skip_existing: true
       - name: Publish (API token)
         if: vars.PYPI_OIDC != 'true'
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip_existing: true
 
   github-release:
     needs: [build, publish]
