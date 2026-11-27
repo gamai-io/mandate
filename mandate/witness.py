@@ -53,15 +53,17 @@ def save_state(path: str, state: dict) -> None:
 
 def accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
            revoked_path: str | None = None, dry_run: bool = False,
-           key_path: str | None = None, signer: str = "") -> dict:
+           key_path: str | None = None, signer: str = "",
+           pq_key_path: str | None = None) -> dict:
     with _LOCK:
         return _accept(sth, proof, signers_path, state_path, revoked_path,
-                       dry_run, key_path, signer)
+                       dry_run, key_path, signer, pq_key_path)
 
 
 def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
             revoked_path: str | None = None, dry_run: bool = False,
-            key_path: str | None = None, signer: str = "") -> dict:
+            key_path: str | None = None, signer: str = "",
+            pq_key_path: str | None = None) -> dict:
     if not mlog.verify_sth(sth, signers_path, revoked_path=revoked_path):
         raise WitnessError("STH signature invalid")
     payload = (sth or {}).get("sth") or {}
@@ -77,7 +79,7 @@ def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
         new_state = {"v": 1, "log_name": log_name, "log_id": log_id,
                      "tree_size": size, "root_hash": root, "sth": sth,
                      "pinned_at": int(time.time() * 1000)}
-        _maybe_sign(new_state, sth, key_path, signer)
+        _maybe_sign(new_state, sth, key_path, signer, pq_key_path)
         if not dry_run:
             save_state(state_path, new_state)
         return {"ok": True, "first": True, "state": new_state}
@@ -107,21 +109,23 @@ def _accept(sth: dict, proof: dict | None, signers_path: str, state_path: str,
     new_state = {"v": 1, "log_name": log_name, "log_id": log_id,
                  "tree_size": size, "root_hash": root, "sth": sth,
                  "pinned_at": int(time.time() * 1000)}
-    _maybe_sign(new_state, sth, key_path, signer)
+    _maybe_sign(new_state, sth, key_path, signer, pq_key_path)
     if not dry_run:
         save_state(state_path, new_state)
     return {"ok": True, "advanced": True, "from": old_size, "to": size,
             "state": new_state}
 
 
-def _maybe_sign(state: dict, sth: dict, key_path: str | None, signer: str) -> None:
+def _maybe_sign(state: dict, sth: dict, key_path: str | None, signer: str,
+                pq_key_path: str | None = None) -> None:
     """Attach a note the witness host signed; without a key there is only a claim."""
     if not key_path:
         return
     from . import witness_note
     try:
         state["note"] = witness_note.make(sth, key_path, signer or "witness",
-                                          pinned_at=state.get("pinned_at"))
+                                          pinned_at=state.get("pinned_at"),
+                                          pq_key_path=pq_key_path)
     except Exception as exc:                       # no note beats a half-written one
         raise WitnessError("could not sign the witness note") from exc
 

@@ -200,6 +200,20 @@ def _cmd_log(args) -> int:
     return 2
 
 
+def _pq_keys(path):
+    """Read allowed ML-DSA public keys: one base64 key per line, optional `name key`."""
+    if not path:
+        return None
+    keys = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            keys.append(line.split()[-1])
+    return keys
+
+
 def _cmd_witness(args) -> int:
     from . import witness as mwit
     cmd = getattr(args, "witness_cmd", None)
@@ -211,7 +225,8 @@ def _cmd_witness(args) -> int:
                               revoked_path=args.revoked,
                               dry_run=(cmd == "verify"),
                               key_path=getattr(args, "key", None),
-                              signer=getattr(args, "signer", "witness"))
+                              signer=getattr(args, "signer", "witness"),
+                              pq_key_path=getattr(args, "pq_key", None))
             _emit(out, None)
             return 0
         if cmd == "show":
@@ -781,12 +796,18 @@ def main(argv=None) -> int:
     p_wa.add_argument("--key", default=None,
                       help="witness signing key; without it the state is a claim, not a note")
     p_wa.add_argument("--signer", default="witness")
+    p_wa.add_argument("--pq-key", dest="pq_key", default=None,
+                      help="ML-DSA-65 key; makes the note hybrid (Ed25519 + ML-DSA)")
     p_wv = wit_sub.add_parser("verify")
     p_wv.add_argument("--state", required=True)
     p_wv.add_argument("--sth", required=True)
     p_wv.add_argument("--proof", default=None)
     p_ws = wit_sub.add_parser("show")
     p_ws.add_argument("--state", required=True)
+    p_pq = sub.add_parser("pq")
+    pq_sub = p_pq.add_subparsers(dest="pq_cmd")
+    p_pqk = pq_sub.add_parser("keygen")
+    p_pqk.add_argument("--out", required=True)
     p_wserve = wit_sub.add_parser("serve")
     p_wserve.add_argument("--state", required=True)
     p_wserve.add_argument("--token", default=os.environ.get(
@@ -909,6 +930,8 @@ def main(argv=None) -> int:
     p_av.add_argument("--log-signers", dest="log_signers", required=True)
     p_av.add_argument("--witness-signers", dest="witness_signers", default=None,
                       help="allowed witness keys; without it a witness state is only a claim")
+    p_av.add_argument("--pq-witness-keys", dest="pq_witness_keys", default=None,
+                      help="file with allowed ML-DSA-65 witness public keys (one per line)")
 
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
@@ -1402,6 +1425,16 @@ def main(argv=None) -> int:
         if args.cmd == "witness":
             return _cmd_witness(args)
 
+        if args.cmd == "pq":
+            from . import hybrid
+            if getattr(args, "pq_cmd", None) == "keygen":
+                public = hybrid.pq_keygen(args.out)
+                _emit({"ok": True, "alg": hybrid.ALG, "public_key": public,
+                       "private_key": args.out}, None)
+                return 0
+            _emit({"error": "unknown_pq_command"}, None)
+            return 2
+
         if args.cmd == "approver":
             return _cmd_approver(args)
 
@@ -1456,7 +1489,8 @@ def main(argv=None) -> int:
                     result = maudit.verify_bundle_file(
                         args.bundle, args.signers, args.log_signers,
                         revoked_path=args.revoked,
-                        witness_signers_path=getattr(args, "witness_signers", None))
+                        witness_signers_path=getattr(args, "witness_signers", None),
+                        pq_witness_keys=_pq_keys(getattr(args, "pq_witness_keys", None)))
                     _emit(result, None)
                     return 0 if result.get("valid") else 1
             except (core.MandateError, OSError, ValueError) as exc:

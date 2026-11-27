@@ -45,13 +45,17 @@ def text_for(payload: dict, pinned_at: int) -> str:
         raise WitnessNoteError("STH payload invalid") from exc
 
 
-def make(sth: dict, key_path: str, signer: str, pinned_at: int | None = None) -> dict:
+def make(sth: dict, key_path: str, signer: str, pinned_at: int | None = None,
+         pq_key_path: str | None = None) -> dict:
     payload = (sth or {}).get("sth") or {}
     when = int(pinned_at if pinned_at is not None else time.time() * 1000)
     text = text_for(payload, when)
-    return {"format": FORMAT, "signer": str(signer),
-            "text": text,
+    note = {"format": FORMAT, "signer": str(signer), "text": text,
             "signature": sign.sign(text, key_path, NAMESPACE)}
+    if pq_key_path:
+        from . import hybrid
+        note["hybrid"] = hybrid.sign_note(text, key_path, str(signer), pq_key_path)
+    return note
 
 
 def parse(text: str) -> dict:
@@ -76,9 +80,11 @@ def parse(text: str) -> dict:
 
 
 def verify(note: dict, signers_path: str, sth: dict,
-           revoked_path: str | None = None) -> dict:
+           revoked_path: str | None = None,
+           pq_keys: list[str] | None = None) -> dict:
     """Return {'valid': bool, 'note': bool, 'matches_sth': bool, 'signer': str}."""
-    result = {"valid": False, "note": False, "matches_sth": False, "signer": ""}
+    result = {"valid": False, "note": False, "matches_sth": False, "signer": "",
+              "hybrid": False, "no_downgrade": True}
     if not isinstance(note, dict) or note.get("format") != FORMAT:
         return result
     text = str(note.get("text") or "")
@@ -92,10 +98,23 @@ def verify(note: dict, signers_path: str, sth: dict,
     except (OSError, ValueError, WitnessNoteError):
         return result
     payload = (sth or {}).get("sth") or {}
+    if isinstance(note.get("hybrid"), dict):
+        # a hybrid note must verify as hybrid: an auditor without the PQ key gets "no",
+        # not a silently downgraded Ed25519-only "yes"
+        from . import hybrid
+        checked = hybrid.verify_note(text, note["hybrid"], signers_path,
+                                     list(pq_keys or []), revoked_path=revoked_path)
+        result["hybrid"] = bool(checked["valid"])
+        result["no_downgrade"] = bool(checked["ed25519"])
+        if not checked["valid"]:
+            result["valid"] = False
+            return result
     result["matches_sth"] = (
         str(fields["log"]) == str(payload.get("log_name"))
         and str(fields["log_id"]) == str(payload.get("log_id"))
         and int(fields["tree_size"]) == int(payload.get("tree_size") or -1)
         and str(fields["root_hash"]) == str(payload.get("root_hash")))
-    result["valid"] = bool(result["note"] and result["matches_sth"])
+    result["valid"] = bool(result["note"] and result["matches_sth"]
+                           and (result["hybrid"] if isinstance(note.get("hybrid"), dict)
+                                else True))
     return result

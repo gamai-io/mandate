@@ -148,3 +148,30 @@ The cases live in `spec/kit/` and are rebuilt with `python3 tools/kit_build.py` 
 keys per build). Three of them tamper **and then sign again** with the approver key:
 that is what isolates the `sth`, `inclusion` and `witness` checks, because otherwise the
 envelope signature fails first and the check under test is never reached.
+
+## Hybrid witness notes (2026-11-27)
+
+An Ed25519 signature collected today can be forged later by a large quantum computer, so
+the witness note can carry **two** signatures: Ed25519 (SSHSIG) and **ML-DSA-65**
+(FIPS 204, from `cryptography`; no extra dependency).
+
+```bash
+mandate pq keygen --out ~/.ssh/witness-pq.key            # 32-byte seed, 0600
+mandate witness accept --state witness.json --sth sth.json \
+    --signers trust/log_signers --key ~/.ssh/witness --signer witness1 \
+    --pq-key ~/.ssh/witness-pq.key
+
+mandate audit verify --bundle bundle.json --signers trust/allowed_signers \
+    --log-signers trust/log_signers --witness-signers trust/witness_signers \
+    --pq-witness-keys trust/witness-pq.pub
+```
+
+A hybrid note (`alg: ed25519+ml-dsa-65`) is accepted only when **both** signatures verify
+and the ML-DSA public key is in the allowed list. Without `--pq-witness-keys` the answer
+is `valid: false` — the verifier reports `no_downgrade: true` when the Ed25519 half did
+verify, but it does not fall back to Ed25519 alone. An Ed25519-only note still verifies as
+before, and `hybrid: false` says so.
+
+What this does not do: it does not make the *grant* or the *bundle envelope*
+post-quantum, and it does not protect a key that is already compromised. It removes the
+single-algorithm assumption from the witness pin.

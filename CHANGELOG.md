@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — hybrid witness note
+- **Ed25519 + ML-DSA-65, both required.** `mandate pq keygen` writes a 32-byte ML-DSA-65
+  seed (0600); `witness accept --pq-key` adds a hybrid block to the note;
+  `audit verify --pq-witness-keys` requires both signatures and refuses to downgrade to
+  Ed25519 alone (reported as `no_downgrade`). Ed25519-only notes keep working.
+
 ## Unreleased — attack evaluation
 - **Eleven attacks, eleven caught, reproducible.** `tools/attack_eval.py` performs each
   attack on a fresh valid record and reports which check caught it: edited receipt,

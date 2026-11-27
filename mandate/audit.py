@@ -11,7 +11,8 @@ class AuditError(core.MandateError):
 
 def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
                   revoked_path: str | None = None,
-                  witness_signers_path: str | None = None) -> dict:
+                  witness_signers_path: str | None = None,
+                  pq_witness_keys: list[str] | None = None) -> dict:
     envelope = export.verify_bundle(bundle, signers_path,
                                     revoked_path=revoked_path)
     receipt = (bundle or {}).get("receipt") or {}
@@ -41,7 +42,8 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
         from . import witness_note
         checked = witness_note.verify(note, witness_signers_path,
                                       (bundle or {}).get("sth"),
-                                      revoked_path=revoked_path)
+                                      revoked_path=revoked_path,
+                                      pq_keys=pq_witness_keys)
         result["witness"] = bool(checked["valid"])
         result["witness_signed"] = bool(checked["note"])
         result["witness_note"] = checked
@@ -63,7 +65,8 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
 
 def verify_bundle_file(path: str, signers_path: str, log_signers_path: str,
                        revoked_path: str | None = None,
-                       witness_signers_path: str | None = None) -> dict:
+                       witness_signers_path: str | None = None,
+                  pq_witness_keys: list[str] | None = None) -> dict:
     return verify_bundle(core.load_json(path), signers_path,
                          log_signers_path, revoked_path=revoked_path,
                          witness_signers_path=witness_signers_path)
