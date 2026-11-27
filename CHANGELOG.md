@@ -1,4 +1,14 @@
 # Changelog
+## 1.0.3 — 2026-11-28
+
+### Fixed
+- **The 1.0.2 `release` job failed at Claims** because the new WORM test could not run as a
+  non-root user: `worm-export` makes the pack `0444/0555`, so the test could not append to the
+  ledger or delete the tree in cleanup. As root (this machine) it passed, which is exactly the
+  kind of difference that should be caught before a tag. The test now chmods before tampering
+  and restores permissions in `tearDown`; verified by running the suite as `nobody`
+  (`22 passed`), which is how CI runs it.
+
 ## 1.0.2 — 2026-11-28
 
 ### Two "partial" control rows became checkable

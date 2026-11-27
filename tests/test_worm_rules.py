@@ -28,7 +28,31 @@ class WormVerify(unittest.TestCase):
         self.pack = res["path"]
 
     def tearDown(self):
+        # worm_export chmods the pack 0444/0555; as a non-root user TemporaryDirectory
+        # cannot delete inside that, so the test would fail in cleanup (CI) instead of on
+        # an assertion.
+        for root, dirs, files in os.walk(self.dir):
+            for name in dirs:
+                try:
+                    os.chmod(os.path.join(root, name), 0o755)
+                except OSError:
+                    pass
+            for name in files:
+                try:
+                    os.chmod(os.path.join(root, name), 0o644)
+                except OSError:
+                    pass
+        try:
+            os.chmod(self.dir, 0o755)
+        except OSError:
+            pass
         self.td.cleanup()
+
+    def _make_writable(self, name: str) -> str:
+        """A 0444 file cannot be appended to by a non-root user: chmod before tampering."""
+        path = os.path.join(self.pack, name)
+        os.chmod(path, 0o644)
+        return path
 
     def test_a_clean_pack_verifies(self):
         out = anchor.worm_verify(self.pack)
@@ -37,19 +61,20 @@ class WormVerify(unittest.TestCase):
         self.assertEqual(out["problems"], [])
 
     def test_a_changed_ledger_is_caught(self):
-        with open(os.path.join(self.pack, "ledger.jsonl"), "a", encoding="utf-8") as fh:
+        with open(self._make_writable("ledger.jsonl"), "a", encoding="utf-8") as fh:
             fh.write('{"v":1,"body":{"type":"control","action":"b"},"hash":"bb","prev":"aa"}\n')
         out = anchor.worm_verify(self.pack)
         self.assertFalse(out["ok"])
         self.assertIn("sha256 mismatch: ledger.jsonl", " ".join(out["problems"]))
 
     def test_a_missing_file_is_caught(self):
-        os.remove(os.path.join(self.pack, "ledger.jsonl"))
+        os.remove(self._make_writable("ledger.jsonl"))
         out = anchor.worm_verify(self.pack)
         self.assertFalse(out["ok"])
         self.assertIn("missing: ledger.jsonl", " ".join(out["problems"]))
 
     def test_a_file_outside_the_manifest_is_caught(self):
+        os.chmod(self.pack, 0o755)      # the pack directory is 0555 after export
         pathlib.Path(os.path.join(self.pack, "extra.txt")).write_text("x", encoding="utf-8")
         out = anchor.worm_verify(self.pack)
         self.assertFalse(out["ok"])
@@ -65,7 +90,7 @@ class WormVerify(unittest.TestCase):
         good = subprocess.run([sys.executable, "-m", "mandate", "worm-verify", "--dir", self.pack],
                               cwd=str(ROOT), capture_output=True, text=True)
         self.assertEqual(good.returncode, 0, good.stdout + good.stderr)
-        with open(os.path.join(self.pack, "ledger.jsonl"), "a", encoding="utf-8") as fh:
+        with open(self._make_writable("ledger.jsonl"), "a", encoding="utf-8") as fh:
             fh.write("{}\n")
         bad = subprocess.run([sys.executable, "-m", "mandate", "worm-verify", "--dir", self.pack],
                              cwd=str(ROOT), capture_output=True, text=True)
