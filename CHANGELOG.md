@@ -1,4 +1,13 @@
 # Changelog
+## 0.68.13 — 2026-11-27
+
+### Fixed
+- **A refusal could fail to serialise.** The strict-JSON error detail echoed the offending
+  text, so a lone surrogate in the input produced a message that could not be encoded as
+  JSON — the verifier returned 500 instead of a refusal. The detail is now
+  unicode-escaped. Found while porting the same parser to `sigil`, which had the identical
+  bug in `/verify`.
+
 
 ## 0.68.12 — 2026-11-27
 
