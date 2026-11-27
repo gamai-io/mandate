@@ -549,6 +549,15 @@ def main(argv=None) -> int:
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
 
+    p_taint = sub.add_parser("taint", help="flagged input becomes provenance the policy refuses")
+    p_taint.add_argument("action", choices=["mark", "clear", "show", "provenance"])
+    p_taint.add_argument("--session", default="")
+    p_taint.add_argument("--source", default="")
+    p_taint.add_argument("--kind", default="data_ref")
+    p_taint.add_argument("--reason", default="")
+    p_taint.add_argument("--covers", default="", help="comma-separated fields")
+    p_taint.add_argument("--ledger", default="ledger.jsonl")
+
     p_fw = sub.add_parser("firewall", help="content gate: secrets out, injections in")
     p_fw.add_argument("action", choices=["scan", "redact", "decide", "selftest"])
     p_fw.add_argument("--text", default=None)
@@ -1139,6 +1148,23 @@ def main(argv=None) -> int:
                 _emit({"error": "ShipError", "message": str(exc)}, None)
                 return 4
             _emit(res, None)
+            return 0
+
+        if args.cmd == "taint":
+            from . import taint as taint_mod
+            covers = [c.strip() for c in (args.covers or "").split(",") if c.strip()]
+            if args.action == "mark":
+                out = taint_mod.mark(args.ledger, args.session, args.source,
+                                     kind=args.kind, reason=args.reason)
+            elif args.action == "clear":
+                out = taint_mod.clear(args.ledger, args.session, args.source,
+                                      reason=args.reason)
+            elif args.action == "show":
+                out = {"active": taint_mod.active(args.ledger, args.session or None)}
+            else:
+                out = {"provenance": taint_mod.provenance_for(args.ledger, args.session,
+                                                              covers or None)}
+            _emit(out, None)
             return 0
 
         if args.cmd == "firewall":

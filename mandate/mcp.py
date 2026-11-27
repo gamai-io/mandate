@@ -7,6 +7,7 @@ are forwarded.
 from __future__ import annotations
 
 import json
+import os
 import select
 import shlex
 import subprocess
@@ -171,6 +172,16 @@ def probe(cmd: str, timeout: float = 10, server: str = "",
                 pass
 
 
+def _record_mcp(ledger_path: str, body: dict) -> None:
+    """Evidence for a mediated decision; never let it hide."""
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(ledger_path)), exist_ok=True)
+        with open(ledger_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(body, ensure_ascii=False, sort_keys=True) + "\n")
+    except OSError:
+        pass
+
+
 def proxy(lock: dict, cmd: str, signers_path: str,
           verify_calls: bool = False, revoked_path: str | None = None,
           in_stream=None, out_stream=None, taint: dict | None = None,
@@ -240,6 +251,22 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                 out_stream.flush()
                 continue
             method = pending.pop(message.get("id"), None)
+            if method == "tools/call" and "result" in message:
+                # RESPONSE_GATE_V1: alat vrati dokument/web/red -> skeniraj prije modela
+                from . import firewall as _firewall
+                scan = _firewall.scan_mcp_result(message["result"])
+                if not scan["ok"]:
+                    kinds = [f["kind"] for f in (scan["inbound"]["findings"]
+                                                 + scan["outbound"]["findings"])]
+                    _record_mcp(ledger_path, {
+                        "v": 1, "type": "control", "action": "refuse",
+                        "code": "ResponseBlocked", "tool": str(method),
+                        "findings": kinds[:8], "chars": scan["chars"],
+                        "ts": int(time.time())})
+                    message = {"jsonrpc": "2.0", "id": message.get("id"),
+                               "error": {"code": -32005,
+                                         "message": "mandate: tool response blocked "
+                                                    "(%s)" % ", ".join(kinds[:3])}}
             if method == "tools/list" and "result" in message:
                 manifest = manifest_from_tools(
                     str(lock.get("server")),
@@ -302,7 +329,9 @@ def proxy(lock: dict, cmd: str, signers_path: str,
                                                      % str(exc)[:120]}}) + "\n")
                             out_stream.flush()
                         continue
-            if mid is not None and method == "tools/list":
+            # pamtimo metod za SVAKI zahtjev sa id-em: reader mora znati da li odgovor
+            # pripada tools/call (tada ga skenira) ili tools/list (tada provjerava lock)
+            if mid is not None:
                 pending[mid] = method
             proc.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
             proc.stdin.flush()

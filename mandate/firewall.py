@@ -160,6 +160,43 @@ def redact(text: str) -> tuple[str, int]:
     return out, count
 
 
+MCP_SCAN_LIMIT = 1_000_000       # ne skeniraj 100 MB odgovor; radije reci da je prevelik
+
+
+def _texts(value, out: list[str], budget: list[int]) -> None:
+    if budget[0] <= 0:
+        return
+    if isinstance(value, str):
+        out.append(value[:budget[0]])
+        budget[0] -= len(value)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(key, str):
+                out.append(key[:200])
+            _texts(item, out, budget)
+    elif isinstance(value, (list, tuple)):
+        for item in value[:500]:
+            _texts(item, out, budget)
+
+
+def scan_mcp_result(result, limit: int = MCP_SCAN_LIMIT) -> dict:
+    """Tool result on its way to the model: everything textual is scanned.
+
+    A tool that returns a document, a web page or a database row is the most common
+    way an instruction reaches the model. Findings are returned, never rewritten:
+    the caller decides whether to block, redact or pass through with a taint mark.
+    """
+    budget = [int(limit)]
+    texts: list[str] = []
+    _texts(result, texts, budget)
+    joined = "\n".join(texts)
+    scan = scan_inbound(joined)
+    out = scan_outbound(joined)
+    oversized = budget[0] <= 0
+    return {"ok": scan["ok"] and out["ok"], "inbound": scan, "outbound": out,
+            "texts": len(texts), "chars": len(joined), "truncated": oversized}
+
+
 def decide(request_text: str, response_text: str = "",
            policy: dict | None = None) -> dict:
     """The whole gate for one exchange, in the order a proxy would run it.

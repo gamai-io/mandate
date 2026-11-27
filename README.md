@@ -34,7 +34,7 @@ is how to hand an auditor a redacted record that still proves it is the same rec
 [`docs/FIREWALL_COMPARE.md`](docs/FIREWALL_COMPARE.md) is the content gate (secrets out, instructions in)
 and an honest comparison with the strongest open agent firewall.
 
-**Status:** 625 tests collected; 0 failed. On a host with Node and bubblewrap 619
+**Status:** 639 tests collected; 0 failed. On a host with Node and bubblewrap 634
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 
@@ -1036,7 +1036,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.70.2** — canonical commitment, Ed25519
+**v0.71.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and

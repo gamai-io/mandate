@@ -6,7 +6,8 @@ Only the latest released version receives security fixes.
 
 | Version | Supported |
 |---------|-----------|
-| 0.70.x  | yes       |
+| 0.71.x  | yes       |
+| 0.70.x  | security fixes only |
 | 0.69.x  | security fixes only |
 | 0.68.x  | security fixes only |
 | < 0.49  | no        |

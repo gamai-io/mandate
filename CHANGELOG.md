@@ -1,4 +1,21 @@
 # Changelog
+## 0.71.0 — 2026-11-27
+
+### The firewall now closes the loop: MCP responses and a taint bridge
+- **MCP response gate** (`mandate/mcp.py`): a `tools/call` result is scanned before the
+  client sees it — every text inside `content`, `echo` and nested structures, capped at
+  1 MB. A blocked result is replaced with JSON-RPC `-32005` and a `control` entry
+  (`code: ResponseBlocked`, the finding kinds) lands in the MCP ledger. The proxy now
+  remembers the method for every request with an id, not only `tools/list`.
+- **`mandate/taint.py` + `mandate taint mark|clear|show|provenance`**: a flagged source
+  becomes a `control` entry (`action: taint`, session, source, reason, findings), and
+  `provenance_for()` turns the active marks into provenance entries with
+  `trust: untrusted`. A policy with `require_trusted` then refuses the effect — the chain
+  `firewall block -> taint -> intent -> deny (untrusted_input)` is a test.
+- Marks are never deleted: `clear` writes an `untaint` entry, so "tainted until 14:20"
+  stays visible.
+- `firewall.scan_mcp_result()` is public API so a custom proxy can reuse it.
+
 ## 0.70.2 — 2026-11-27
 
 ### Fixed
