@@ -25,7 +25,11 @@ mandate demo        # propose -> grant -> redeem -> replay refused -> changed am
 grant, `redeem` executes it, a replay is refused, a changed amount is refused with
 `CommitmentMismatch`, the receipt verifies, and an audit pack is written.
 
-**Status:** 507 tests collected; 0 failed. On a host with Node and bubblewrap 502
+New here? [`docs/QUICKSTART.md`](docs/QUICKSTART.md) is the 30-minute path from install to a
+verified record. [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md) is how to run the kit against
+*your* verifier and publish the record behind the badge.
+
+**Status:** 578 tests collected; 0 failed. On a host with Node and bubblewrap 573
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 

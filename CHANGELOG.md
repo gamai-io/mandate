@@ -12,6 +12,21 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Academy: quickstart, conformance page, badge record
+- **`docs/QUICKSTART.md`** — 30 minutes from `pip install` to a verified record, with the
+  outputs copied from a real run.
+- **`docs/CONFORMANCE.md`** — what the kit is, why four cases must fail, how to publish a
+  badge *with the record behind it*, and the table of verifiers we actually ran.
+- **`tools/kit.py --badge FILE [--name NAME]`** writes `mandate-conformance/1`
+  (`passed`, `failed`, `total`, `ok`, `checked_at`, per-case results) and prints the
+  shields.io snippet. A badge without the record is a claim.
+
+### Fixed: global flags were overwritten by the subcommands
+- `mandate --signers X redeem ...` silently used `trust/allowed_signers`, because the
+  subparsers re-declared `--signers`/`--policy` with their own defaults. The subparser
+  defaults are now `SUPPRESS`, so the value given before the subcommand survives.
+  Found by running the quickstart exactly as written (`tests/test_cli_global_flags.py`).
+
 ### Replay: re-derive the decision, do not just trust the signature
 - **`mandate replay --bundle b.json [--policy p.json]`** recomputes `commitment`,
   `render_hash`, `result_hash`, the recorded `policy_digest`, the `taint` block and a fresh

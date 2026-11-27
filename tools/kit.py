@@ -51,6 +51,9 @@ def main(argv: list[str]) -> int:
                     help="command template with {bundle} {signers} {log_signers}")
     ap.add_argument("--cases", default=str(ROOT / "spec" / "kit" / "cases.json"))
     ap.add_argument("--json", action="store_true", help="machine-readable report")
+    ap.add_argument("--badge", default=None,
+                    help="write a conformance record (JSON) for a badge page")
+    ap.add_argument("--name", default="", help="verifier name for the badge record")
     args = ap.parse_args(argv[1:])
     manifest = json.loads(pathlib.Path(args.cases).read_text(encoding="utf-8"))
     signers = str((ROOT / manifest["signers"]).resolve())
@@ -85,6 +88,26 @@ def main(argv: list[str]) -> int:
         rows.append({"case": case["name"], "ok": ok, "valid": valid,
                      "expected": expect_valid, "why": why})
         failures += 0 if ok else 1
+
+    if args.badge:
+        import time as _time
+        record = {
+            "format": "mandate-conformance/1",
+            "verifier": args.name or " ".join(shlex.split(args.verifier)[:2]),
+            "passed": len(rows) - failures,
+            "failed": failures,
+            "total": len(rows),
+            "ok": failures == 0,
+            "checked_at": int(_time.time()),
+            "cases": [{"case": r["case"], "ok": r["ok"]} for r in rows],
+        }
+        pathlib.Path(args.badge).write_text(json.dumps(record, indent=1), encoding="utf-8")
+        colour = "brightgreen" if record["ok"] else "red"
+        label = "mandate%20conformance"
+        value = "%d%%2F%d" % (record["passed"], record["total"])
+        print("![%s](https://img.shields.io/badge/%s-%s-%s)"
+              % ("mandate conformance", label, value, colour))
+        print("record: %s  (%d/%d)" % (args.badge, record["passed"], record["total"]))
 
     if args.json:
         print(json.dumps({"cases": rows, "failed": failures,

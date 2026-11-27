@@ -514,7 +514,7 @@ def main(argv=None) -> int:
 
     p_limits = sub.add_parser("limits")
     p_limits.add_argument("--ledger", default="ledger.jsonl")
-    p_limits.add_argument("--policy", default=None)
+    p_limits.add_argument("--policy", default=argparse.SUPPRESS)
 
     p_inv = sub.add_parser("inventory")
     p_inv.add_argument("--ledger", default="ledger.jsonl")
@@ -530,7 +530,7 @@ def main(argv=None) -> int:
     p_chg.add_argument("--approver", default=None)
     p_chg.add_argument("--key", default=None)
     p_chg.add_argument("--reason", default="")
-    p_chg.add_argument("--signers", default=None)
+    p_chg.add_argument("--signers", default=argparse.SUPPRESS)
     p_chg.add_argument("--signer-cmd", dest="signer_cmd", default=None)
 
     p_watch = sub.add_parser("watch")
@@ -550,7 +550,7 @@ def main(argv=None) -> int:
 
     p_replay = sub.add_parser("replay", help="re-derive the decision from a bundle")
     p_replay.add_argument("--bundle", required=True)
-    p_replay.add_argument("--policy", default=None)
+    p_replay.add_argument("--policy", default=argparse.SUPPRESS)
 
     p_dsse = sub.add_parser("dsse", help="DSSE envelope over a receipt (interop)")
     p_dsse.add_argument("action", choices=["sign", "verify"])
@@ -590,7 +590,7 @@ def main(argv=None) -> int:
     p_pack.add_argument("--svid", action="append", default=None)
     p_pack.add_argument("--owner", action="append", default=None)
     p_pack.add_argument("--controls", default=None)
-    p_pack.add_argument("--signers", default=None)
+    p_pack.add_argument("--signers", default=argparse.SUPPRESS)
     p_pack.add_argument("--anchors", default="anchors")
     p_pack.add_argument("--grant", action="append", default=None,
                         help="archive this grant in the pack (repeatable)")
@@ -618,7 +618,7 @@ def main(argv=None) -> int:
     p_svid.add_argument("--ttl", type=int, default=300)
     p_svid.add_argument("--out", default=None)
     p_svid.add_argument("--allow-wildcard", dest="allow_wildcard", action="store_true")
-    p_svid.add_argument("--signers", default=None)
+    p_svid.add_argument("--signers", default=argparse.SUPPRESS)
 
     p_egress = sub.add_parser("egress")
     p_egress.add_argument("action", choices=("policy", "proxy", "check", "summary"))
@@ -652,7 +652,7 @@ def main(argv=None) -> int:
     p_warden.add_argument("--key", default=None)
     p_warden.add_argument("--signer", default=None)
     p_warden.add_argument("--verify", action="store_true")
-    p_warden.add_argument("--signers", default=None)
+    p_warden.add_argument("--signers", default=argparse.SUPPRESS)
 
     p_anchor = sub.add_parser("anchor")
     p_anchor.add_argument("--ledger", default="ledger.jsonl")
@@ -678,7 +678,7 @@ def main(argv=None) -> int:
 
     p_chain = sub.add_parser("chain")
     p_chain.add_argument("--ledger", default="ledger.jsonl")
-    p_chain.add_argument("--signers", default=None, help="verify receipt signatures")
+    p_chain.add_argument("--signers", default=argparse.SUPPRESS, help="verify receipt signatures")
     p_chain.add_argument("--broker-signers", dest="broker_signers", default=None,
                          help="verify broker result entries")
 
@@ -950,11 +950,12 @@ def main(argv=None) -> int:
     p_av.add_argument("--witness-quorum", dest="witness_quorum", type=int, default=0,
                       help="require N distinct witnesses on the same tree head (0 = off)")
 
+    # GLOBAL_FLAGS_V1: subparser default mora biti SUPPRESS, inače pregazi
+    # `mandate --signers X redeem ...` sa podrazumijevanom putanjom.
     for _sp in (p_check, p_prop, p_grant, p_redeem):
-        _sp.add_argument("--policy", default=None)
+        _sp.add_argument("--policy", default=argparse.SUPPRESS)
     for _sp in (p_check, p_redeem, p_verify):
-        _sp.add_argument("--signers", default=os.environ.get(
-            "MANDATE_SIGNERS", "trust/allowed_signers"))
+        _sp.add_argument("--signers", default=argparse.SUPPRESS)
     p_verify.add_argument("--ledger", default=None,
                           help="check an unsigned receipt against this ledger")
 

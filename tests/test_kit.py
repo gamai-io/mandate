@@ -33,6 +33,22 @@ class Kit(unittest.TestCase):
         self.assertEqual(done.returncode, 1)
         self.assertGreaterEqual(report["failed"], 5, report)
 
+    def test_badge_record_matches_the_run(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            record = pathlib.Path(td) / "conformance.json"
+            done = subprocess.run([sys.executable, str(KIT), "--verifier", VERIFIER,
+                                   "--badge", str(record), "--name", "tests"],
+                                  cwd=ROOT, capture_output=True, text=True, timeout=180)
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            self.assertIn("shields.io/badge", done.stdout)
+            data = json.loads(record.read_text(encoding="utf-8"))
+            self.assertEqual(data["format"], "mandate-conformance/1")
+            self.assertTrue(data["ok"])
+            self.assertEqual(data["failed"], 0)
+            self.assertEqual(data["total"], len(data["cases"]))
+            self.assertEqual(data["verifier"], "tests")
+
     def test_the_case_list_is_complete(self):
         manifest = json.loads((ROOT / "spec" / "kit" / "cases.json").read_text())
         names = {case["name"] for case in manifest["cases"]}
