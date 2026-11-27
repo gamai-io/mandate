@@ -12,6 +12,14 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Build: a reproducible release path
+- **`tools/build_release.sh <tag> [outdir]`** builds from the tag's archive with
+  `SOURCE_DATE_EPOCH` set to the tag commit, normalises the sdist and runs `twine check`.
+  Two runs produce identical sha256 sums (`23d44ba2…` wheel, `365ed2d7…` sdist for
+  `v0.69.0`), which is what `tools/verify_pypi.py` compares against.
+- 0.69.0 itself was built before the script, so its published containers carry build
+  timestamps; every file inside them is byte-identical to the tag build.
+
 ### Hardware-rooted signing: inspection, and what the gate already enforced
 - **`mandate hardware list|check`**: per-signer key type and a `hardware` flag; `check
   --signature` reports the key that *actually produced* the signature (not the first

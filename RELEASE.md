@@ -20,6 +20,27 @@ Expected: all green. Do not tag on a red suite.
 
 ## 3. Build
 
+Byte-reproducible (this is what makes `tools/verify_pypi.py` pass):
+
+```bash
+tools/build_release.sh v<ver> dist      # builds from the tag archive with SOURCE_DATE_EPOCH
+```
+
+By hand, the same thing:
+
+```bash
+export SOURCE_DATE_EPOCH=$(git show -s --format=%ct v<ver>)
+python3 -m build
+python3 tools/normalize_sdist.py dist/*.tar.gz
+twine check dist/*
+sha256sum dist/*
+```
+
+**0.69.0 was built before this script existed**, so its published bytes are not
+reproducible (content is: every file inside both archives hashes the same). Rebuilding
+`v0.69.0` with the script gives two identical artifacts; the published containers differ
+only in timestamps.
+
 ```bash
 python3 -m venv .venv-build
 . .venv-build/bin/activate
