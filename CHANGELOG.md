@@ -12,6 +12,13 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Attack corpus 11 → 17
+- `tools/attack_eval.py` now also runs: a payee planted in an email and cited as data
+  (refused with `untrusted_input`), a control case where the same effect comes from the
+  ERP (allowed), a homoglyph payee, a zero-width payee, a coverage downgrade inside a
+  re-signed bundle, and a single witness against a two-witness policy. `17/17 caught`,
+  `docs/ATTACKS.md` regenerated from the run.
+
 ### Witness quorum: N independent witnesses, not one host
 - **`bundle.witness_notes`** (list) plus `audit verify --witness-quorum N`: the bundle is
   only valid when N **distinct** witnesses signed a note for the **same** tree head.

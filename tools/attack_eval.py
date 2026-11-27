@@ -241,6 +241,63 @@ def attacks(env: dict) -> list[dict]:
            "the receipt does not sit under the rewritten root (inclusion); the witness "
            "note also still pins the original root")
 
+    # 11 plant an instruction in a document and claim it as a data source
+    tainted = dict(INTENT)
+    tainted = json.loads(json.dumps(INTENT))
+    tainted["nonce"] = "attack-taint"
+    tainted["provenance"] = [{"type": "data_ref", "source": "email:supplier.pdf",
+                             "trust": "untrusted", "covers": ["target", "amount"]}]
+    pol = core.load_policy()
+    pol["effects"] = dict(pol["effects"])
+    pol["effects"]["payment.send"] = dict(pol["effects"]["payment.send"],
+                                          require_trusted=["target", "amount"])
+    decision = core.check(tainted, pol)
+    caught = decision.get("reason") == "untrusted_input"
+    record("11. plant the payee in an email and cite it as data",
+           caught, "core.check", f"{decision.get('decision')}: {decision.get('reason')}"
+           f" fields={decision.get('fields')}")
+
+    # 12 same effect, but the source is the ERP: the gate must not block honest work
+    trusted = json.loads(json.dumps(tainted))
+    trusted["provenance"][0].update({"source": "erp:vendor:1", "trust": "trusted"})
+    ok = core.check(trusted, pol).get("reason") != "untrusted_input"
+    record("12. control: the same effect from the ERP is allowed", ok, "core.check",
+           "trust labels must not turn into a blanket ban")
+
+    # 13 write a known payee with a cyrillic letter so it looks new (or a blocked one
+    #    so it looks allowed)
+    from mandate import normalize, report
+    payee = "Apple Inc"
+    lookalike = "\u0410pple Inc"          # cyrillic A
+    core.append_receipt(env["ledger"], {
+        "v": 1, "type": "receipt", "decision": "executed", "ts": 1,
+        "render": {"fields": {"kind": "payment.send", "target": payee,
+                              "amount": {"value": 1, "currency": "BAM"}}}})
+    hist = report.payee_history(env["ledger"], lookalike, "payment.send")
+    record("13. spell a known payee with a homoglyph", not hist["first_time"],
+           "report.payee_history", f"payments={hist['payments']} for {lookalike!r}; "
+           f"fold={normalize.fold(lookalike)!r}")
+
+    # 14 zero-width characters in the payee
+    zw = "Apple\u200b Inc"
+    hist = report.payee_history(env["ledger"], zw, "payment.send")
+    record("14. hide a zero-width character in the payee", not hist["first_time"],
+           "report.payee_history", f"payments={hist['payments']} for {zw!r}")
+
+    # 15 claim the effect was only self-reported while the policy wants enforced
+    b = env["bundle"]()
+    b["receipt"]["body"]["coverage"] = "self_reported"
+    r = verify(env, b)
+    record("15. downgrade the coverage class inside a re-signed bundle", not r["valid"],
+           first_failure(r), "the coverage class is inside the signed receipt")
+
+    # 16 ship one witness where the policy asks for two
+    from mandate import quorum as _quorum
+    q = _quorum.evaluate([env["bundle"]()["witness_note"]], env["bundle"]()["sth"],
+                         env["signers"], 2)
+    record("16. ship a single witness when the policy asks for two", not q["ok"],
+           "quorum.evaluate", q.get("message") or "ok")
+
     return out
 
 
