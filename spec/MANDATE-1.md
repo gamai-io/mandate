@@ -103,6 +103,13 @@ Rules:
   weaker class is refused — the refusal is written to the ledger as a `control` entry.
 - An unknown value is refused everywhere (`E_COVERAGE`).
 
+## Witness quorum
+A bundle may carry `witness_notes` (a list). With `audit verify --witness-quorum N` the
+bundle is valid only when **N distinct witnesses** signed a note for the **same** tree
+head (`log_id`, `tree_size`, `root_hash`). Duplicate keys count once; a revoked key counts
+zero. Valid notes for different tree heads are a split view (`E_SPLIT_VIEW`) and fail the
+bundle even if the count is sufficient (`E_QUORUM` is the too-few case).
+
 ## Interop: DSSE and in-toto
 A receipt can be wrapped without changing it:
 

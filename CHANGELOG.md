@@ -12,6 +12,17 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Witness quorum: N independent witnesses, not one host
+- **`bundle.witness_notes`** (list) plus `audit verify --witness-quorum N`: the bundle is
+  only valid when N **distinct** witnesses signed a note for the **same** tree head.
+  `quorum.evaluate()` verifies every note against the bundle's STH; the same key listed
+  twice counts once and a revoked witness does not count.
+- Two failures are reported separately: `E_QUORUM` (too few) and `E_SPLIT_VIEW` (valid
+  notes for different roots/sizes — two logs or a replayed note). A split view fails the
+  bundle even when the count is high enough.
+- Single-note bundles keep working unchanged; `witness_notes` with exactly one note and
+  no quorum behaves like `witness_note`.
+
 ### Untrusted input can block an effect (taint)
 - **`trust` on provenance entries**: `trusted` (ERP, bank file, signed export),
   `untrusted` (document, email, web page, model output) or `unknown` (default). Anything

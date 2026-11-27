@@ -12,7 +12,8 @@ class AuditError(core.MandateError):
 def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
                   revoked_path: str | None = None,
                   witness_signers_path: str | None = None,
-                  pq_witness_keys: list[str] | None = None) -> dict:
+                  pq_witness_keys: list[str] | None = None,
+                  witness_quorum: int = 0) -> dict:
     envelope = export.verify_bundle(bundle, signers_path,
                                     revoked_path=revoked_path)
     receipt = (bundle or {}).get("receipt") or {}
@@ -57,6 +58,32 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
                 and int(state.get("tree_size")) == int(payload.get("tree_size")))
         except (TypeError, ValueError):
             result["witness"] = False
+
+    # QUORUM_V1: N nezavisnih svjedoka za isti tree head (bundle.witness_notes)
+    notes = (bundle or {}).get("witness_notes")
+    if not isinstance(notes, list):
+        notes = [note] if isinstance(note, dict) else []
+    if witness_signers_path and notes:
+        from . import quorum as _quorum
+        need = int(witness_quorum or 0)
+        q = _quorum.evaluate(notes, (bundle or {}).get("sth"), witness_signers_path,
+                             need or 1, revoked_path=revoked_path,
+                             pq_keys=pq_witness_keys)
+        if need:
+            result["witness_quorum"] = q
+            result["witness"] = bool(q["ok"])
+            if not q["ok"]:
+                result["quorum_error"] = q.get("code")
+            if len(notes) > 1:
+                split = _quorum.split_view(notes, witness_signers_path,
+                                           revoked_path=revoked_path,
+                                           pq_keys=pq_witness_keys)
+                result["witness_split_view"] = bool(split.get("split"))
+                if split.get("split"):
+                    result["quorum_error"] = _quorum.SPLIT
+                    result["witness"] = False
+        else:
+            result["witness"] = bool(result["witness"] or q["ok"])
     result["valid"] = bool(envelope.get("valid") and result["sth"]
                            and result["inclusion"] and result["witness"])
     decision = result.get("decision")
@@ -68,7 +95,10 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
 def verify_bundle_file(path: str, signers_path: str, log_signers_path: str,
                        revoked_path: str | None = None,
                        witness_signers_path: str | None = None,
-                  pq_witness_keys: list[str] | None = None) -> dict:
+                       pq_witness_keys: list[str] | None = None,
+                       witness_quorum: int = 0) -> dict:
     return verify_bundle(core.load_json(path), signers_path,
                          log_signers_path, revoked_path=revoked_path,
-                         witness_signers_path=witness_signers_path)
+                         witness_signers_path=witness_signers_path,
+                         pq_witness_keys=pq_witness_keys,
+                         witness_quorum=witness_quorum)

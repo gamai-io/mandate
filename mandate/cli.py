@@ -943,6 +943,8 @@ def main(argv=None) -> int:
                       help="allowed witness keys; without it a witness state is only a claim")
     p_av.add_argument("--pq-witness-keys", dest="pq_witness_keys", default=None,
                       help="file with allowed ML-DSA-65 witness public keys (one per line)")
+    p_av.add_argument("--witness-quorum", dest="witness_quorum", type=int, default=0,
+                      help="require N distinct witnesses on the same tree head (0 = off)")
 
     for _sp in (p_check, p_prop, p_grant, p_redeem):
         _sp.add_argument("--policy", default=None)
@@ -1536,7 +1538,8 @@ def main(argv=None) -> int:
                         args.bundle, args.signers, args.log_signers,
                         revoked_path=args.revoked,
                         witness_signers_path=getattr(args, "witness_signers", None),
-                        pq_witness_keys=_pq_keys(getattr(args, "pq_witness_keys", None)))
+                        pq_witness_keys=_pq_keys(getattr(args, "pq_witness_keys", None)),
+                        witness_quorum=int(getattr(args, "witness_quorum", 0) or 0))
                     _emit(result, None)
                     return 0 if result.get("valid") else 1
             except (core.MandateError, OSError, ValueError) as exc:
