@@ -164,6 +164,16 @@ def _record(policy: dict, ledger_path: str | None, body: dict) -> None:
         append_receipt(ledger_path, {"v": 1, "type": "control", **body})
 
 
+def _read_n(sock, size: int) -> bytes:
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(min(65536, size - len(data)))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
 class _Handler(socketserver.StreamRequestHandler):
     timeout = 30
 
@@ -242,6 +252,15 @@ class _Handler(socketserver.StreamRequestHandler):
         _record(policy, ledger, {"action": "egress", "decision": "allow",
                                  "code": verdict["code"], "host": host, "port": port,
                                  "method": method, "ts": time.time()})
+        ca_dir = str(policy.get("intercept_ca") or "")
+        if method.upper() == "CONNECT" and policy.get("intercept") and ca_dir:
+            self.wfile.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            self.wfile.flush()
+            try:
+                self._intercept(upstream, host, port, ca_dir, ledger)
+            finally:
+                upstream.close()
+            return
         try:
             if method.upper() == "CONNECT":
                 self.wfile.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
@@ -256,6 +275,184 @@ class _Handler(socketserver.StreamRequestHandler):
             self._pipe(upstream)
         finally:
             upstream.close()
+
+    # --- TLS interception (opt-in per policy) ------------------------------
+    def _intercept(self, upstream: socket.socket, host: str, port: int,
+                   ca_dir: str, ledger_path: str | None) -> None:
+        """Terminate TLS for one request, scan both directions, relay the verdict.
+
+        One request per connection, no keep-alive, `Content-Length` bodies only
+        (chunked bodies are passed through unscanned and recorded as such). Everything
+        is scanned in memory; nothing decrypted is written to disk.
+        """
+        from . import egress_tls, firewall
+        try:
+            ctx = egress_tls.server_context(ca_dir, host)
+            client = ctx.wrap_socket(self.connection, server_side=True)
+        except Exception as exc:  # noqa: BLE001
+            _record(self.server.policy, ledger_path,
+                    {"action": "egress", "decision": "deny", "code": "tls_handshake",
+                     "host": host, "error": str(exc)[:120], "ts": time.time()})
+            return
+        try:
+            head = self._read_until(client, b"\r\n\r\n")
+            if not head:
+                return
+            text = head.decode("latin-1")
+            lines = text.split("\r\n")
+            try:
+                method, path, _ = lines[0].split(" ", 2)
+            except ValueError:
+                self._respond(client, 400, "bad request")
+                return
+            headers = {}
+            for line in lines[1:]:
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    headers[key.strip().lower()] = value.strip()
+            chunked = "chunked" in headers.get("transfer-encoding", "").lower()
+            body = b""
+            if chunked:
+                body = self._read_chunked(client)
+            elif headers.get("content-length", "").isdigit():
+                body = self._read_exact(client, min(int(headers["content-length"]), 2_000_000))
+
+            request_text = body.decode("utf-8", "replace")
+            scan = firewall.scan_outbound(request_text)
+            if not scan["ok"]:
+                kinds = [f["kind"] for f in scan["findings"] if f["action"] == "block"]
+                _record(self.server.policy, ledger_path,
+                        {"action": "egress", "decision": "deny", "code": "request_blocked",
+                         "host": host, "port": port, "method": method,
+                         "findings": kinds[:8], "ts": time.time()})
+                self._respond(client, 403, "blocked by mandate: %s" % ", ".join(kinds[:3]))
+                return
+            forwarded, replacements = firewall.redact(request_text) if scan["redactable"] \
+                else (request_text, 0)
+            if replacements:
+                _record(self.server.policy, ledger_path,
+                        {"action": "egress", "decision": "allow", "code": "redacted",
+                         "host": host, "port": port, "replacements": replacements,
+                         "ts": time.time()})
+
+            out = ["%s %s HTTP/1.1" % (method, path)]
+            for key, value in headers.items():
+                if key in ("proxy-authorization", "proxy-connection"):
+                    continue
+                out.append("%s: %s" % (key, value))
+            if "content-length" in headers:
+                out = [line for line in out if not line.lower().startswith("content-length:")]
+                out.append("Content-Length: %d" % len(forwarded.encode("utf-8")))
+            out.append("Connection: close")
+            payload = ("\r\n".join(out) + "\r\n\r\n").encode("latin-1") \
+                + forwarded.encode("utf-8")
+            policy_obj = self.server.policy
+            want_tls = policy_obj.get("intercept_upstream_tls")
+            if want_tls is None:
+                want_tls = port in (443, 8443)
+            if want_tls:
+                try:
+                    upstream = egress_tls.client_context(
+                        policy_obj.get("upstream_ca")).wrap_socket(
+                            upstream, server_hostname=host)
+                except Exception as exc:  # noqa: BLE001
+                    _record(policy_obj, ledger_path,
+                            {"action": "egress", "decision": "deny",
+                             "code": "upstream_tls", "host": host,
+                             "error": str(exc)[:120], "ts": time.time()})
+                    self._respond(client, 502, "upstream TLS failed")
+                    return
+            upstream.sendall(payload)
+
+            resp_head = self._read_until(upstream, b"\r\n\r\n")
+            if not resp_head:
+                self._respond(client, 502, "no response")
+                return
+            resp_text = resp_head.decode("latin-1")
+            resp_headers = {}
+            for line in resp_text.split("\r\n")[1:]:
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    resp_headers[key.strip().lower()] = value.strip()
+            resp_body = b""
+            if "chunked" in resp_headers.get("transfer-encoding", "").lower():
+                resp_body = self._read_chunked(upstream)
+            elif resp_headers.get("content-length", "").isdigit():
+                resp_body = self._read_exact(upstream,
+                                             min(int(resp_headers["content-length"]),
+                                                 2_000_000))
+            inbound = firewall.scan_inbound(resp_body.decode("utf-8", "replace"))
+            if not inbound["ok"]:
+                kinds = [f["kind"] for f in inbound["findings"] if f["action"] == "block"]
+                _record(self.server.policy, ledger_path,
+                        {"action": "egress", "decision": "deny",
+                         "code": "response_blocked", "host": host, "port": port,
+                         "findings": kinds[:8], "ts": time.time()})
+                self._respond(client, 502, "response blocked by mandate: %s"
+                              % ", ".join(kinds[:3]))
+                return
+            status_line = resp_text.split("\r\n")[0]
+            keep = ["content-type", "content-encoding", "cache-control", "date"]
+            out = [status_line]
+            for key in keep:
+                if key in resp_headers:
+                    out.append("%s: %s" % (key, resp_headers[key]))
+            out.append("Content-Length: %d" % len(resp_body))
+            out.append("Connection: close")
+            client.sendall(("\r\n".join(out) + "\r\n\r\n").encode("latin-1") + resp_body)
+        finally:
+            try:
+                client.close()
+            except OSError:
+                pass
+
+    @staticmethod
+    def _read_until(sock, marker: bytes, limit: int = 65536) -> bytes:
+        data = b""
+        while marker not in data and len(data) < limit:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+        return data
+
+    @staticmethod
+    def _read_exact(sock, size: int) -> bytes:
+        data = b""
+        while len(data) < size:
+            chunk = sock.recv(min(65536, size - len(data)))
+            if not chunk:
+                break
+            data += chunk
+        return data
+
+    @staticmethod
+    def _read_chunked(sock, limit: int = 2_000_000) -> bytes:
+        data = b""
+        while len(data) < limit:
+            line = b""
+            while not line.endswith(b"\r\n"):
+                chunk = sock.recv(1)
+                if not chunk:
+                    return data
+                line += chunk
+            try:
+                size = int(line.strip().split(b";")[0], 16)
+            except ValueError:
+                return data
+            if size == 0:
+                sock.recv(2)
+                return data
+            data += _read_n(sock, size)
+            sock.recv(2)
+        return data
+
+    def _respond(self, sock, status: int, message: str) -> None:
+        body = message.encode("utf-8")
+        sock.sendall(("HTTP/1.1 %d %s\r\nContent-Type: text/plain; charset=utf-8\r\n"
+                      "Content-Length: %d\r\nConnection: close\r\n\r\n"
+                      % (status, "Blocked" if status >= 400 else "OK", len(body))
+                      ).encode("latin-1") + body)
 
     def _pipe(self, upstream: socket.socket) -> None:
         self.connection.settimeout(30)

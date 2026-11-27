@@ -675,7 +675,8 @@ def main(argv=None) -> int:
     p_svid.add_argument("--signers", default=argparse.SUPPRESS)
 
     p_egress = sub.add_parser("egress")
-    p_egress.add_argument("action", choices=("policy", "proxy", "check", "summary"))
+    p_egress.add_argument("action", choices=("policy", "proxy", "check", "summary",
+                                             "ca", "trust"))
     p_egress.add_argument("target", nargs="?", default=None, help="host:port for action=check")
     p_egress.add_argument("--policy", default=argparse.SUPPRESS)
     p_egress.add_argument("--allow", action="append", default=None)
@@ -684,6 +685,11 @@ def main(argv=None) -> int:
     p_egress.add_argument("--port", type=int, default=3128)
     p_egress.add_argument("--ledger", default=None)
     p_egress.add_argument("--token-env", dest="token_env", default=None)
+    p_egress.add_argument("--intercept", action="store_true",
+                          help="terminate TLS and scan bodies (needs --ca-dir)")
+    p_egress.add_argument("--ca-dir", dest="ca_dir", default=None)
+    p_egress.add_argument("--upstream-ca", dest="upstream_ca", default=None,
+                          help="extra trust anchor for the real origin")
     p_egress.add_argument("--target", dest="target_opt", default=None,
                           help="host:port to test (same as the positional, avoids argparse ambiguity)")
 
@@ -1525,6 +1531,21 @@ def main(argv=None) -> int:
             return 0 if res["valid"] else 6
 
         if args.cmd == "egress":
+            if args.action in ("ca", "trust"):
+                from . import egress_tls
+                ca_dir = args.ca_dir or "egress-ca"
+                if args.action == "trust":
+                    cert = str(pathlib.Path(ca_dir) / egress_tls.CA_CERT)
+                    _emit({"ca": cert, "hint": egress_tls.trust_hint(cert)}, None)
+                    return 0
+                try:
+                    info = egress_tls.init_ca(ca_dir)
+                except egress_tls.CaError as exc:
+                    _emit({"ok": False, "error": "E_CA", "message": str(exc)}, None)
+                    return 1
+                _emit({"ok": True, **info,
+                       "next": "mandate egress trust --ca-dir %s" % ca_dir}, None)
+                return 0
             if args.action == "policy":
                 pol = egress.default_policy()
                 pol["allow"] = list(args.allow or [])
@@ -1549,6 +1570,15 @@ def main(argv=None) -> int:
                 _emit(egress.summary(args.ledger or "egress.jsonl"), None)
                 return 0
             pol = egress.load_policy(policy_path)
+            if args.intercept:
+                if not args.ca_dir:
+                    _emit({"ok": False, "error": "E_CA",
+                           "message": "TLS interception needs --ca-dir "
+                                      "(run `mandate egress ca init` first)"}, None)
+                    return 2
+                pol = dict(pol, intercept=True, intercept_ca=args.ca_dir)
+                if args.upstream_ca:
+                    pol["upstream_ca"] = args.upstream_ca
             try:
                 egress.run_forever(pol, args.host, args.port, args.ledger)
             except KeyboardInterrupt:

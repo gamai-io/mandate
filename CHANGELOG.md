@@ -1,4 +1,22 @@
 # Changelog
+## 0.73.0 — 2026-11-27
+
+### TLS interception, with the trade-off written down
+- **`mandate egress ca init|trust`** (`mandate/egress_tls.py`): a local CA generated with
+  `openssl` (no new dependency), key `0600`, idempotent, plus the exact trust instructions for
+  Linux/curl/Python/Node. Per-host leaf certificates are cached, `0600`, 90 days, with `DNS:`
+  or `IP:` SAN — a wrong SAN is a rejected handshake, so the test checks both.
+- **`mandate egress proxy --intercept --ca-dir DIR`**: after CONNECT the proxy terminates TLS,
+  scans the request body (`request_blocked` → 403), redacts identifiers, forwards with
+  verification **on** (`--upstream-ca` adds a private anchor; there is no "don't verify"
+  flag), scans the response (`response_blocked` → 502) and records every decision in the same
+  ledger as grants. Nothing decrypted is written to disk.
+- `docs/TLS_INTERCEPT.md` states what it buys, what it costs (a CA key that can impersonate
+  any host), key custody, and the limits: one request per connection, `Content-Length` bodies,
+  no HTTP/2 or WebSocket.
+- `tests/test_egress_tls.py`: real TLS origin signed by our CA; clean POST passes, a secret in
+  the body is refused, an instruction in the response is refused, each with a ledger entry.
+
 ## 0.72.1 — 2026-11-27
 
 ### Fixed

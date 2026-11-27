@@ -32,9 +32,10 @@ is how to hand an auditor a redacted record that still proves it is the same rec
 [`docs/CAPABILITIES.md`](docs/CAPABILITIES.md) is delegated authority that can only narrow.
 [`docs/HARDWARE.md`](docs/HARDWARE.md) says exactly what a security key proves and what it does not.
 [`docs/FIREWALL_COMPARE.md`](docs/FIREWALL_COMPARE.md) is the content gate (secrets out, instructions in)
-and an honest comparison with the strongest open agent firewall.
+and an honest comparison with the strongest open agent firewall; [`docs/TLS_INTERCEPT.md`](docs/TLS_INTERCEPT.md)
+is the optional TLS interception, including what a local CA costs you.
 
-**Status:** 639 tests collected; 0 failed. On a host with Node and bubblewrap 634
+**Status:** 644 tests collected; 0 failed. On a host with Node and bubblewrap 639
 pass; the rest skip with a stated reason, and CI skips more where those tools are
 absent. `python3 -m pytest -q tests/`.
 
@@ -1036,7 +1037,7 @@ skills/     agent skill instructions
 
 ## Status
 
-**v0.72.1** — canonical commitment, Ed25519
+**v0.73.0** — canonical commitment, Ed25519
 grant bound to the executing agent, one-shot redeem under a file lock (per nonce store),
 hash-chained receipts with a `.head` anchor, provenance enforcement, idempotent
 effect journal + write adapter, payment adapter with provider idempotency and
