@@ -548,6 +548,10 @@ def main(argv=None) -> int:
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
 
+    p_replay = sub.add_parser("replay", help="re-derive the decision from a bundle")
+    p_replay.add_argument("--bundle", required=True)
+    p_replay.add_argument("--policy", default=None)
+
     p_dsse = sub.add_parser("dsse", help="DSSE envelope over a receipt (interop)")
     p_dsse.add_argument("action", choices=["sign", "verify"])
     p_dsse.add_argument("--receipt", default=None, help="receipt body JSON (sign)")
@@ -1088,6 +1092,13 @@ def main(argv=None) -> int:
                 return 4
             _emit(res, None)
             return 0
+
+        if args.cmd == "replay":
+            from . import replay as replay_mod
+            pol = (core.load_json(args.policy) if args.policy else None)
+            out = replay_mod.replay(core.load_json(args.bundle), pol)
+            _emit(out, None)
+            return 0 if out.get("ok") else 1
 
         if args.cmd == "dsse":
             from . import dsse as dsse_mod

@@ -103,6 +103,14 @@ Rules:
   weaker class is refused — the refusal is written to the ledger as a `control` entry.
 - An unknown value is refused everywhere (`E_COVERAGE`).
 
+## Replay
+`mandate replay --bundle b.json [--policy p.json]` re-derives the decision: `commitment`,
+`render_hash`, `result_hash`, `policy_digest`, `taint` and a fresh `check()`. Failure codes:
+`E_REPLAY_HASH` (the bytes do not match the receipt), `E_POLICY_DRIFT` (the policy now has a
+different digest than the receipt recorded) and `E_DECISION` (the policy now refuses what
+the receipt says was executed). `executed`/`observe` are compatible with `allow` and `ask`
+— a human approval is what turned `ask` into `executed` — but never with `deny`.
+
 ## Witness quorum
 A bundle may carry `witness_notes` (a list). With `audit verify --witness-quorum N` the
 bundle is valid only when **N distinct witnesses** signed a note for the **same** tree

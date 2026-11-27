@@ -12,11 +12,21 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
-### Attack corpus 11 → 17
+### Replay: re-derive the decision, do not just trust the signature
+- **`mandate replay --bundle b.json [--policy p.json]`** recomputes `commitment`,
+  `render_hash`, `result_hash`, the recorded `policy_digest`, the `taint` block and a fresh
+  `check()`, and reports which one drifted: `E_REPLAY_HASH` (bytes do not match),
+  `E_POLICY_DRIFT` (the policy changed since the receipt) or `E_DECISION` (the policy now
+  refuses what the receipt says was executed). Exit 0 only when everything reproduces.
+- A human approval turns `ask` into `executed`, so a recorded `executed`/`observe` is
+  compatible with `allow` and `ask`; only `deny` means the decision does not follow.
+
+### Attack corpus 11 → 18
 - `tools/attack_eval.py` now also runs: a payee planted in an email and cited as data
   (refused with `untrusted_input`), a control case where the same effect comes from the
   ERP (allowed), a homoglyph payee, a zero-width payee, a coverage downgrade inside a
-  re-signed bundle, and a single witness against a two-witness policy. `17/17 caught`,
+  re-signed bundle, a single witness against a two-witness policy, and a record replayed
+  under a policy that now denies it. `18/18 caught`,
   `docs/ATTACKS.md` regenerated from the run.
 
 ### Witness quorum: N independent witnesses, not one host

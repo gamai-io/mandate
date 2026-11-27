@@ -298,6 +298,16 @@ def attacks(env: dict) -> list[dict]:
     record("16. ship a single witness when the policy asks for two", not q["ok"],
            "quorum.evaluate", q.get("message") or "ok")
 
+    # 17 the record is signed, but the policy it claims to follow has changed since
+    from mandate import replay as replay_mod
+    b = env["bundle"]()
+    other_policy = json.loads(json.dumps(core.load_policy()))
+    other_policy["effects"]["payment.send"] = dict(
+        other_policy["effects"]["payment.send"], max_auto=1)
+    rep = replay_mod.replay(b, other_policy)
+    record("17. replay the record under a policy that now says no", not rep["ok"],
+           "mandate.replay", f"{rep.get('code')}: {rep.get('message', '')[:70]}")
+
     return out
 
 
