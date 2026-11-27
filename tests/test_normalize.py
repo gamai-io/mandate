@@ -6,9 +6,7 @@ the cheapest way to make a known payee look new (or a blocked one look fine).
 """
 from __future__ import annotations
 
-import json
 import os
-import pathlib
 import tempfile
 import unittest
 

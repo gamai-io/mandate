@@ -16,7 +16,7 @@ import sys
 import tempfile
 import unittest
 
-from mandate import core, export, replay
+from mandate import core, replay
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 

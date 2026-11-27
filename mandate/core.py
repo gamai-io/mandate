@@ -9,7 +9,6 @@ import time
 import uuid
 
 from . import coverage as _coverage
-from . import normalize as _normalize
 from . import sign
 from .jcs import canonicalize as _canonicalize
 
