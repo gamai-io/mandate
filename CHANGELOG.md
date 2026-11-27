@@ -12,6 +12,17 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### DSSE + in-toto: other toolchains can read our receipts
+- **`mandate/dsse.py`**: DSSE envelopes (`pae()` matches the spec vector), signed with the
+  same SSH keys as everything else. `mandate dsse sign --receipt F --key K --signer NAME
+  [--statement] [-o env.json]` and `mandate dsse verify --file env.json [--keyid NAME]`.
+- **in-toto Statement v1** wrapper (`--statement`): subject digest = sha256 of the receipt,
+  `predicateType: https://gamai.io/mandate/receipt/v1`. Strict parsing on load (duplicate
+  keys, unknown fields, invalid base64 → `E_DSSE`/`E_FIELDS`/`E_BASE64`).
+- Limits stated in the module: signatures are SSHSIG blobs (opaque to DSSE, verifiable with
+  `sign.verify`), and full SCITT/COSE is not implemented — the statement is what a SCITT
+  service would wrap.
+
 ### Name folding before policy decisions
 - **`mandate/normalize.py`**: `fold()` removes invisible characters (zero-width, bidi,
   soft hyphen), maps Cyrillic/Greek/Armenian homoglyphs, unifies compatibility forms and

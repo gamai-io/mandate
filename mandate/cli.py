@@ -548,6 +548,17 @@ def main(argv=None) -> int:
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
 
+    p_dsse = sub.add_parser("dsse", help="DSSE envelope over a receipt (interop)")
+    p_dsse.add_argument("action", choices=["sign", "verify"])
+    p_dsse.add_argument("--receipt", default=None, help="receipt body JSON (sign)")
+    p_dsse.add_argument("--file", default=None, help="envelope JSON (verify)")
+    p_dsse.add_argument("--key", default=None, help="signing key (sign)")
+    p_dsse.add_argument("--signer", default=None, help="signer name (sign)")
+    p_dsse.add_argument("--keyid", default=None, help="require this keyid (verify)")
+    p_dsse.add_argument("--statement", action="store_true",
+                        help="wrap as in-toto Statement v1 instead of a bare receipt")
+    p_dsse.add_argument("--out", "-o", default=None)
+
     p_nonce = sub.add_parser("nonce")
     p_nonce.add_argument("action", choices=("serve", "check"))
     p_nonce.add_argument("--host", default="127.0.0.1")
@@ -1075,6 +1086,41 @@ def main(argv=None) -> int:
                 return 4
             _emit(res, None)
             return 0
+
+        if args.cmd == "dsse":
+            from . import dsse as dsse_mod
+            if args.action == "sign":
+                if not (args.receipt and args.key and args.signer):
+                    _emit({"error": "usage",
+                           "message": "dsse sign --receipt F --key K --signer NAME [--statement]"}, None)
+                    return 2
+                body = _read(args.receipt)
+                if isinstance(body, dict) and isinstance(body.get("body"), dict):
+                    body = body["body"]          # prihvati i cijeli ledger entry
+                env = dsse_mod.envelope_for_receipt(
+                    body, args.key, args.signer, as_statement=args.statement)
+                if args.out:
+                    with open(args.out, "w", encoding="utf-8") as fh:
+                        json.dump(env, fh, ensure_ascii=False, indent=2, sort_keys=True)
+                        fh.write("\n")
+                    _emit({"ok": True, "out": args.out,
+                           "payloadType": env["payloadType"]}, None)
+                else:
+                    _emit(env, None)
+                return 0
+            try:
+                env = dsse_mod.load_envelope(args.file) if args.file else None
+                if env is None:
+                    _emit({"error": "usage", "message": "dsse verify --file env.json"}, None)
+                    return 2
+                ok = dsse_mod.verify(env, args.signers, revoked_path=args.revoked,
+                                     require_keyid=args.keyid)
+            except dsse_mod.DsseError as exc:
+                _emit({"ok": False, "error": exc.code, "message": str(exc)}, None)
+                return 1
+            _emit({"ok": bool(ok), "envelope": bool(ok),
+                   "keyid": (env.get("signatures") or [{}])[0].get("keyid")}, None)
+            return 0 if ok else 1
 
         if args.cmd == "nonce":
             from . import nonce as nonce_mod

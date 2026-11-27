@@ -90,6 +90,21 @@ Rules:
   weaker class is refused — the refusal is written to the ledger as a `control` entry.
 - An unknown value is refused everywhere (`E_COVERAGE`).
 
+## Interop: DSSE and in-toto
+A receipt can be wrapped without changing it:
+
+```json
+{"payloadType": "application/vnd.gamai.mandate.receipt.v1+json",
+ "payload": "<base64 of jcs(receipt body)>",
+ "signatures": [{"keyid": "approver", "sig": "<base64 of SSHSIG over PAE>"}]}
+```
+
+The signed bytes are the DSSE pre-authentication encoding:
+`"DSSEv1" SP len(type) SP type SP len(payload) SP payload`.
+With `--statement` the payload becomes an in-toto Statement v1 whose `subject` digest is
+`sha256(jcs(receipt body))` and whose `predicateType` is
+`https://gamai.io/mandate/receipt/v1`.
+
 ## Decision codes (`check`)
 - `0` allow (low risk, or under `max_auto`)
 - `10` ask (a grant is required)
