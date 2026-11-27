@@ -1,5 +1,20 @@
 # Changelog
-## Unreleased (0.69.3)
+## 0.70.0 — 2026-11-27
+
+### Firewall: content gate on top of the egress proxy
+- **`mandate firewall scan|redact|decide|selftest`** (`mandate/firewall.py`): 17 outbound
+  patterns (cloud keys, private-key blocks, JWTs, credentials in URLs/connection strings,
+  bearer headers, emails, IBANs, Luhn-checked card numbers, mobile numbers, high-entropy
+  tokens) and 10 inbound patterns (instruction override, prompt reveal, role override,
+  tool-directive payment, credential request, urgency+payment, invisible characters, hidden
+  HTML comments, base64 blobs). Matching runs **after `normalize.fold`**, so zero-width and
+  homoglyph variants do not slip through.
+- Findings keep a **masked** value and an offset, never the secret: the ledger must not
+  become the leak. `decide()` returns `deny` / `redact` / `allow` in the order a proxy runs.
+- **`spec/firewall/corpus.json`** (45 cases: 27 attacks/leaks, 18 benign) and
+  `tools/firewall_eval.py`: `caught 27, missed 0, false positives 0`, run in CI as
+  `test_firewall.py::Corpus`. `docs/FIREWALL.md` is generated from the run;
+  `docs/FIREWALL_COMPARE.md` compares it with `pipelock` and states which side is stronger.
 
 ### The conformance kit now tests the new claims (8 → 11 cases)
 - **`coverage_missing`** — a receipt without a class, verified with `--require-coverage`, must

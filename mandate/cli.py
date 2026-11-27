@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import sys
 import time
 import urllib.error
@@ -547,6 +548,13 @@ def main(argv=None) -> int:
     p_ship.add_argument("--offset", default="ship.state")
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
+
+    p_fw = sub.add_parser("firewall", help="content gate: secrets out, injections in")
+    p_fw.add_argument("action", choices=["scan", "redact", "decide", "selftest"])
+    p_fw.add_argument("--text", default=None)
+    p_fw.add_argument("--file", default=None)
+    p_fw.add_argument("--response", default=None, help="inbound text to scan as well")
+    p_fw.add_argument("--out", "-o", default=None)
 
     p_hw = sub.add_parser("hardware", help="which signing keys are hardware-backed")
     p_hw.add_argument("action", choices=["list", "check"], nargs="?", default="list")
@@ -1131,6 +1139,39 @@ def main(argv=None) -> int:
                 _emit({"error": "ShipError", "message": str(exc)}, None)
                 return 4
             _emit(res, None)
+            return 0
+
+        if args.cmd == "firewall":
+            from . import firewall as fw
+            if args.action == "selftest":
+                import subprocess as _sp
+                done = _sp.run([sys.executable, str(pathlib.Path(__file__).resolve().parents[1]
+                                                    / "tools" / "firewall_eval.py"), "--json"],
+                               capture_output=True, text=True)
+                _emit({"ok": done.returncode == 0, "report": json.loads(done.stdout or "{}")}, None)
+                return 0 if done.returncode == 0 else 1
+            text = args.text
+            if text is None and args.file:
+                text = pathlib.Path(args.file).read_text(encoding="utf-8", errors="replace")
+            if text is None:
+                _emit({"error": "usage", "message": "firewall scan --text ... | --file F"}, None)
+                return 2
+            if args.action == "scan":
+                out = {"outbound": fw.scan_outbound(text)}
+                if args.response is not None:
+                    out["inbound"] = fw.scan_inbound(args.response)
+                _emit(out, None)
+                return 0 if out["outbound"]["ok"] else 1
+            if args.action == "decide":
+                res = fw.decide(text, args.response or "")
+                _emit(res, None)
+                return 0 if res["allow"] else 1
+            cleaned, count = fw.redact(text)
+            if args.out:
+                pathlib.Path(args.out).write_text(cleaned, encoding="utf-8")
+                _emit({"ok": True, "out": args.out, "replacements": count}, None)
+            else:
+                _emit({"ok": True, "text": cleaned, "replacements": count}, None)
             return 0
 
         if args.cmd == "hardware":
