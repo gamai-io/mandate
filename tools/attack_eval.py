@@ -308,6 +308,18 @@ def attacks(env: dict) -> list[dict]:
     record("17. replay the record under a policy that now says no", not rep["ok"],
            "mandate.replay", f"{rep.get('code')}: {rep.get('message', '')[:70]}")
 
+    # 18 hide a value in a redacted view and then swap it on reveal
+    from mandate import disclose as disc
+    body = b["receipt"]["body"] if isinstance(b, dict) and isinstance(b.get("receipt"), dict) else None
+    if body:
+        view = disc.redact(body, ["render.fields.target"])
+        try:
+            disc.reveal(view, ["render.fields.target"], {"render.fields.target": "Attacker Ltd"})
+            caught, detail = False, "swapped value was accepted"
+        except disc.DisclosureError as exc:
+            caught, detail = True, f"{getattr(exc, 'code', 'E_DISCLOSURE')}: {exc}"
+        record("18. swap a value in a redacted view", caught, "mandate.disclose", detail)
+
     return out
 
 

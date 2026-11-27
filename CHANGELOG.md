@@ -12,6 +12,18 @@
   strongest case. That is the same lie as a capability list that advertises what nobody
   implemented.
 
+### Selective disclosure: a redacted receipt that still proves something
+- **`mandate disclose redact|verify|reveal`** (`mandate/disclose.py`): hidden fields become
+  salted commitments (`sha256("salt:"||salt||":"||jcs(value))`), the view records the hash of
+  the full receipt, and a reveal must hash back to it. Failure codes `E_PATH`, `E_HASH`,
+  `E_COMMITMENT`, `E_NODISCLOSURE`, `E_SALT`.
+- The view can be signed by whoever discloses (namespace `mandate-disclosure`), because the
+  original signature covers the values, not the redacted form. `docs/DISCLOSURE.md` states
+  that limit in the table rather than burying it.
+- Error codes from library exceptions (`E_*`) now reach the CLI output instead of being
+  flattened into `{"error": "io"}`.
+- Attack corpus 18 → 19: swapping a value in a redacted view.
+
 ### Academy: quickstart, conformance page, badge record
 - **`docs/QUICKSTART.md`** — 30 minutes from `pip install` to a verified record, with the
   outputs copied from a real run.

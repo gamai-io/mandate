@@ -548,6 +548,18 @@ def main(argv=None) -> int:
     p_ship.add_argument("--batch", type=int, default=200)
     p_ship.add_argument("--dry-run", dest="dry_run", action="store_true")
 
+    p_disc = sub.add_parser("disclose", help="redacted view of a receipt (selective disclosure)")
+    p_disc.add_argument("action", choices=["redact", "verify", "reveal"])
+    p_disc.add_argument("--receipt", default=None)
+    p_disc.add_argument("--view", default=None)
+    p_disc.add_argument("--fields", default="", help="comma-separated paths, e.g. render.fields.target")
+    p_disc.add_argument("--values", default=None, help="JSON object path -> value (reveal)")
+    p_disc.add_argument("--expect-hash", dest="expect_hash", default=None)
+    p_disc.add_argument("--key", default=None, help="sign the redacted view (who discloses)")
+    p_disc.add_argument("--signer", default=None)
+    p_disc.add_argument("--signers", default=argparse.SUPPRESS)
+    p_disc.add_argument("--out", "-o", default=None)
+
     p_replay = sub.add_parser("replay", help="re-derive the decision from a bundle")
     p_replay.add_argument("--bundle", required=True)
     p_replay.add_argument("--policy", default=argparse.SUPPRESS)
@@ -1092,6 +1104,70 @@ def main(argv=None) -> int:
                 _emit({"error": "ShipError", "message": str(exc)}, None)
                 return 4
             _emit(res, None)
+            return 0
+
+        if args.cmd == "disclose":
+            from . import disclose as disc
+            if args.action == "redact":
+                if not args.receipt:
+                    _emit({"error": "usage", "message": "disclose redact --receipt F --fields a,b"}, None)
+                    return 2
+                paths = [p.strip() for p in (args.fields or "").split(",") if p.strip()]
+                if not paths:
+                    _emit({"error": "usage", "message": "--fields render.fields.target,..."}, None)
+                    return 2
+                body = _read(args.receipt)
+                if isinstance(body, dict) and isinstance(body.get("body"), dict):
+                    body = body["body"]
+                view = disc.redact(body, paths, expect_hash=args.expect_hash)
+                if args.key:
+                    from . import sign as sign_mod
+                    payload = core.jcs({k: v for k, v in view.items()
+                                        if k not in ("signature", "signer")})
+                    view["signature"] = sign_mod.sign(payload, args.key,
+                                                      "mandate-disclosure")
+                    view["signer"] = str(args.signer or "")
+                if args.out:
+                    with open(args.out, "w", encoding="utf-8") as fh:
+                        json.dump(view, fh, ensure_ascii=False, indent=2, sort_keys=True)
+                        fh.write("\n")
+                    _emit({"ok": True, "out": args.out, "redacted": view["redacted"],
+                           "receipt_hash": view["receipt_hash"],
+                           "signed": bool(args.key)}, None)
+                else:
+                    _emit(view, None)
+                return 0
+            if args.action == "verify":
+                view = core.load_json(args.view) if args.view else None
+                if not view:
+                    _emit({"error": "usage", "message": "disclose verify --view F"}, None)
+                    return 2
+                out = disc.check_view(view)
+                if view.get("signature"):
+                    from . import sign as sign_mod
+                    payload = core.jcs({k: v for k, v in view.items()
+                                        if k not in ("signature", "signer")})
+                    out["view_signature"] = bool(sign_mod.verify(
+                        payload, str(view.get("signer") or ""), str(view["signature"]),
+                        args.signers, "mandate-disclosure", revoked_path=args.revoked))
+                _emit(out, None)
+                return 0
+            # reveal
+            view = core.load_json(args.view) if args.view else None
+            values = core.load_json(args.values) if args.values else {}
+            paths = [p.strip() for p in (args.fields or "").split(",") if p.strip()]
+            if not (view and paths):
+                _emit({"error": "usage",
+                       "message": "disclose reveal --view F --fields a,b --values vals.json"}, None)
+                return 2
+            res = disc.reveal(view, paths, values)
+            if args.out:
+                with open(args.out, "w", encoding="utf-8") as fh:
+                    json.dump(res, fh, ensure_ascii=False, indent=2, sort_keys=True)
+                    fh.write("\n")
+                _emit({"ok": True, "out": args.out, "hash": res["hash"]}, None)
+            else:
+                _emit(res, None)
             return 0
 
         if args.cmd == "replay":
@@ -1757,7 +1833,9 @@ def main(argv=None) -> int:
         _emit({"error": type(exc).__name__, "message": str(exc)}, None)
         return 3
     except (OSError, ValueError) as exc:
-        _emit({"error": "io", "message": str(exc)}, None)
-        return 2
+        # greške koje nose mašinski kod (E_*) se prijavljuju kao takve, ne kao „io"
+        code = getattr(exc, "code", None)
+        _emit({"error": code or "io", "message": str(exc)}, None)
+        return 1 if code else 2
     parser.print_help(sys.stderr)
     return 2
