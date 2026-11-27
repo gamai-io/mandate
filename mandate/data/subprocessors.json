@@ -1,0 +1,22 @@
+{
+ "format": "mandate-subprocessors/1",
+ "updated": "2026-11-28",
+ "statement": "The product is software you run. We operate no hosted service that processes your data, so there are no subprocessors for your records.",
+ "categories": [
+  {
+   "name": "Distribution",
+   "items": ["PyPI (hosts the published artifacts)", "GitHub (source, releases, CI)"],
+   "sees_your_data": false,
+   "note": "These carry the package and its metadata. No ledger, receipt, intent or customer identifier is ever sent to them by the software."
+  },
+  {
+   "name": "Optional companion packages",
+   "items": ["sigil-profile depends on fastapi, uvicorn, httpx, rfc8785, cryptography, jsonschema"],
+   "sees_your_data": "only inside your own environment",
+   "note": "Those libraries are installed by you, run on your hosts, and are not operated by us. gamai-mandate itself has no runtime dependencies (standard library only)."
+  }
+ ],
+ "transfers": "None by us. Nothing leaves the host that runs the software unless you configure an adapter (payment provider, ERP, mail) yourself.",
+ "contact": "security contact in SECURITY.md",
+ "change_policy": "A new subprocessor would be a hosted service; we would announce it in the changelog before it exists, not after."
+}

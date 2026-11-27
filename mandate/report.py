@@ -220,6 +220,19 @@ def pack(ledger_path: str, out_dir: str, tokens: list[dict] | None = None,
     with open(os.path.join(out_dir, "dora_roi.json"), "w", encoding="utf-8") as fh:
         json.dump(DORA_ROI, fh, indent=1, sort_keys=True)
 
+    # row 11: the three things a supplier questionnaire asks for that are not the ledger
+    from . import controls as _controls
+    try:
+        version = __import__("mandate").__version__
+    except Exception:  # noqa: BLE001
+        version = ""
+    for name, payload in (
+            ("subprocessors.json", _controls.subprocessors()),
+            ("contract_clauses.json", _controls.contract_clauses()),
+            ("dd_answers.json", _controls.dd_answers(version))):
+        with open(os.path.join(out_dir, name), "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=1, sort_keys=True, ensure_ascii=False)
+
     head = ""
     head_path = ledger_path + ".head"
     if os.path.exists(head_path):

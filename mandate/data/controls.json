@@ -96,9 +96,9 @@
   {
    "n": 11,
    "control": "Third-party register and due diligence",
-   "artifact": "mandate pack (inventory, changes, dora_roi.json, controls.md, index.json with per-file sha256 and the ledger head)",
+   "artifact": "mandate pack now also carries dd_answers.json, subprocessors.json and contract_clauses.json (dated, generated from the same data as `mandate controls`, sha256-listed in index.json); nine drop-in clauses, each naming the command that proves it",
    "status": "partial",
-   "missing": "contract clause template, subprocessor list, dated due-diligence answers",
+   "missing": "the bank's own counsel adapting the clauses; a signed DPA template",
    "owner": "bank+us"
   },
   {

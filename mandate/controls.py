@@ -60,6 +60,50 @@ def summary(framework: str = "") -> dict:
     }
 
 
+def load_file(name: str) -> dict:
+    path = os.path.join(os.path.dirname(DATA), name)
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def subprocessors() -> dict:
+    return load_file("subprocessors.json")
+
+
+def contract_clauses() -> dict:
+    return load_file("contract_clauses.json")
+
+
+def dd_answers(version: str = "", now: int | None = None) -> dict:
+    """The due-diligence answers, dated, with the command that proves each one.
+
+    Generated from the same data as `mandate controls`, so a questionnaire cannot be
+    answered from a document that drifted: if a row changes, this changes with it.
+    """
+    import time as _time
+    data = load()
+    matrix = summary()
+    return {
+        "format": "mandate-dd-answers/1",
+        "product": "gama-mandate",
+        "version": version,
+        "answered_at": int(now if now is not None else _time.time()),
+        "controls": {"rows": matrix["rows"], "have": matrix["have"],
+                     "partial": matrix["partial"], "gap": matrix["gap"]},
+        "rows": [{"n": r["n"], "control": r["control"], "status": r["status"],
+                  "artifact": r["artifact"], "missing": r["missing"]} for r in data["rows"]],
+        "not_claimed": data.get("not_claimed", []),
+        "subprocessors": "see subprocessors.json in this pack",
+        "clauses": "see contract_clauses.json in this pack",
+        "how_to_verify": [
+            "mandate audit verify --bundle <bundle> --log-signers <f> --witness-signers <f>",
+            "mandate replay --bundle <bundle>",
+            "mandate worm-verify --dir <export>",
+            "python3 tools/kit.py --verifier '<your verifier>'",
+        ],
+    }
+
+
 def render(framework: str = "", status: str = "") -> str:
     data = load()
     lines = []

@@ -1,0 +1,61 @@
+{
+ "format": "mandate-contract-clauses/1",
+ "updated": "2026-11-28",
+ "note": "Drop-in text for a supplier agreement. Not legal advice: counsel adapts it to the jurisdiction and to the bank's own policy.",
+ "clauses": [
+  {
+   "id": "C1",
+   "title": "Audit and verification rights",
+   "text": "The Customer may verify the Supplier's evidence at any time without the Supplier's cooperation, using the published verification commands, and may audit the Supplier's development and release process once per year and after any security incident, remotely or on site with 10 business days' notice.",
+   "evidence": "mandate audit verify, mandate replay, mandate worm-verify, docs/CONFORMANCE.md"
+  },
+  {
+   "id": "C2",
+   "title": "Evidence retention and return",
+   "text": "Receipts, grants and the hash-chained ledger remain the Customer's data. On termination the Supplier returns them in the published open formats within 10 business days and deletes any copy it holds within 30 days, certifying the deletion in writing.",
+   "evidence": "mandate export, mandate worm-export, mandate pack"
+  },
+  {
+   "id": "C3",
+   "title": "Incident notification",
+   "text": "The Supplier notifies the Customer without undue delay and in any event within 24 hours of becoming aware of a security incident affecting the software, and provides the affected versions, the failure mode, the fix and a signed advisory.",
+   "evidence": "CHANGELOG entries, SECURITY.md, signed releases"
+  },
+  {
+   "id": "C4",
+   "title": "Subcontracting",
+   "text": "The Supplier processes no Customer data itself, operates no hosted service for the software, and will not add a subprocessor that would see Customer data without prior written approval. The current list is Annex A.",
+   "evidence": "mandate/data/subprocessors.json (shipped in the pack)"
+  },
+  {
+   "id": "C5",
+   "title": "Exit plan",
+   "text": "The software is distributed under MIT, so no escrow is required. The Customer may fork and maintain the published source. The Supplier documents the export path for every artifact it produced (records, keys' verification material, anchors, configuration).",
+   "evidence": "LICENSE, docs/REFERENCE.md, mandate worm-export"
+  },
+  {
+   "id": "C6",
+   "title": "Release integrity",
+   "text": "Each release states its test count, is reproducible from the tagged source, and states its limits. Where PyPI provenance is available the Supplier publishes it; where it is not, the Supplier says so rather than implying it.",
+   "evidence": "tools/verify_pypi.py, tools/claims.py, release notes"
+  },
+  {
+   "id": "C7",
+   "title": "Change notification",
+   "text": "The record format and the verification semantics are frozen from 1.0. Breaking changes are announced at least one minor release in advance; the ability to verify an existing record is never removed.",
+   "evidence": "spec/MANDATE-1.md (Stability), CHANGELOG"
+  },
+  {
+   "id": "C8",
+   "title": "Data location",
+   "text": "The software runs on the Customer's infrastructure. The Supplier transfers no Customer data across borders and has no remote access by default.",
+   "evidence": "mandate doctor (reports what the host does), no outbound calls by default"
+  },
+  {
+   "id": "C9",
+   "title": "Limits of the evidence",
+   "text": "The Supplier does not certify compliance and does not warrant that the software prevents all agent misconduct. The evidence shows who authorised what; the obligation to comply remains with the Customer.",
+   "evidence": "docs/BANK_CONTROL_MATRIX.md, mandate controls (not_claimed)"
+  }
+ ]
+}

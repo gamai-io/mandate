@@ -1,4 +1,20 @@
 # Changelog
+## 1.0.5 — 2026-11-28
+
+### Procurement answers generated from the code (row 11)
+- **`mandate pack`** now also writes three files, each listed with its sha256 in `index.json`:
+  - `dd_answers.json` — dated due-diligence answers built from the same data as
+    `mandate controls` (per-row artifact, blunt status, what is missing), plus the
+    `not_claimed` list and the exact commands a customer can run instead of trusting us.
+  - `subprocessors.json` — states plainly that we operate no hosted service and therefore
+    have no subprocessors for the customer's records; PyPI/GitHub carry artifacts, not data.
+  - `contract_clauses.json` — nine drop-in clauses (audit rights, retention and return,
+    24-hour incident notice, subcontracting, exit, release integrity, change notice, data
+    location, limits of the evidence), each naming the command that proves it.
+- Because the answers are generated from `mandate/data/controls.json`, a drifting answer fails
+  `tests/test_procurement.py` rather than being found in a bank's questionnaire.
+- Control matrix row 11 updated in `docs/BANK_CONTROL_MATRIX.md` and `mandate/data/controls.json`.
+
 ## 1.0.4 — 2026-11-28
 
 ### Detection a SOC can actually consume (row 12)
