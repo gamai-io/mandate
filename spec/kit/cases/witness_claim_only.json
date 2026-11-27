@@ -6,22 +6,22 @@
    "approver": "approver",
    "audience": "",
    "commitment": "sha256:cb26d904727b24e484deca589b0e446f3aedd57b55d91fbdca103c1662e25d68",
-   "nonce": "8e5ce487056b458c963a67bdae62c01d",
+   "nonce": "5d9cefc1ca2a489bb5edab1b7cf52a40",
    "policy_digest": "",
    "render_hash": "8ebccdda87afeee5ed1c2db845ea30b771456380b71ee8dc25708949d7279c8f",
    "scope": {
     "max_uses": 1,
-    "not_after": 1795772782
+    "not_after": 1795810675
    },
    "v": 1
   },
-  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgo9pOi5IdO3ia3+eoejEyP7QGzd\nR+QGVdbyRmDfMRGMAAAAAHbWFuZGF0ZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy\nNTUxOQAAAEAXm3ffwzZ0c4JCqqVHismLb2ydzXUg3EyU51aU4uhtF7JHXnn50pOurtdfGB\nmsGTbodsfk4GUhG0piJA8bqlcL\n-----END SSH SIGNATURE-----\n"
+  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgO5EZQqbPbos/x8Nv91JpQq6B1N\nDwIOOcWyfn0e0nGjIAAAAHbWFuZGF0ZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy\nNTUxOQAAAECMrWKtany1uaniEVH4tLHeacGBQ8zy8VP4E7BCytINHa34Lp67t8alNt6pZG\nuRtJYm9KNwD1Yz74unrmbDynQN\n-----END SSH SIGNATURE-----\n"
  },
  "inclusion_proof": {
-  "leaf_hash": "373ad3247a6f4cc614e9cd298b5523d48a5d91630e0058a52e61a3a4494a6065",
+  "leaf_hash": "d2e85ccc0236af3a80a3ac80f782c9df911f23c3801853e8d1437176cac22cf0",
   "leaf_index": 0,
   "path": [],
-  "root_hash": "373ad3247a6f4cc614e9cd298b5523d48a5d91630e0058a52e61a3a4494a6065",
+  "root_hash": "d2e85ccc0236af3a80a3ac80f782c9df911f23c3801853e8d1437176cac22cf0",
   "tree_size": 1,
   "v": 1
  },
@@ -58,8 +58,9 @@
    "approver": "approver",
    "binding": true,
    "commitment": "sha256:cb26d904727b24e484deca589b0e446f3aedd57b55d91fbdca103c1662e25d68",
+   "coverage": "enforced",
    "decision": "executed",
-   "grant_nonce": "8e5ce487056b458c963a67bdae62c01d",
+   "grant_nonce": "5d9cefc1ca2a489bb5edab1b7cf52a40",
    "policy_digest": "50f7bad6163db2c87e405923671749e2",
    "prev": "GENESIS",
    "proposal_id": "m1c26c3b72ff9b2b74fc59ee10",
@@ -82,43 +83,53 @@
    "result_hash": "c26c3b72ff9b2b74fc59ee10d94cd9d0f6036dcf4a927bac0876950ccaf2aa47",
    "revert": "irreversible",
    "session": "kit",
-   "ts": 1795771882,
+   "taint": {
+    "material_untrusted": [],
+    "tainted": true,
+    "trusted_fields": [],
+    "unknown_fields": [
+     "amount",
+     "target"
+    ],
+    "untrusted_fields": []
+   },
+   "ts": 1795809775,
    "type": "receipt",
    "v": 1
   },
-  "hash": "79cf0127609f80044294aeda743495a0092ae1247e7b72bb9e2925a9861be184"
+  "hash": "28a0f072567b6038742181ec1eed742163b9cee5902620999751f587218338ec"
  },
  "signature": {
   "alg": "ssh-ed25519",
-  "key_id": "SHA256:aiSKjOWvRsvJ8k82Li9faqesAiMkwqXVzg3LR01IICw",
+  "key_id": "SHA256:tdNPytWK90QTcB71vasuDLy22t8OALdVrEYUsifndgc",
   "namespace": "mandate-export",
   "signer": "approver",
-  "value": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgo9pOi5IdO3ia3+eoejEyP7QGzd\nR+QGVdbyRmDfMRGMAAAAAObWFuZGF0ZS1leHBvcnQAAAAAAAAABnNoYTUxMgAAAFMAAAAL\nc3NoLWVkMjU1MTkAAABACXJtA/Zgxj4VS9KHu6FJrYe82lOtSqB80l8bUnS/Zs4feC4G4F\nPBpW+BfwiWykUr04Y108BnRYK/nCO5l2qqAg==\n-----END SSH SIGNATURE-----\n"
+  "value": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgO5EZQqbPbos/x8Nv91JpQq6B1N\nDwIOOcWyfn0e0nGjIAAAAObWFuZGF0ZS1leHBvcnQAAAAAAAAABnNoYTUxMgAAAFMAAAAL\nc3NoLWVkMjU1MTkAAABAPm1/o+EEX/VFMMFCUFyOauNWHt495wKuRXBbqlWTxGUBVGJnCc\nxt62XQdopUX8UD8aZSLx6rLgSR9e4a79TMDg==\n-----END SSH SIGNATURE-----\n"
  },
  "sth": {
-  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAglZ0d4TSwUBA8wvZ2zyzkCczrUj\nIfF5lnAfxBLaYfrLIAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABA4raVRMp3E0yHZ7A2le3AJn0A6AUT/SsHj3Q8rj/mUasxaeYm5Z2Ey5\na26L9i6XmEu4nkshLxC1ys+tPL420wDA==\n-----END SSH SIGNATURE-----\n",
+  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgPz0TepjR00zbIrWEboY5Jx0eyv\nvBOuympEmjtIfcHfMAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABAjkrrHQ6euWfyuCjwTa5KjNUkq2bfqgCjZfcl/bL3uxUDSLO6KFHVbC\nqw7iQ/C43VL/ybVLbv+6fmV/5IUSkHAA==\n-----END SSH SIGNATURE-----\n",
   "sth": {
-   "log_id": "SHA256:q5jG7jFZQkNkeHMIrcU6mtN/NhHAEPWTBmzFGU4Xnfo",
+   "log_id": "SHA256:SnH4whxDvNv6W9cZZNO4euhZ9CH0UlmAe3pXGRFrHuk",
    "log_name": "log1",
-   "root_hash": "373ad3247a6f4cc614e9cd298b5523d48a5d91630e0058a52e61a3a4494a6065",
-   "timestamp": 1795771883027,
+   "root_hash": "d2e85ccc0236af3a80a3ac80f782c9df911f23c3801853e8d1437176cac22cf0",
+   "timestamp": 1795809775759,
    "tree_size": 1,
    "v": 1
   }
  },
  "v": 1,
  "witness_state": {
-  "log_id": "SHA256:q5jG7jFZQkNkeHMIrcU6mtN/NhHAEPWTBmzFGU4Xnfo",
+  "log_id": "SHA256:SnH4whxDvNv6W9cZZNO4euhZ9CH0UlmAe3pXGRFrHuk",
   "log_name": "log1",
-  "pinned_at": 1795771883058,
-  "root_hash": "373ad3247a6f4cc614e9cd298b5523d48a5d91630e0058a52e61a3a4494a6065",
+  "pinned_at": 1795809775778,
+  "root_hash": "d2e85ccc0236af3a80a3ac80f782c9df911f23c3801853e8d1437176cac22cf0",
   "sth": {
-   "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAglZ0d4TSwUBA8wvZ2zyzkCczrUj\nIfF5lnAfxBLaYfrLIAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABA4raVRMp3E0yHZ7A2le3AJn0A6AUT/SsHj3Q8rj/mUasxaeYm5Z2Ey5\na26L9i6XmEu4nkshLxC1ys+tPL420wDA==\n-----END SSH SIGNATURE-----\n",
+   "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgPz0TepjR00zbIrWEboY5Jx0eyv\nvBOuympEmjtIfcHfMAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABAjkrrHQ6euWfyuCjwTa5KjNUkq2bfqgCjZfcl/bL3uxUDSLO6KFHVbC\nqw7iQ/C43VL/ybVLbv+6fmV/5IUSkHAA==\n-----END SSH SIGNATURE-----\n",
    "sth": {
-    "log_id": "SHA256:q5jG7jFZQkNkeHMIrcU6mtN/NhHAEPWTBmzFGU4Xnfo",
+    "log_id": "SHA256:SnH4whxDvNv6W9cZZNO4euhZ9CH0UlmAe3pXGRFrHuk",
     "log_name": "log1",
-    "root_hash": "373ad3247a6f4cc614e9cd298b5523d48a5d91630e0058a52e61a3a4494a6065",
-    "timestamp": 1795771883027,
+    "root_hash": "d2e85ccc0236af3a80a3ac80f782c9df911f23c3801853e8d1437176cac22cf0",
+    "timestamp": 1795809775759,
     "tree_size": 1,
     "v": 1
    }

@@ -1,4 +1,17 @@
 # Changelog
+## Unreleased (0.69.3)
+
+### The conformance kit now tests the new claims (8 → 11 cases)
+- **`coverage_missing`** — a receipt without a class, verified with `--require-coverage`, must
+  be rejected; **`coverage_invalid`** — an invented class (`trust_me`) is refused even without
+  the flag; **`taint_mismatch`** — a `taint` block that does not match the bundle's intent is
+  refused. Cases may carry `"extra": [...]` so the kit also checks the policy a verifier claims
+  to enforce.
+- `audit verify` gains **`--require-coverage`** and now always refuses an invalid class; it also
+  recomputes the taint block when the bundle carries both the receipt and the intent.
+- Each new case is a *rebuilt* record: a new ledger entry with its own STH, inclusion proof and
+  witness note, so the case fails at the check under test instead of at `inclusion`.
+
 ## 0.69.2 — 2026-11-27
 
 ### Fixed

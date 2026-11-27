@@ -13,7 +13,8 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
                   revoked_path: str | None = None,
                   witness_signers_path: str | None = None,
                   pq_witness_keys: list[str] | None = None,
-                  witness_quorum: int = 0) -> dict:
+                  witness_quorum: int = 0,
+                  require_coverage: bool = False) -> dict:
     envelope = export.verify_bundle(bundle, signers_path,
                                     revoked_path=revoked_path)
     receipt = (bundle or {}).get("receipt") or {}
@@ -25,7 +26,7 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
         "witness": False,
         "decision": (receipt.get("body") or {}).get("decision"),
         # COVERAGE_V1: kako je efekat uhvaćen — enforced / observed / self_reported
-        "coverage": (receipt.get("body") or {}).get("coverage"),
+        "coverage_class": (receipt.get("body") or {}).get("coverage"),
     }
     sth = (bundle or {}).get("sth")
     if not isinstance(sth, dict):
@@ -84,8 +85,34 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
                     result["witness"] = False
         else:
             result["witness"] = bool(result["witness"] or q["ok"])
+    # COVERAGE_V1: neispravna klasa je laž i pada uvijek; nedostatak samo u strogom modu
+    body = receipt.get("body") or {}
+    cov = body.get("coverage")
+    result["coverage"] = True
+    if cov is not None:
+        from . import coverage as _coverage
+        try:
+            result["coverage_class"] = _coverage.norm(cov)
+            result["coverage_detail"] = _coverage.describe(cov)
+        except _coverage.CoverageError:
+            result["coverage"] = False
+    elif require_coverage:
+        result["coverage"] = False
+
+    # TAINT_V1: ako receipt nosi taint blok, mora odgovarati intentu iz bundlea
+    taint = body.get("taint")
+    if isinstance(taint, dict) and isinstance((bundle or {}).get("intent"), dict):
+        from . import core as _core
+        try:
+            expected = _core.taint_report((bundle or {}).get("intent"))
+            result["taint"] = expected == taint
+        except Exception:  # noqa: BLE001
+            result["taint"] = False
+
     result["valid"] = bool(envelope.get("valid") and result["sth"]
-                           and result["inclusion"] and result["witness"])
+                           and result["inclusion"] and result["witness"]
+                           and result.get("coverage", True)
+                           and result.get("taint", True))
     decision = result.get("decision")
     result["executed"] = bool(result["valid"] and decision == "executed")
     result["observed"] = bool(result["valid"] and decision == "observe")
@@ -96,9 +123,11 @@ def verify_bundle_file(path: str, signers_path: str, log_signers_path: str,
                        revoked_path: str | None = None,
                        witness_signers_path: str | None = None,
                        pq_witness_keys: list[str] | None = None,
-                       witness_quorum: int = 0) -> dict:
+                       witness_quorum: int = 0,
+                       require_coverage: bool = False) -> dict:
     return verify_bundle(core.load_json(path), signers_path,
                          log_signers_path, revoked_path=revoked_path,
                          witness_signers_path=witness_signers_path,
                          pq_witness_keys=pq_witness_keys,
-                         witness_quorum=witness_quorum)
+                         witness_quorum=witness_quorum,
+                         require_coverage=require_coverage)

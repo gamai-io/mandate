@@ -17,13 +17,16 @@ ok   sth_bad_signature     valid=False
 ok   proof_tampered        valid=False
 ok   witness_claim_only    valid=False
 ok   witness_note_forged   valid=False
+ok   coverage_missing      valid=False
+ok   coverage_invalid      valid=False
+ok   taint_mismatch        valid=False
 
-8/8 cases correct
+11/11 cases correct
 ```
 
 ## Why four "must fail" cases matter
 
-A verifier that returns `{"valid": true}` for everything scores 5/8 — not 8/8. The kit also
+A verifier that returns `{"valid": true}` for everything scores 8/11 — not 11/11. The kit also
 checks **why** a case fails: for `proof_tampered` it expects the first failing check to be
 `inclusion`, not `signature`. That is what separates "this bundle is broken" from "this
 verifier is checking the wrong thing".
@@ -50,7 +53,7 @@ reproducible.
 
 | verifier | kit | record |
 |---|---|---|
-| `mandate` reference (`audit verify`) | **8/8** | reproducible: run the command above |
+| `mandate` reference (`audit verify`) | **11/11** | reproducible: run the command above |
 | *yours* | — | send the `conformance.json` + the command; it goes in this table |
 
 We do not certify verifiers we did not run. To be listed, the record must be produced by a
@@ -59,13 +62,17 @@ command a third party can run against `spec/kit/` unchanged.
 ## What the kit does and does not prove
 
 - **Does**: the verifier rejects a tampered receipt, a swapped inclusion proof, an unknown
-  signer, a forged witness note, and a claim without a signature — and accepts the honest
-  record.
+  signer, a forged witness note, a claim without a signature, a receipt with no coverage class
+  (when `--require-coverage` is set), an invented class, and a taint block that does not match
+  the intent — and accepts the honest record.
 - **Does not**: prove the verifier checks *everything your threat model needs*. Add your own
   cases: the format is a JSON manifest of bundles plus expected outcomes, and the tool does
   not care where they came from.
 
 ## Adding a case
+
+`coverage_missing` carries `"extra": ["--require-coverage"]`: a case may pass flags to the
+verifier under test, so the kit also checks the *policy* a verifier claims to enforce.
 
 1. Put the bundle under `spec/kit/` (or anywhere the manifest points to).
 2. Add an entry to `spec/kit/cases.json`:

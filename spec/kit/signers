@@ -1,2 +1,2 @@
-approver namespaces="mandate,mandate-export" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPaTouSHTt4mt/nqHoxMj+0Bs3UfkBlXW8kZg3zERjA root@vmi3557242
-log1 namespaces="mandate-log" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJWdHeE0sFAQPML2ds8s5AnM61IyHxeZZwH8QS2mH6yy root@vmi3557242
+approver namespaces="mandate,mandate-export" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDuRGUKmz26LP8fDb/dSaUKugdTQ8CDjnFsn59HtJxoy root@vmi3557242
+log1 namespaces="mandate-log" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID89E3qY0dNM2yK1hG6GOScdHsr7wTrspqRJo7SH3B3z root@vmi3557242

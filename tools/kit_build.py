@@ -88,11 +88,37 @@ def build(work: str):
         # deep copies: each case is mutated independently, and a shared nested dict would
         # silently change the bundle the signature was made over
         proof_value = over.pop("proof", clone(proof))
+        receipt_value = over.pop("receipt", clone(receipt))
+        if receipt_value is not clone(receipt):
+            # izmijenjen receipt mora imati svoj hash, inače prvi padne "receipt" provjera
+            receipt_value["hash"] = core.sha256(core.jcs(receipt_value["body"]))
         kwargs = dict(key_path=approver, signer="approver", sth=clone(sth),
                       witness_state=clone(state))
         kwargs.update(over)
-        return export.build_bundle(clone(receipt), clone(INTENT), clone(grant),
+        return export.build_bundle(clone(receipt_value), clone(INTENT), clone(grant),
                                    proof_value, **kwargs)
+
+    _case_no = [0]
+
+    def relogged(body):
+        """Zapiši izmijenjeni body kroz append_receipt i napravi novi STH/proof/note.
+
+        Ručno sastavljanje JSON-a nije dovoljno: leaf hash pokriva i ono što append_receipt
+        upiše (prev/hash), pa inclusion padne prije provjere koja se testira.
+        """
+        _case_no[0] += 1
+        no = _case_no[0]
+        ledger2 = os.path.join(work, "ledger-case-%d.jsonl" % no)
+        entry = core.append_receipt(ledger2, body)
+        leaves2 = mlog.leaves_from_ledger(ledger2)
+        payload2 = mlog.sth_payload("log1", mlog.log_id_from_key(logkey),
+                                    len(leaves2), mlog.root_hex(leaves2))
+        sth2 = mlog.sign_sth(payload2, logkey)
+        state_path2 = os.path.join(work, "witness-case-%d.json" % no)
+        mwit.accept(sth2, None, signers, state_path2, key_path=wkey, signer="witness1")
+        return {"receipt": entry, "sth": sth2,
+                "proof": mlog.inclusion_proof(leaves2, 0),
+                "witness_state": mwit.load_state(state_path2)}
 
     cases = {}
 
@@ -143,6 +169,28 @@ def build(work: str):
     cases["witness_note_forged"] = dict(bundle=resigned(witness_note=note),
                                         expect={"valid": False, "fails": "witness"})
 
+    # COVERAGE_V1: receipt bez klase prolazi samo u kompat modu; sa --require-coverage pada
+    no_cov_body = clone(receipt)["body"]
+    no_cov_body.pop("coverage", None)
+    cases["coverage_missing"] = dict(
+        bundle=resigned(**relogged(no_cov_body)),
+        expect={"valid": False, "fails": "coverage"},
+        extra=["--require-coverage"])
+
+    # ... a klasa koja ne postoji je laž i pada bez ikakvog flaga
+    bad_cov_body = clone(receipt)["body"]
+    bad_cov_body["coverage"] = "trust_me"
+    cases["coverage_invalid"] = dict(bundle=resigned(**relogged(bad_cov_body)),
+                                     expect={"valid": False, "fails": "coverage"})
+
+    # TAINT_V1: taint blok mora odgovarati intentu iz bundlea
+    bad_taint_body = clone(receipt)["body"]
+    bad_taint_body["taint"] = {
+        "untrusted_fields": [], "unknown_fields": [], "trusted_fields": [],
+        "material_untrusted": [], "tainted": False}
+    cases["taint_mismatch"] = dict(bundle=resigned(**relogged(bad_taint_body)),
+                                   expect={"valid": False, "fails": "taint"})
+
     return cases, wkey, signers, log_signers, witness_signers
 
 
@@ -163,8 +211,10 @@ def main() -> int:
         path = KIT / "cases" / f"{name}.json"
         path.write_text(json.dumps(case["bundle"], indent=1, sort_keys=True) + "\n",
                         encoding="utf-8")
-        manifest.append({"name": name, "bundle": str(path.relative_to(ROOT)),
-                         **case["expect"]})
+        entry = {"name": name, "bundle": str(path.relative_to(ROOT)), **case["expect"]}
+        if case.get("extra"):
+            entry["extra"] = case["extra"]
+        manifest.append(entry)
     (KIT / "cases.json").write_text(json.dumps(
         {"format": "mandate-conformance-kit/1",
          "signers": str((KIT / "signers").relative_to(ROOT)),

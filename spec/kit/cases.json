@@ -50,6 +50,27 @@
    "bundle": "spec/kit/cases/witness_note_forged.json",
    "valid": false,
    "fails": "witness"
+  },
+  {
+   "name": "coverage_missing",
+   "bundle": "spec/kit/cases/coverage_missing.json",
+   "valid": false,
+   "fails": "coverage",
+   "extra": [
+    "--require-coverage"
+   ]
+  },
+  {
+   "name": "coverage_invalid",
+   "bundle": "spec/kit/cases/coverage_invalid.json",
+   "valid": false,
+   "fails": "coverage"
+  },
+  {
+   "name": "taint_mismatch",
+   "bundle": "spec/kit/cases/taint_mismatch.json",
+   "valid": false,
+   "fails": "taint"
   }
  ]
 }

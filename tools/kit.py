@@ -31,12 +31,17 @@ def failing_check(result: dict) -> str:
     The envelope reports its own parts (signature, receipt, inclusion), so a broken
     seal is named `signature` rather than the whole envelope.
     """
+    # konkretnija provjera ima prednost nad kantom "receipt": ako je pao coverage/taint,
+    # to je razlog, a ne "nešto u receiptu"
+    for name in ("coverage", "taint"):
+        if result.get(name) is False:
+            return name
     envelope = result.get("envelope")
     if isinstance(envelope, dict):
         for name in ("signature", "receipt", "inclusion"):
             if envelope.get(name) is False:
                 return name
-    for name in ("sth", "inclusion", "witness"):
+    for name in ("sth", "inclusion", "witness", "coverage", "taint"):
         value = result.get(name)
         if isinstance(value, dict):
             value = value.get("valid")
@@ -63,10 +68,12 @@ def main(argv: list[str]) -> int:
     rows, failures = [], 0
     for case in manifest["cases"]:
         bundle = str((ROOT / case["bundle"]).resolve())
+        extra = " ".join(case.get("extra") or [])
         command = (args.verifier.replace("{bundle}", bundle)
                    .replace("{signers}", signers)
                    .replace("{log_signers}", log_signers)
-                   .replace("{witness_signers}", witness_signers))
+                   .replace("{witness_signers}", witness_signers)
+                   + ((" " + extra) if extra else ""))
         done = subprocess.run(shlex.split(command), capture_output=True, text=True,
                               timeout=120)
         try:
