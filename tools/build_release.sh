@@ -20,6 +20,9 @@ cd "$root"
 commit="$(git rev-list -n1 "$tag")"
 epoch="$(git show -s --format=%ct "$commit")"
 export SOURCE_DATE_EPOCH="$epoch"
+# verify_pypi.py gradi sa PYTHONHASHSEED=0; bez toga se redoslijed fajlova u sdists-u
+# mijenja izmedju buildova (isti sadrzaj, drugi bajtovi).
+export PYTHONHASHSEED=0
 echo "tag $tag -> commit ${commit:0:12}, SOURCE_DATE_EPOCH=$epoch"
 
 work="$(mktemp -d)"

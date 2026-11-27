@@ -1,4 +1,15 @@
 # Changelog
+## 0.69.2 — 2026-11-27
+
+### Fixed
+- **The reproducible build now matches the verifier.** `tools/build_release.sh` did not set
+  `PYTHONHASHSEED`, which `tools/verify_pypi.py` does: the same source produced an sdist with
+  a different member order (same content, different bytes). The script sets it now, so a
+  rebuild of this tag is byte-identical to what PyPI serves — the check that was missing for
+  0.69.0 and 0.69.1.
+- `cap attenuate` without `--ttl` inherits the parent's remaining life instead of asking for
+  3600 s and failing `E_WIDEN` on a fresh parent (from 0.69.1).
+
 ## 0.69.1 — 2026-11-27
 
 ### Fixed
