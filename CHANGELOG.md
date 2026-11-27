@@ -1,4 +1,24 @@
 # Changelog
+## 0.74.0 — 2026-11-27
+
+### The PyPI page is readable again: README 1,061 → 157 lines
+- The long-form sections (examples, operations, effect broker, transparency log, MCP gates,
+  stack, bank control matrix, invariants, layout) moved **verbatim** to
+  [`docs/REFERENCE.md`](docs/REFERENCE.md); nothing was deleted. The README keeps the pitch,
+  the demo, the 60-second quickstart, one table of "what else is in the box", what it does
+  not do, and the install order.
+- **`## Install order`** says it plainly: `pip install gama-mandate` is the product, the
+  other packages are layers, add one when you need what it does. The same sentence belongs in
+  the other packages' READMEs (next release of each).
+- "What it does not do" now lists credential isolation, compliance certification,
+  tamper-proofness **and** the absence of an independent audit, in one place.
+
+### Also in this release
+- `sigil-profile 0.22.4` (separate package, published): its `pyproject.toml` had **no
+  `readme` field**, so PyPI showed a 0-character description. It now ships its README
+  (10,637 characters). That empty page was sigil, not `gamai-guard` (guard 1.0.5 has a
+  7,408-character description).
+
 ## 0.73.1 — 2026-11-27
 
 ### Fixed
