@@ -87,8 +87,16 @@ def main() -> int:
     if not remote:
         print("PyPI has no files for %s %s" % (name, version))
         return 1
-    with tempfile.TemporaryDirectory() as td:
-        build(ROOT, td, when)
+    with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as sd:
+        # Gradi se iz `git archive <tag>`, ne iz radnog stabla: tako u build ne mogu ući
+        # necommitovani fajlovi, a redoslijed fajlova je isti kao u tools/build_release.sh.
+        source = ROOT
+        if args.tag:
+            source = sd
+            archive = subprocess.run(["git", "archive", args.tag], cwd=ROOT,
+                                     capture_output=True, check=True).stdout
+            subprocess.run(["tar", "-x", "-C", source], input=archive, check=True)
+        build(source, td, when)
         local = {f: sha256(os.path.join(td, f)) for f in sorted(os.listdir(td))}
     bad = 0
     for filename in sorted(set(local) | set(remote)):
