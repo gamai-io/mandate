@@ -58,7 +58,7 @@ def _walk(value: Any, depth: int = 0) -> None:
         try:
             value.encode("utf-8")
         except UnicodeEncodeError:
-            raise StrictJSONError("lone_surrogate", value[:20]) from None
+            raise StrictJSONError("lone_surrogate", value[:20].encode("unicode_escape").decode()) from None
         return
     if isinstance(value, dict):
         for key, item in value.items():
@@ -66,7 +66,7 @@ def _walk(value: Any, depth: int = 0) -> None:
                 try:
                     key.encode("utf-8")
                 except UnicodeEncodeError:
-                    raise StrictJSONError("lone_surrogate", key[:20]) from None
+                    raise StrictJSONError("lone_surrogate", key[:20].encode("unicode_escape").decode()) from None
             _walk(item, depth + 1)
         return
     if isinstance(value, list):
