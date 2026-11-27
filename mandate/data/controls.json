@@ -18,7 +18,7 @@
    "control": "Agent inventory, owner, model version",
    "artifact": "mandate inventory (per agent: effects, kinds, approvers, scopes, first/last seen, amount total; JSON + CSV)",
    "status": "partial",
-   "missing": "reconcile against IdP/cloud inventory; model version per agent",
+   "missing": "reconcile against the IdP/cloud inventory; model version per agent is pinned in change records, not yet read from the running agent",
    "owner": "us"
   },
   {
@@ -88,9 +88,9 @@
   {
    "n": 10,
    "control": "Change control over prompts, models and permissions",
-   "artifact": "mandate change record (file sha256 + Ed25519 signature + reason), change list --signers verifies each",
+   "artifact": "mandate change record: file sha256 + Ed25519 signature + reason + ticket (PROJECT-123; --require-ticket refuses without one) + optional pinned model (name@version and sha256 of the artefact); `mandate change verify --dir` compares the newest signed hash per file with the bytes on disk and reports `unrecorded_change` / `missing` (exit 4); `mandate change models` lists the current pin per model",
    "status": "partial",
-   "missing": "link a change to a ticket id; model version pinning",
+   "missing": "link the ticket to the tracker's own audit trail (webhook); per-agent model pin in the svid",
    "owner": "us"
   },
   {

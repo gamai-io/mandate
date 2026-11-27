@@ -525,7 +525,7 @@ def main(argv=None) -> int:
     p_inv.add_argument("--owner", action="append", default=None, help="agent=owner")
 
     p_chg = sub.add_parser("change")
-    p_chg.add_argument("action", choices=("record", "list"))
+    p_chg.add_argument("action", choices=("record", "list", "verify", "models"))
     p_chg.add_argument("--ledger", default="ledger.jsonl")
     p_chg.add_argument("--file", default=None)
     p_chg.add_argument("--approver", default=None)
@@ -533,6 +533,13 @@ def main(argv=None) -> int:
     p_chg.add_argument("--reason", default="")
     p_chg.add_argument("--signers", default=argparse.SUPPRESS)
     p_chg.add_argument("--signer-cmd", dest="signer_cmd", default=None)
+    p_chg.add_argument("--ticket", default="", help="PROJECT-123 that authorised the change")
+    p_chg.add_argument("--require-ticket", dest="require_ticket", action="store_true",
+                       help="refuse a change record that has no valid ticket id")
+    p_chg.add_argument("--model", default="", help="model version this change pins (name@ver)")
+    p_chg.add_argument("--model-digest", dest="model_digest", default="",
+                       help="sha256:<64 hex> of the pinned model artefact")
+    p_chg.add_argument("--dir", default=".", help="root for action=verify")
 
     p_watch = sub.add_parser("watch")
     p_watch.add_argument("--log", required=True, help="JSONL access log")
@@ -1147,12 +1154,26 @@ def main(argv=None) -> int:
                     _emit({"error": "Usage",
                            "message": "change record --file F --approver A --key K --reason R"}, None)
                     return 2
-                res = audit_report.change_record(args.ledger, args.file, args.approver,
-                                                 args.key, args.reason,
-                                                 getattr(args, "signer_cmd", None))
-                _emit({k: res[k] for k in ("entry", "file", "sha256", "actor", "reason")}, None)
+                res = audit_report.change_record(
+                    args.ledger, args.file, args.approver, args.key, args.reason,
+                    getattr(args, "signer_cmd", None), ticket=args.ticket,
+                    model=args.model, model_digest=args.model_digest,
+                    require_ticket=args.require_ticket)
+                out = {k: res[k] for k in ("entry", "file", "sha256", "actor", "reason", "ticket")}
+                if res.get("ticket_problem"):
+                    out["ticket_problem"] = res["ticket_problem"]
+                _emit(out, None)
                 return 0
-            res = audit_report.changes(args.ledger, args.signers)
+            if args.action == "verify":
+                res = audit_report.drift(args.ledger, args.dir,
+                                         getattr(args, "signers", None))
+                _emit(res, None)
+                return 0 if res.get("ok") else 4
+            if args.action == "models":
+                res = audit_report.pinned_models(args.ledger)
+                _emit(res, None)
+                return 0 if res.get("count") else 4
+            res = audit_report.changes(args.ledger, args.signers, ticket=args.ticket)
             _emit(res, None)
             return 0
 

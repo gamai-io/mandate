@@ -1,4 +1,22 @@
 # Changelog
+## 1.0.6 — 2026-11-28
+
+### Change control that can fail (row 10)
+- **Ticket on every change**: `mandate change record --ticket SEC-142`; `--require-ticket`
+  refuses a record whose ticket is missing or does not look like `PROJECT-123`, because a
+  change with no traceable ticket proves *that* something changed, never *who asked for it*.
+- **`mandate change verify --dir DIR`**: for each file with a signed record, compares the
+  newest recorded sha256 with the bytes on disk and reports `unrecorded_change` or `missing`,
+  exit 4. This is the failure mode change control actually suffers from — the record was true
+  last month. Config-looking files that were never recorded are listed as `untracked` (a
+  process gap, not a tamper); keys and the ledger are not.
+- **Model pinning**: `--model gpt-x@2026-11-01 --model-digest sha256:<64 hex>` on the record,
+  and `mandate change models` lists the current pin per model name. Shape is validated, so
+  "two words" cannot be a pinned model.
+- `change list --ticket` filters; ties within the same second are decided by ledger order
+  (the later entry is the later decision), which the tests caught.
+- Control matrix row 10 updated in `docs/BANK_CONTROL_MATRIX.md` and `mandate/data/controls.json`.
+
 ## 1.0.5 — 2026-11-28
 
 ### Procurement answers generated from the code (row 11)

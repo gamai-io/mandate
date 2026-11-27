@@ -12,9 +12,11 @@ drift away from what actually happened.
 from __future__ import annotations
 
 import csv
+import fnmatch
 import hashlib
 import json
 import os
+import re
 import shutil
 import time
 from collections import defaultdict
@@ -97,9 +99,37 @@ def write_inventory_csv(inv: dict, path: str) -> None:
                              a["first_seen"], a["last_seen"], a["amount_total"]])
 
 
+TICKET_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,15}-[0-9]{1,9}$")
+MODEL_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}(@[A-Za-z0-9._:/-]{1,80})?$")
+
+
+def _ticket_problem(ticket: str) -> str:
+    """A change without a ticket is an unrecorded change; a ticket that is not a ticket is a note."""
+    if not ticket:
+        return "ticket required: a change with no ticket id cannot be traced to an approval"
+    if not TICKET_RE.match(ticket):
+        return ("ticket %r does not look like PROJECT-123; a free-form string is not a ticket" % ticket)
+    return ""
+
+
 def change_record(ledger_path: str, path: str, approver: str, key_path: str,
-                  reason: str, signer_cmd: str | None = None) -> dict:
-    """Row 10: a change to a control file, hashed and signed by its approver."""
+                  reason: str, signer_cmd: str | None = None, ticket: str = "",
+                  model: str = "", model_digest: str = "",
+                  require_ticket: bool = False) -> dict:
+    """Row 10: a change to a control file, hashed and signed by its approver.
+
+    Carries the ticket that authorised it and, optionally, the model versions the change
+    pins (`--model gpt-x@2026-11-01 --model-digest sha256:...`). Without a ticket the record
+    proves *that* something changed, never *who asked for it* — so `--require-ticket` turns
+    the warning into a refusal.
+    """
+    problem = _ticket_problem(ticket)
+    if problem and require_ticket:
+        raise MandateError(problem)
+    if model and not MODEL_RE.match(model):
+        raise MandateError("model %r is not name or name@version" % model)
+    if model_digest and not (model_digest.startswith("sha256:") and len(model_digest) == 71):
+        raise MandateError("model digest must be sha256:<64 hex>")
     raw = open(path, "rb").read()
     body = {
         "v": 1,
@@ -108,10 +138,18 @@ def change_record(ledger_path: str, path: str, approver: str, key_path: str,
         "actor": approver,
         "reason": reason,
         "file": os.path.basename(path),
+        "path": os.path.normpath(path),
         "sha256": hashlib.sha256(raw).hexdigest(),
         "bytes": len(raw),
         "ts": int(time.time()),
+        "ticket": ticket,
     }
+    if problem:
+        body["ticket_problem"] = problem
+    if model:
+        body["model"] = model
+    if model_digest:
+        body["model_digest"] = model_digest
     if signer_cmd:
         from . import signing as _signing
         signed = _signing.sign_with(signer_cmd, canonicalize(body))
@@ -125,13 +163,17 @@ def change_record(ledger_path: str, path: str, approver: str, key_path: str,
     return {"entry": entry["hash"], **body}
 
 
-def changes(ledger_path: str, signers_path: str | None = None) -> dict:
+def changes(ledger_path: str, signers_path: str | None = None,
+            ticket: str = "") -> dict:
     found = []
     for e in _entries(ledger_path):
         body = e.get("body") or {}
         if body.get("type") == "control" and body.get("action") == "change":
+            if ticket and body.get("ticket") != ticket:
+                continue
             item = {k: body.get(k) for k in
-                    ("file", "sha256", "bytes", "actor", "reason", "ts", "signer")}
+                    ("file", "path", "sha256", "bytes", "actor", "reason", "ts", "signer",
+                     "ticket", "ticket_problem", "model", "model_digest")}
             item["entry"] = e.get("hash")
             if signers_path and body.get("signature"):
                 signed = {k: v for k, v in body.items()
@@ -142,6 +184,77 @@ def changes(ledger_path: str, signers_path: str | None = None) -> dict:
                                 sign.DEFAULT_NAMESPACE))
             found.append(item)
     return {"count": len(found), "changes": found}
+
+
+def drift(ledger_path: str, root: str, signers_path: str | None = None,
+          include: tuple[str, ...] = ("*.json", "*.yaml", "*.yml", "*.toml", "*.ini", "*.conf",
+                                      "*.cfg", "*.py")) -> dict:
+    """Is the control file on disk still the one someone signed for?
+
+    Change control fails quietly in one way: a file gets edited and nobody records it. This
+    compares the newest signed change per file against the bytes on disk and calls the
+    difference `unrecorded_change`. A file that was never recorded is reported separately
+    (`untracked`) — that is a gap in the process, not a tamper.
+    """
+    latest: dict[str, dict] = {}
+    for item in changes(ledger_path, signers_path)["changes"]:
+        key = item.get("path") or item.get("file")
+        if not key:
+            continue
+        # `>=`: two records in the same second are decided by ledger order, and the later
+        # entry is the later decision. `>` silently kept the older one and reported drift
+        # right after a correct re-record.
+        if key not in latest or float(item.get("ts") or 0) >= float(latest[key].get("ts") or 0):
+            latest[key] = item
+    rows, problems = [], []
+    for key, item in sorted(latest.items()):
+        candidate = key if os.path.isabs(key) else os.path.join(root, os.path.basename(key))
+        if not os.path.exists(candidate):
+            rows.append({"file": os.path.basename(key), "state": "missing",
+                         "recorded": item.get("sha256")})
+            problems.append("missing: %s" % os.path.basename(key))
+            continue
+        now = hashlib.sha256(open(candidate, "rb").read()).hexdigest()
+        state = "ok" if now == item.get("sha256") else "unrecorded_change"
+        rows.append({"file": os.path.basename(key), "state": state,
+                     "recorded": item.get("sha256"), "current": now,
+                     "ticket": item.get("ticket"), "actor": item.get("actor")})
+        if state != "ok":
+            problems.append("unrecorded change: %s (recorded %s, now %s)" % (
+                os.path.basename(key), str(item.get("sha256"))[:12], now[:12]))
+    untracked = []
+    if os.path.isdir(root):
+        known = {os.path.basename(key) for key in latest}
+        for name in sorted(os.listdir(root)):
+            full = os.path.join(root, name)
+            if not os.path.isfile(full) or name in known or name.startswith("."):
+                continue
+            # samo konfiguracioni fajlovi: ključevi i ledger nisu "zaboravljeni", oni nisu kontrola
+            if include and not any(fnmatch.fnmatch(name, pat) for pat in include):
+                continue
+            untracked.append(name)
+    return {"ok": not problems, "code": "ok" if not problems else "drift",
+            "checked": len(rows), "files": rows, "problems": problems[:10],
+            "untracked": untracked[:20],
+            "note": ("untracked files are a process gap, not a tamper; recorded files are the "
+                     "ones whose bytes were signed")}
+
+
+def pinned_models(ledger_path: str) -> dict:
+    """What model versions the change records pin, newest first per model."""
+    out: dict[str, dict] = {}
+    for item in changes(ledger_path)["changes"]:
+        name = item.get("model")
+        if not name:
+            continue
+        # jedan model, jedna linija: verzija je vrijednost, ne ključ
+        key = name.split("@")[0]
+        stamp = float(item.get("ts") or 0)
+        if key not in out or stamp >= out[key]["ts"]:
+            out[key] = {"model": name, "digest": item.get("model_digest") or "",
+                         "ts": int(stamp), "ticket": item.get("ticket") or "",
+                         "file": item.get("file") or "", "actor": item.get("actor") or ""}
+    return {"count": len(out), "models": sorted(out.values(), key=lambda m: -m["ts"])}
 
 
 DORA_ROI = {
