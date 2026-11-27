@@ -1,5 +1,5 @@
 # Changelog
-## Unreleased (0.69.0)
+## 0.69.0 — 2026-11-27
 
 ### Coverage classes: a receipt now says how it was captured
 - **`coverage` in every receipt**: `enforced` (the gate could refuse it), `observed`
