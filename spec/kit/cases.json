@@ -1,0 +1,48 @@
+{
+ "format": "mandate-conformance-kit/1",
+ "signers": "spec/kit/signers",
+ "log_signers": "spec/kit/log_signers",
+ "cases": [
+  {
+   "name": "valid",
+   "bundle": "spec/kit/cases/valid.json",
+   "valid": true
+  },
+  {
+   "name": "tampered_receipt",
+   "bundle": "spec/kit/cases/tampered_receipt.json",
+   "valid": false,
+   "fails": "signature"
+  },
+  {
+   "name": "tampered_signature",
+   "bundle": "spec/kit/cases/tampered_signature.json",
+   "valid": false,
+   "fails": "signature"
+  },
+  {
+   "name": "unknown_signer",
+   "bundle": "spec/kit/cases/unknown_signer.json",
+   "valid": false,
+   "fails": "signature"
+  },
+  {
+   "name": "sth_bad_signature",
+   "bundle": "spec/kit/cases/sth_bad_signature.json",
+   "valid": false,
+   "fails": "sth"
+  },
+  {
+   "name": "proof_tampered",
+   "bundle": "spec/kit/cases/proof_tampered.json",
+   "valid": false,
+   "fails": "inclusion"
+  },
+  {
+   "name": "witness_mismatch",
+   "bundle": "spec/kit/cases/witness_mismatch.json",
+   "valid": false,
+   "fails": "witness"
+  }
+ ]
+}

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — conformance kit
+- **`tools/kit.py` scores any verifier.** Seven cases (one valid, six rejections), and for
+  a rejection it names the first check that must fail. Three cases tamper and re-sign so
+  the `sth`, `inclusion` and `witness` checks are actually reached. `tools/kit_build.py`
+  regenerates `spec/kit/`; `tests/test_kit.py` proves our verifier passes all seven and a
+  verifier that always says yes fails at least five.
+
 ## Unreleased — strict parsing
 - **Both verifiers refuse ambiguous JSON.** `{"a":1,"a":2}`, `NaN`/`Infinity`, integers
   beyond 2^53−1, lone UTF-16 surrogates, depth > 128 and non-UTF-8 bytes now fail with a

@@ -100,3 +100,36 @@ error code from each.
 
 The idea and the rule list follow Tracekit's `format.canon.loads_strict` (MIT); the
 implementation here is ours.
+
+## Conformance kit (2026-11-27)
+
+An auditor who writes their own verifier should not have to take ours on trust. The kit runs
+a fixed set of bundles through **any** verifier command and reports whether each verdict,
+and the first failing check, is right:
+
+```bash
+python3 tools/kit.py --verifier "python3 -m mandate --signers {signers} audit verify \
+    --bundle {bundle} --log-signers {log_signers}"
+```
+
+```
+ok   valid                valid=True
+ok   tampered_receipt     valid=False
+ok   tampered_signature   valid=False
+ok   unknown_signer       valid=False
+ok   sth_bad_signature    valid=False
+ok   proof_tampered       valid=False
+ok   witness_mismatch     valid=False
+
+7/7 cases correct
+```
+
+`{bundle}`, `{signers}` and `{log_signers}` are substituted. The verifier prints one JSON
+object; `valid` is required, and `envelope.signature`, `envelope.receipt`,
+`envelope.inclusion`, `sth`, `inclusion`, `witness` are used to name the first failure.
+`--json` gives the same report machine-readable; exit 0 means every case is correct.
+
+The cases live in `spec/kit/` and are rebuilt with `python3 tools/kit_build.py` (fresh
+keys per build). Three of them tamper **and then sign again** with the approver key:
+that is what isolates the `sth`, `inclusion` and `witness` checks, because otherwise the
+envelope signature fails first and the check under test is never reached.

@@ -1,0 +1,129 @@
+{
+ "format": "mandate-receipt/1",
+ "grant": {
+  "grant": {
+   "agent": "agent@example",
+   "approver": "approver",
+   "audience": "",
+   "commitment": "sha256:cb26d904727b24e484deca589b0e446f3aedd57b55d91fbdca103c1662e25d68",
+   "nonce": "3427230f0e6a4e8eb7bc0c11bf387124",
+   "policy_digest": "",
+   "render_hash": "8ebccdda87afeee5ed1c2db845ea30b771456380b71ee8dc25708949d7279c8f",
+   "scope": {
+    "max_uses": 1,
+    "not_after": 1795764191
+   },
+   "v": 1
+  },
+  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgXMGZNmQwspE5C1kZXa12nU2BXc\n55D56hRM92apl9rf8AAAAHbWFuZGF0ZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy\nNTUxOQAAAECiV6Cwa4/y59BlzizKQFDnzLWTEzEyrzaD94J4r9IoTLYszDaIbVlfbsTDcn\ndUCPu+gWnXtp01Vhj2ri7LBgUB\n-----END SSH SIGNATURE-----\n"
+ },
+ "inclusion_proof": {
+  "leaf_hash": "7b34374d88b53a6c0dcd168ccb432ff092a24878ee4ccdf0a51a30340f7d98fb",
+  "leaf_index": 0,
+  "path": [],
+  "root_hash": "7b34374d88b53a6c0dcd168ccb432ff092a24878ee4ccdf0a51a30340f7d98fb",
+  "tree_size": 1,
+  "v": 1
+ },
+ "intent": {
+  "actor": {
+   "agent": "agent@example",
+   "session": "kit"
+  },
+  "effect": {
+   "amount": {
+    "currency": "BAM",
+    "value": 10.0
+   },
+   "kind": "payment.send",
+   "target": "Supplier"
+  },
+  "nonce": "kit-nonce-1",
+  "provenance": [
+   {
+    "covers": [
+     "target",
+     "amount"
+    ],
+    "source": "erp:vendor:1",
+    "type": "data_ref"
+   }
+  ],
+  "requested_by": "approver",
+  "v": 1
+ },
+ "receipt": {
+  "body": {
+   "agent": "agent@example",
+   "approver": "approver",
+   "binding": true,
+   "commitment": "sha256:cb26d904727b24e484deca589b0e446f3aedd57b55d91fbdca103c1662e25d68",
+   "decision": "executed",
+   "grant_nonce": "3427230f0e6a4e8eb7bc0c11bf387124",
+   "policy_digest": "50f7bad6163db2c87e405923671749e2",
+   "prev": "GENESIS",
+   "proposal_id": "m1c26c3b72ff9b2b74fc59ee10",
+   "render": {
+    "fields": {
+     "amount": {
+      "currency": "BAM",
+      "value": 10.0
+     },
+     "evidence": [
+      "erp:vendor:1"
+     ],
+     "kind": "payment.send",
+     "params": {},
+     "target": "Supplier"
+    },
+    "summary": "payment.send | target=\"Supplier\" | amount=10.00 BAM | evidence=erp:vendor:1"
+   },
+   "render_hash": "8ebccdda87afeee5ed1c2db845ea30b771456380b71ee8dc25708949d7279c8f",
+   "result_hash": "c26c3b72ff9b2b74fc59ee10d94cd9d0f6036dcf4a927bac0876950ccaf2aa47",
+   "revert": "irreversible",
+   "session": "kit",
+   "ts": 1795763292,
+   "type": "receipt",
+   "v": 1
+  },
+  "hash": "51654cc755ad050f17b9437bce14986cfce171ef40ce90558ff2df8dc86f89b5"
+ },
+ "signature": {
+  "alg": "ssh-ed25519",
+  "key_id": "SHA256:hJrLpzyULk5gUQGc7U+bN9Af1ZLSWoXHe4LeByZrLNY",
+  "namespace": "mandate-export",
+  "signer": "approver",
+  "value": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgXMGZNmQwspE5C1kZXa12nU2BXc\n55D56hRM92apl9rf8AAAAObWFuZGF0ZS1leHBvcnQAAAAAAAAABnNoYTUxMgAAAFMAAAAL\nc3NoLWVkMjU1MTkAAABAflHcFcQNFZouYqLaXoww8ETsvBN0FlJvryMnC8tw5EMgi9ZsKq\nUGcLTDt69ArBGIKpIJp6pkNaycSAeVisGUCA==\n-----END SSH SIGNATURE-----\n"
+ },
+ "sth": {
+  "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgEySUKmXLNJff1UZ3/nU9FbsIUl\nV7R/XJB0rwvNB03pkAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABANB14wLfbVqN/ePDmfnwrphabmvvLoCbw8+DPKFBruUtfP0Z24wlPSq\nA5XmjXoiNxpGSt/r7LHreE/Ja16GKhCw==\n-----END SSH SIGNATURE-----\n",
+  "sth": {
+   "log_id": "SHA256:UWC+mF2QV9PfxAmeo9V1xPrDfFEpE81tCfGOiMTPGhQ",
+   "log_name": "log1",
+   "root_hash": "7b34374d88b53a6c0dcd168ccb432ff092a24878ee4ccdf0a51a30340f7d98fb",
+   "timestamp": 1795763292066,
+   "tree_size": 1,
+   "v": 1
+  }
+ },
+ "v": 1,
+ "witness_state": {
+  "log_id": "SHA256:UWC+mF2QV9PfxAmeo9V1xPrDfFEpE81tCfGOiMTPGhQ",
+  "log_name": "log1",
+  "pinned_at": 1795763292084,
+  "root_hash": "7b34374d88b53a6c0dcd168ccb432ff092a24878ee4ccdf0a51a30340f7d98fb",
+  "sth": {
+   "sig": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgEySUKmXLNJff1UZ3/nU9FbsIUl\nV7R/XJB0rwvNB03pkAAAALbWFuZGF0ZS1sb2cAAAAAAAAABnNoYTUxMgAAAFMAAAALc3No\nLWVkMjU1MTkAAABANB14wLfbVqN/ePDmfnwrphabmvvLoCbw8+DPKFBruUtfP0Z24wlPSq\nA5XmjXoiNxpGSt/r7LHreE/Ja16GKhCw==\n-----END SSH SIGNATURE-----\n",
+   "sth": {
+    "log_id": "SHA256:UWC+mF2QV9PfxAmeo9V1xPrDfFEpE81tCfGOiMTPGhQ",
+    "log_name": "log1",
+    "root_hash": "7b34374d88b53a6c0dcd168ccb432ff092a24878ee4ccdf0a51a30340f7d98fb",
+    "timestamp": 1795763292066,
+    "tree_size": 1,
+    "v": 1
+   }
+  },
+  "tree_size": 1,
+  "v": 1
+ }
+}
