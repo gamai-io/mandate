@@ -8,6 +8,8 @@ import os
 import time
 import uuid
 
+from . import coverage as _coverage
+from . import normalize as _normalize
 from . import sign
 from .jcs import canonicalize as _canonicalize
 
@@ -626,7 +628,14 @@ def verify_receipt_signature(body: dict, signers_path: str,
 
 def build_receipt(intent: dict, grant_core: dict, commitment: str,
                   result_hash: str, decision: str = "executed",
-                  ts: float | None = None) -> dict:
+                  ts: float | None = None,
+                  coverage: str = "enforced") -> dict:
+    """Receipt always states HOW the effect was captured (coverage class).
+
+    `enforced` is the default because a receipt only exists after `redeem`
+    authorised it. An adapter that merely watched the call must say
+    `observed`, and an agent that reports itself must say `self_reported`.
+    """
     return {
         "v": VERSION,
         "type": "receipt",
@@ -638,6 +647,7 @@ def build_receipt(intent: dict, grant_core: dict, commitment: str,
         "session": str((intent.get("actor") or {}).get("session") or ""),
         "grant_nonce": str(grant_core.get("nonce") or ""),
         "decision": decision,
+        "coverage": _coverage.norm(coverage),
         "result_hash": result_hash,
         "ts": int(time.time() if ts is None else ts),
         "render": render(intent),
@@ -680,13 +690,15 @@ def redeem(intent: dict, grant_obj: dict, signers_path: str,
            revoked_path: str | None = None,
            sign_key: str | None = None, signer: str | None = None,
            signer_cmd: str | None = None, observe: bool = False,
-           instruction_store: str = "") -> dict:
+           instruction_store: str = "",
+           coverage: str | None = None,
+           require_coverage: str | None = None) -> dict:
     """Redeem a grant; any refusal is written to the ledger before it is raised."""
     try:
         return _redeem(intent, grant_obj, signers_path, ledger_path, namespace,
                        allow_self, now, claim, policy, audience, require_audience,
                        revoked_path, sign_key, signer, signer_cmd, observe,
-                       instruction_store)
+                       instruction_store, coverage, require_coverage)
     except MandateError as exc:
         _record_refusal(ledger_path, intent if isinstance(intent, dict) else {},
                         exc, grant_obj)
@@ -721,7 +733,9 @@ def _redeem(intent: dict, grant_obj: dict, signers_path: str,
            revoked_path: str | None = None,
            sign_key: str | None = None, signer: str | None = None,
            signer_cmd: str | None = None, observe: bool = False,
-           instruction_store: str = "") -> dict:
+           instruction_store: str = "",
+           coverage: str | None = None,
+           require_coverage: str | None = None) -> dict:
     verified = verify_authorization(
         intent, grant_obj, signers_path, namespace, allow_self, now, policy,
         audience, require_audience, revoked_path)
@@ -736,9 +750,24 @@ def _redeem(intent: dict, grant_obj: dict, signers_path: str,
         except memory_store.MemoryError as exc:
             raise PolicyDenied(str(exc)) from exc
     nonce = str(grant_core.get("nonce") or "")
+    # COVERAGE_V1: kako je efekat uhvaćen; politika može tražiti minimum.
+    cov = _coverage.norm(coverage) if coverage else ("observed" if observe else "enforced")
+    need = require_coverage
+    if need is None and isinstance(policy, dict):
+        need = policy.get("require_coverage")
+    if need:
+        try:
+            need_n = _coverage.norm(need)
+        except _coverage.CoverageError as exc:
+            raise PolicyDenied("policy require_coverage: %s" % exc) from exc
+        if not _coverage.meets(cov, need_n):
+            raise PolicyDenied(
+                "coverage %s is weaker than the policy minimum %s for this effect"
+                % (cov, need_n))
     receipt = build_receipt(intent, grant_core, verified["commitment"],
                             sha256(jcs(intent)), ts=verified["moment"],
-                            decision="observe" if observe else "executed")
+                            decision="observe" if observe else "executed",
+                            coverage=cov)
     if policy is not None:
         receipt["policy_digest"] = policy_digest(policy)
     receipt["binding"] = not observe
@@ -773,10 +802,19 @@ def _redeem(intent: dict, grant_obj: dict, signers_path: str,
 
 def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
                    signers_path: str, namespace: str = "mandate",
-                   revoked_path: str | None = None) -> bool:
+                   revoked_path: str | None = None,
+                   require_coverage: bool = False) -> bool:
     body = (receipt_entry or {}).get("body") or {}
     if sha256(jcs(body)) != (receipt_entry or {}).get("hash"):
         return False
+    if body.get("coverage") is None:
+        if require_coverage:
+            return False
+    else:
+        try:
+            _coverage.norm(body["coverage"])
+        except _coverage.CoverageError:
+            return False
     if body.get("commitment") != intent_commitment(intent):
         return False
     if body.get("render_hash") != render_hash(intent):

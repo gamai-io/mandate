@@ -63,6 +63,7 @@ and principal = `approver`.
     "commitment": "sha256:...", "render_hash": "sha256:...",
     "approver": "approver",
     "grant_nonce": "uuid", "decision": "executed",
+    "coverage": "enforced",
     "result_hash": "sha256:...", "ts": 1794184500,
     "render": {"summary": "payment.send | Example Supplier | 1170.00 BAM"},
     "prev": "GENESIS"
@@ -71,6 +72,23 @@ and principal = `approver`.
 }
 ```
 `hash = sha256(jcs(body))`, `body.prev` = previous entry hash (or `GENESIS`).
+
+### `coverage` — how the effect was captured
+Every receipt states the strength of the evidence, in this order:
+
+| value | meaning |
+|---|---|
+| `enforced` | the effect could not happen without passing `redeem`; the gate refused anything unauthorised |
+| `observed` | a hook or adapter saw the call but could not block it |
+| `self_reported` | only the agent says it happened; nothing enforced it |
+
+Rules:
+- A receipt produced by `redeem` is `enforced` unless the caller states otherwise;
+  `observe=True` records `observed`.
+- `verify` accepts a missing `coverage` only in compatibility mode. With
+  `require_coverage` (library) or a policy that sets `require_coverage`, a missing or
+  weaker class is refused — the refusal is written to the ledger as a `control` entry.
+- An unknown value is refused everywhere (`E_COVERAGE`).
 
 ## Decision codes (`check`)
 - `0` allow (low risk, or under `max_auto`)

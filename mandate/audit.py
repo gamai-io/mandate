@@ -23,6 +23,8 @@ def verify_bundle(bundle: dict, signers_path: str, log_signers_path: str,
         "inclusion": False,
         "witness": False,
         "decision": (receipt.get("body") or {}).get("decision"),
+        # COVERAGE_V1: kako je efekat uhvaćen — enforced / observed / self_reported
+        "coverage": (receipt.get("body") or {}).get("coverage"),
     }
     sth = (bundle or {}).get("sth")
     if not isinstance(sth, dict):

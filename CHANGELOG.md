@@ -1,4 +1,29 @@
 # Changelog
+## Unreleased (0.69.0)
+
+### Coverage classes: a receipt now says how it was captured
+- **`coverage` in every receipt**: `enforced` (the gate could refuse it), `observed`
+  (a hook saw it, could not block) or `self_reported` (only the agent says so).
+  `redeem` writes `enforced`; `observe=True` writes `observed`. Unknown values are
+  refused with `E_COVERAGE`. `verify_receipt(require_coverage=True)` rejects receipts
+  without a class; a policy may set `require_coverage` and the refusal is recorded in the
+  ledger as a `control` entry.
+- Why: a receipt that does not say how it was captured invites the reader to assume the
+  strongest case. That is the same lie as a capability list that advertises what nobody
+  implemented.
+
+### Name folding before policy decisions
+- **`mandate/normalize.py`**: `fold()` removes invisible characters (zero-width, bidi,
+  soft hyphen), maps Cyrillic/Greek/Armenian homoglyphs, unifies compatibility forms and
+  strips diacritics, so `Аpple`, `Apple\u200b` and `Ａｐｐｌｅ` all compare equal to
+  `Apple`. `report.payee_history` now folds both sides: a known payee cannot look new
+  (and a first-time payee cannot hide behind a homoglyph) just by changing characters.
+  Receipts keep the original bytes — folding is used for decisions only.
+
+### Fixed
+- Đ/đ, Ł/ł, Ø/ø, Æ/æ, Œ/œ fold to their ASCII form (they do not decompose under NFKD).
+
+
 ## 0.68.13 — 2026-11-27
 
 ### Fixed

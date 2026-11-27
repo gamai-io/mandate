@@ -393,8 +393,11 @@ def payee_history(ledger_path: str, target: str, kind: str = "") -> dict:
     payee that looks ordinary. Counting prior payments turns that into a question
     the human can answer.
     """
+    from . import normalize as _normalize
+    want = _normalize.fold(target)
     first = last = None
     count = 0
+    aliases = set()
     for entry in _entries(ledger_path):
         body = entry.get("body") or {}
         if body.get("type") != "receipt":
@@ -402,8 +405,12 @@ def payee_history(ledger_path: str, target: str, kind: str = "") -> dict:
         # receipts carry the rendered effect; older ones carry the intent
         fields = ((body.get("render") or {}).get("fields")
                   or ((body.get("intent") or {}).get("effect")) or {})
-        if str(fields.get("target") or "") != str(target):
+        seen = str(fields.get("target") or "")
+        # NORMALIZE_V1: „Аpple" (ćirilično А) i „Apple\u200b" su isti primalac
+        if _normalize.fold(seen) != want:
             continue
+        if seen != str(target):
+            aliases.add(seen)
         if kind and str(fields.get("kind") or "") != str(kind):
             continue
         count += 1
