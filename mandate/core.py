@@ -277,6 +277,11 @@ def missing_provenance(intent: dict, spec: dict) -> list[str]:
             if entry.get("type") == "data_ref"
             and str(entry.get("source") or "").strip()]
     missing = []
+    wanted_source = str(spec.get("source_required") or "")
+    if wanted_source:
+        have = any(str(entry.get("source") or "").startswith(wanted_source) for entry in refs)
+        if not have:
+            missing.append("source:" + wanted_source)
     for field in required:
         covered = any((not entry.get("covers"))
                       or field in entry.get("covers") for entry in refs)
@@ -362,13 +367,18 @@ def check(intent: dict, policy: dict | None = None) -> dict:
                     "fields": bad, "provenance_ok": True,
                     "risk": spec.get("risk"), "taint": taint,
                     "render": render(intent)}
+    if spec.get("deny"):
+        return {"decision": "deny", "reason": "explicit deny", "kind": kind,
+                "provenance_ok": True, "risk": spec.get("risk"), "render": render(intent)}
     risk = str(spec.get("risk") or "high")
-    value, _currency = _amount(intent)
+    value, currency = _amount(intent)
     if risk == "low":
         decision = "allow"
     else:
         max_auto = spec.get("max_auto") or 0
-        if max_auto and value is not None and value <= float(max_auto):
+        wanted_currency = str(spec.get("max_auto_currency") or "")
+        currency_ok = (not wanted_currency) or (str(currency or "") == wanted_currency)
+        if max_auto and value is not None and value <= float(max_auto) and currency_ok:
             decision = "allow"
         else:
             decision = "ask"

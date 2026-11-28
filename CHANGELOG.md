@@ -1,4 +1,22 @@
 # Changelog
+## 1.0.16 — 2026-11-28
+
+### Sentences become policy — deterministically, or not at all
+- **`mandate policy compile --text "…" | --file rules.txt [--out policy.json]`** turns bilingual
+  rules into effect limits: `allow pay up to 500 EUR only if provenance erp:vendor`. The compiled
+  effect keeps the sentence in `purpose`, so a reviewer reads the rule and its source together.
+- **It refuses instead of guessing**: two effects in one sentence, no decision word, an unknown
+  effect, or "always" for a medium/high-risk effect are all `CompileError` with a reason; refusals
+  are listed per line and the command exits 4. `default: deny` is never relaxed.
+- **Policy semantics hardened to make the compile honest**: an explicit `deny` rule now refuses
+  (it was ignored), `max_auto_currency` makes a limit currency-bound (500 EUR no longer allows 500
+  BAM), and `source_required` demands a `data_ref` from that source, not merely some provenance.
+- Two bugs caught by the corpus: a provenance source was read as an effect name (`erp:vendor` →
+  `supplier.change`), and a right word boundary made Bosnian inflections unparseable (`ponudu`,
+  `cijene`, `emaila`).
+- 22 tests (`tests/test_policyc.py`), including a decisions block that runs the compiled policy
+  against sample intents: under limit allow, over limit ask, wrong currency ask, wrong source deny.
+
 ## 1.0.15 — 2026-11-28
 
 ### `mandate exec`: a command is an effect, and it needs a grant

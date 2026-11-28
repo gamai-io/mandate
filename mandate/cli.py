@@ -834,11 +834,14 @@ def main(argv=None) -> int:
 
     p_policy = sub.add_parser("policy")
     p_policy.add_argument("action", nargs="?", default="show",
-                          choices=("show", "lint", "explain", "diff"))
+                          choices=("show", "lint", "explain", "diff", "compile"))
     p_policy.add_argument("--policy", default=argparse.SUPPRESS)
     p_policy.add_argument("--against", default=None, help="previous policy for diff")
     p_policy.add_argument("--effect", default=None, help="effect kind for explain")
     p_policy.add_argument("--amount", type=float, default=None)
+    p_policy.add_argument("--text", default=None, help="sentence(s) to compile (action=compile)")
+    p_policy.add_argument("--file", default=None, help="file with sentences (action=compile)")
+    p_policy.add_argument("--out", default=None, help="write the merged policy here")
     p_policy.add_argument("--currency", default=None)
 
     p_sandbox = sub.add_parser("sandbox")
@@ -2243,6 +2246,28 @@ def main(argv=None) -> int:
             if action == "show":
                 _emit(policy, None)
                 return 0
+            if action == "compile":
+                from . import policyc
+                text = args.text
+                if args.file:
+                    text = pathlib.Path(args.file).read_text(encoding="utf-8")
+                if not text:
+                    _emit({"error": "Usage", "message":
+                           "policy compile --text \"allow pay up to 500 EUR\" | --file rules.txt"},
+                          None)
+                    return 2
+                compiled = policyc.compile_text(text, policy)
+                merged = policyc.merge_policy(policy, compiled["compiled"])
+                lint = policy_tools.lint(merged)
+                out = {"compiled": compiled["compiled"], "refused": compiled["refused"],
+                       "lines": compiled["lines"], "lint": lint,
+                       "explain": policyc.explain(compiled["compiled"])}
+                if args.out:
+                    pathlib.Path(args.out).write_text(json.dumps(merged, indent=2, sort_keys=True)
+                                                      + "\n", encoding="utf-8")
+                    out["out"] = args.out
+                _emit(out, None)
+                return 0 if not compiled["refused"] and lint.get("ok", True) else 4
             if action == "lint":
                 res = policy_tools.lint(policy)
                 _emit(res, None)
