@@ -750,6 +750,13 @@ def main(argv=None) -> int:
     p_exec.add_argument("--out", default=None, help="write the intent here (for approval)")
     p_exec.add_argument("rest", nargs=argparse.REMAINDER)
 
+    p_dora = sub.add_parser("dora", help="DORA pack: register row, Art. 30 clauses, incident clock")
+    p_dora.add_argument("--provider", default="")
+    p_dora.add_argument("--lei", default="")
+    p_dora.add_argument("--contract-ref", dest="contract_ref", default="")
+    p_dora.add_argument("--format", dest="fmt", default="json", choices=("json", "md"))
+    p_dora.add_argument("--out", default=None)
+
     p_tlog = sub.add_parser("tlog", help="public transparency log for releases (RFC 6962)")
     p_tlog.add_argument("action", choices=("build", "prove", "verify", "head", "anchor"))
     p_tlog.add_argument("--manifest", default=None, help="JSON array of entries for action=build")
@@ -1864,6 +1871,20 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "dora":
+            from . import dora as dora_mod
+            res = dora_mod.pack(args.provider, args.contract_ref, args.lei)
+            if args.fmt == "md":
+                text = dora_mod.render_markdown(res)
+                if args.out:
+                    pathlib.Path(args.out).write_text(text, encoding="utf-8")
+                    _emit({"ok": True, "out": args.out, "sections": 3}, None)
+                else:
+                    print(text, end="")
+                return 0
+            _emit(res, args.out)
+            return 0
 
         if args.cmd == "exec":
             from . import exec as exec_mod

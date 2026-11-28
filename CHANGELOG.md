@@ -1,4 +1,20 @@
 # Changelog
+## 1.0.17 — 2026-11-28
+
+### DORA pack: register row, Art. 30 clauses, incident clock
+- **`mandate dora [--provider] [--lei] [--contract-ref] [--format json|md] [--out FILE]`** emits the
+  three documents an ICT third-party file needs: an Art. 28(3) register row (service, locations,
+  subcontractors, exit plan, audit rights, control counts from `mandate controls`), the Art. 30(2)
+  points a–e and the Art. 30(3) access/audit rights with the artefact and command behind each, and
+  the incident-notification timeline.
+- **The 72-hour myth is corrected in the data**: DORA reporting runs 4 hours (initial), 24 hours
+  (intermediate) and one month (final) from classification; "72 hours" belongs to NIS2/GDPR-style
+  regimes. A template that repeats it signals it was copied.
+- **Nothing is invented**: the LEI is empty with a note pointing at GLEIF, the buyer decides whether
+  the function is critical, and `not_claimed` says there is no DORA certification and that this is
+  not legal advice.
+- 14 tests (`tests/test_dora.py`).
+
 ## 1.0.16 — 2026-11-28
 
 ### Sentences become policy — deterministically, or not at all
