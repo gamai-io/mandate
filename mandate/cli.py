@@ -738,6 +738,14 @@ def main(argv=None) -> int:
     p_ctl.add_argument("--summary", action="store_true")
     p_ctl.add_argument("--out", "-o", default=None)
 
+    p_bundle = sub.add_parser("export-bundle",
+                              help="one JSON with receipt+intent+grant+public key, verifiable offline")
+    p_bundle.add_argument("--intent", required=True)
+    p_bundle.add_argument("--grant", required=True)
+    p_bundle.add_argument("--ledger", default="ledger.jsonl")
+    p_bundle.add_argument("--signers", default=None)
+    p_bundle.add_argument("--out", default=None)
+
     p_prov = sub.add_parser("provenance",
                             help="check PEP 740 attestations for a published version")
     p_prov.add_argument("--version", default=None, help="defaults to the installed version")
@@ -1817,6 +1825,17 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "export-bundle":
+            from . import bundle as bundle_mod
+            try:
+                res = bundle_mod.export_bundle(_read(args.intent), _read(args.grant),
+                                               args.ledger, args.signers or "")
+            except bundle_mod.BundleError as exc:
+                _emit({"error": "BundleError", "message": str(exc)}, None)
+                return 3
+            _emit(res, args.out)
+            return 0
 
         if args.cmd == "provenance":
             from . import provenance as prov

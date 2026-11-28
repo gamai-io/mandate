@@ -174,7 +174,10 @@ def sign(payload: str, key_path: str, namespace: str = DEFAULT_NAMESPACE) -> str
     with tempfile.TemporaryDirectory() as td:
         data = os.path.join(td, "payload")
         with open(data, "w", encoding="utf-8") as fh:
-            fh.write(payload + "\n")
+            # Exact bytes, no trailing newline: an independent verifier that canonicalises the
+            # same object must be able to check this signature without knowing a private
+            # convention. Records signed before 1.0.10 carry "\n" and still verify (below).
+            fh.write(payload)
         try:
             proc = subprocess.run(
                 ["ssh-keygen", "-Y", "sign", "-f", path, "-n", namespace, data],
@@ -204,14 +207,18 @@ def verify(payload: str, name: str, signature: str, signers_path: str,
         sig = os.path.join(td, "payload.sig")
         with open(sig, "w", encoding="utf-8") as fh:
             fh.write(signature)
-        try:
-            proc = subprocess.run(
-                ["ssh-keygen", "-Y", "verify", "-f", filtered, "-I", str(name),
-                 "-n", namespace, "-s", sig],
-                input=payload + "\n", capture_output=True, text=True, timeout=20)
-        except (OSError, subprocess.SubprocessError):
-            return False
-    return proc.returncode == 0
+        # Two candidates, newest first: exact bytes (1.0.10+) and the legacy trailing newline.
+        for text in (payload, payload + "\n"):
+            try:
+                proc = subprocess.run(
+                    ["ssh-keygen", "-Y", "verify", "-f", filtered, "-I", str(name),
+                     "-n", namespace, "-s", sig],
+                    input=text, capture_output=True, text=True, timeout=20)
+            except (OSError, subprocess.SubprocessError):
+                return False
+            if proc.returncode == 0:
+                return True
+    return False
 
 
 def public_key_for(name: str, signers_path: str) -> str | None:

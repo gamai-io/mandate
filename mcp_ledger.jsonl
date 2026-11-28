@@ -7,3 +7,5 @@
 {"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795858404, "type": "control", "v": 1}
 {"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795858921, "type": "control", "v": 1}
 {"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795864281, "type": "control", "v": 1}
+{"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795864632, "type": "control", "v": 1}
+{"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795864795, "type": "control", "v": 1}

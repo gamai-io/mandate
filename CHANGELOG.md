@@ -1,4 +1,28 @@
 # Changelog
+## 1.0.10 — 2026-11-28
+
+### The proof verifies in the browser, with zero network calls
+- **`web/mandate-verify.js`** (shipped in the sdist): a self-contained verifier — RFC 8785
+  canonicalisation, SHA-256, Ed25519 (BigInt, RFC 8032) and the OpenSSH signature blob format.
+  `verify.html` now has a "Provjeri lokalno" panel: paste a bundle, every check runs in the tab.
+  Verified with Playwright: **0 network requests** after the click, a clean bundle shows green,
+  changing one amount turns the commitment check red.
+- **`mandate export-bundle --intent I --grant G --ledger L [--signers S]`** packages exactly the
+  four things a stranger needs — receipt, intent, signed grant, approver's public key — into one
+  JSON file. Without a signers file it still exports, with a plain warning that the signature
+  cannot be checked.
+- Independence is tested, not asserted: `tests/test_bundle_js.py` runs the **JavaScript** verifier
+  under Node against a CLI-produced bundle, checks that Python and JS canonicalise a corpus
+  byte-identically, that a changed amount fails on the commitment, and that an edited receipt body
+  fails on the hash. Node is optional — without it the tests skip instead of passing silently.
+
+### Fixed
+- **Signature covered an extra newline.** `sign()` wrote `payload + "\n"` to the file given to
+  `ssh-keygen -Y sign`, so every signature covered one byte that is not part of RFC 8785. An
+  independent verifier had to discover that by trial; a third party would call a clean record
+  invalid. Signatures now cover the exact canonical bytes; `verify()` accepts both conventions, so
+  records issued before 1.0.10 still verify (`tests/test_sign_convention.py`).
+
 ## 1.0.9 — 2026-11-28
 
 ### Salted commitment (answer to AP2's deterministic-signature warning)

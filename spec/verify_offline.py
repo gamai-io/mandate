@@ -320,17 +320,24 @@ def parse_sshsig(armored):
 
 
 def sshsig_verify(armored, payload, namespace="mandate"):
+    """Check the SSHSIG blob over the canonical bytes.
+
+    Two conventions exist: 1.0.10+ signs the exact canonical bytes, earlier releases signed
+    `payload + "\n"` because of how the payload was written to disk before `ssh-keygen -Y sign`.
+    Both are accepted here so an old record still verifies; nothing else is.
+    """
     parsed = parse_sshsig(armored)
     if parsed["namespace"] != namespace:
         return False, "namespace is %r, expected %r" % (parsed["namespace"], namespace)
-    digest = hashlib.new(parsed["hash"], payload.encode("utf-8")).digest()
-    to_sign = (b"SSHSIG" + _ssh_string(parsed["namespace"].encode())
-               + _ssh_string(parsed["reserved"])
-               + _ssh_string(parsed["hash"].encode())
-               + _ssh_string(digest))
-    if not ed25519_verify(parsed["public_key"], parsed["signature"], to_sign):
-        return False, "signature does not verify"
-    return True, "signature verifies"
+    for text in (payload, payload + "\n"):
+        digest = hashlib.new(parsed["hash"], text.encode("utf-8")).digest()
+        to_sign = (b"SSHSIG" + _ssh_string(parsed["namespace"].encode())
+                   + _ssh_string(parsed["reserved"])
+                   + _ssh_string(parsed["hash"].encode())
+                   + _ssh_string(digest))
+        if ed25519_verify(parsed["public_key"], parsed["signature"], to_sign):
+            return True, "signature verifies"
+    return False, "signature does not verify"
 
 
 # ------------------------------------------------------------------ Mandate-1
@@ -478,7 +485,7 @@ def verify(grant_path, intent_path, signers_path, receipt_path,
     core = grant_obj.get("grant") or {}
     signature = str(grant_obj.get("sig") or "")
 
-    ok, why = sshsig_verify(signature, jcs(core) + "\n", namespace)
+    ok, why = sshsig_verify(signature, jcs(core), namespace)   # both conventions inside
     checks.append({"check": "grant_signature", "ok": ok, "detail": why})
     if not ok:
         errors.append(why)
