@@ -1,4 +1,23 @@
 # Changelog
+## 1.0.12 — 2026-11-28
+
+### Public release log (RFC 6962), with an externally timestamped checkpoint
+- **`mandate tlog build|head|prove|verify|anchor`**: leaves are JCS entries, the head is a size and
+  a root, inclusion proofs are generated and checked against that root, and the checkpoint is
+  signed with a log key. `anchor` sends the checkpoint digest to an RFC 3161 authority
+  (FreeTSA) and stores the token plus sidecar.
+- **Published**: `gamai.io/tlog.html` lists every artifact of 1.0.7–1.0.11 and verifies
+  **inclusion in the browser** plus the checkpoint signature; `gamai.io/tlog/log.json`,
+  `proofs.json`, `checkpoint.json`, `anchors/`. Current head: size 10,
+  root `1518f30013f64a95…`, checkpoint signature valid, external stamp
+  `2026-11-28T11:58:52Z`.
+- **The subtle bug that was caught**: the first audit path walked the *sibling subtree* as well,
+  producing proofs that verified against nothing. Tests now prove every leaf at sizes 1–17 and
+  cross-check the root with a second, independent construction.
+- `docs/TLOG.md` states what the log proves (inclusion, order, time) and what it does not (that we
+  did not rewrite history before anyone looked; that the release is good).
+- 15 tests (`tests/test_tlog.py`).
+
 ## 1.0.11 — 2026-11-28
 
 ### AP2 / Verifiable Intent sidecar (we point at their authorisation, we do not imitate it)

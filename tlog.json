@@ -1,0 +1,137 @@
+{
+ "checkpoint": {
+  "created": 1795866966,
+  "format": "mandate-checkpoint/1",
+  "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB7HdjGW+NBr2aQst9tvT6LKDrQBw0XqgTbVuzY94wcY mandate-tlog",
+  "root": "1518f30013f64a9500ab5ef3d734e0a778a5299908136c4b6da4bec0be6edcca",
+  "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgHsd2MZb40GvZpCy3229PosoOtA\nHDReqBNtW7Nj3jBxgAAAAHbWFuZGF0ZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtzc2gtZWQy\nNTUxOQAAAEBq34t45ZbkdX1Sh/vP7/45EmBQ0xstxEUAgYCBU81+re9wKlgmif7midkZKG\nlvG9Ii+48Qz/u9hEpNhz0n3pYB\n-----END SSH SIGNATURE-----\n",
+  "signer": "mandate-log",
+  "size": 10
+ },
+ "created": 1795866966,
+ "entries": [
+  {
+   "entry": {
+    "bytes": 203362,
+    "file": "gama_mandate-1.0.7-py3-none-any.whl",
+    "release": "1.0.7",
+    "sha256": "743745be89c671a457e60f2a924a8081fea88a8f7d3066c7948ef28d1a5a1f9f",
+    "uploaded": "2026-11-28T09:37:53.365501Z",
+    "url": "https://files.pythonhosted.org/packages/63/35/76bbc59405f9c0acff0c77cff520efbbe88847ab49895c074d03aa999ae9/gama_mandate-1.0.7-py3-none-any.whl"
+   },
+   "index": 0,
+   "leaf": "2c10f5fe57380ec1c57408b4b4fe86804d586b3591f9a4e3394b8feb0e0c8295"
+  },
+  {
+   "entry": {
+    "bytes": 430533,
+    "file": "gama_mandate-1.0.7.tar.gz",
+    "release": "1.0.7",
+    "sha256": "901ab8b2cbd470b662732c5d6b60b8ca0827df27e2bc22ffefbfe283efc55097",
+    "uploaded": "2026-11-28T09:37:54.847988Z",
+    "url": "https://files.pythonhosted.org/packages/c2/fb/ed8c0264c67416ac3fa7678fa50ecb69e2a0bc9506833a1f196e083f6446/gama_mandate-1.0.7.tar.gz"
+   },
+   "index": 1,
+   "leaf": "2b249dbaf01fb2cfb1ecd88095fd03b50261f511cdb25385ef3d1f0d206bd15e"
+  },
+  {
+   "entry": {
+    "bytes": 203364,
+    "file": "gama_mandate-1.0.8-py3-none-any.whl",
+    "release": "1.0.8",
+    "sha256": "c44f919ceb418f13e635314d127498552f24446076532608eae235e38dcfbb45",
+    "uploaded": "2026-11-28T09:46:30.656346Z",
+    "url": "https://files.pythonhosted.org/packages/85/ad/4cc9a3d1ce211edb496b4af1b725cabddb4fc79f9bfa1004f051d7acdc62/gama_mandate-1.0.8-py3-none-any.whl"
+   },
+   "index": 2,
+   "leaf": "571a8a80f5010287a38913d945ec58a79a2de2e7f41df3c1a45843d68ebbc41e"
+  },
+  {
+   "entry": {
+    "bytes": 432309,
+    "file": "gama_mandate-1.0.8.tar.gz",
+    "release": "1.0.8",
+    "sha256": "5995d6bf126663a09a62c110337e5a0d908c5e0ef9bc24eed387e79b78c12ec2",
+    "uploaded": "2026-11-28T09:46:32.197379Z",
+    "url": "https://files.pythonhosted.org/packages/46/4f/25cd45bdedae4d0af63fa1852a62b212e36e2f4a76c8fc92cbc9a30dbaac/gama_mandate-1.0.8.tar.gz"
+   },
+   "index": 3,
+   "leaf": "6d3bc3febd3753bd540527dad80b916451b223177f60e4b11fdb3648f85f7ee3"
+  },
+  {
+   "entry": {
+    "bytes": 204326,
+    "file": "gama_mandate-1.0.9-py3-none-any.whl",
+    "release": "1.0.9",
+    "sha256": "6110158e86f0c7724186dbdd108c3f9d15bdc030770f93774c5687e7e3cd3209",
+    "uploaded": "2026-11-28T11:15:29.270675Z",
+    "url": "https://files.pythonhosted.org/packages/96/28/50e9c6ee4a3464a36ba6b036d75a5c936006714ad06d90958c9fa600d584/gama_mandate-1.0.9-py3-none-any.whl"
+   },
+   "index": 4,
+   "leaf": "2c70163d0ee74aa63bdfeeb817d2457b649a15dffc0abbe9ab7a7467cffed5ac"
+  },
+  {
+   "entry": {
+    "bytes": 436800,
+    "file": "gama_mandate-1.0.9.tar.gz",
+    "release": "1.0.9",
+    "sha256": "15bf41f101b1c6b8c0c5d1ea1a524beba6e5319a09abaed1580245a8d6ae31e8",
+    "uploaded": "2026-11-28T11:15:31.147714Z",
+    "url": "https://files.pythonhosted.org/packages/20/69/6b40a3e91ea5655fb4160d07a2fadb9f140fc1307afef57b116c5d024dc0/gama_mandate-1.0.9.tar.gz"
+   },
+   "index": 5,
+   "leaf": "c76ca6d4490e781a0fac0792387c871947274d425a10c08e9cad93876b177c16"
+  },
+  {
+   "entry": {
+    "bytes": 205831,
+    "file": "gama_mandate-1.0.10-py3-none-any.whl",
+    "release": "1.0.10",
+    "sha256": "eef974f96fc3154f4a69243e4547d10ba372ccc51f7a9eff25b596e4dfc160f2",
+    "uploaded": "2026-11-28T11:24:26.943351Z",
+    "url": "https://files.pythonhosted.org/packages/81/07/0d397cf55a59c36509a9c0eeb986aaa9f8c966d6c30ca7e72a387b7e8f75/gama_mandate-1.0.10-py3-none-any.whl"
+   },
+   "index": 6,
+   "leaf": "e0996167ef4d639a2367e284cfc5c32359bc39740072e34ede0681ba7c9e7d9c"
+  },
+  {
+   "entry": {
+    "bytes": 445915,
+    "file": "gama_mandate-1.0.10.tar.gz",
+    "release": "1.0.10",
+    "sha256": "d1bd414eddf63cc4605434650c37fb1099d2fefacef12701eb93e5da6d4d573e",
+    "uploaded": "2026-11-28T11:24:28.351883Z",
+    "url": "https://files.pythonhosted.org/packages/9a/02/70ece5d32c228be0cf81cd5e3629a0155a182ea0085948972a211779c6a1/gama_mandate-1.0.10.tar.gz"
+   },
+   "index": 7,
+   "leaf": "26864315a460f64792242277474513e7e5b75839e612f9f9466cb3905d2b7fea"
+  },
+  {
+   "entry": {
+    "bytes": 209606,
+    "file": "gama_mandate-1.0.11-py3-none-any.whl",
+    "release": "1.0.11",
+    "sha256": "06c9b852323eb20fdbdd09abd6d4ebeb4dcdc707021bcd9890ea9d961cedcb17",
+    "uploaded": "2026-11-28T11:37:44.661981Z",
+    "url": "https://files.pythonhosted.org/packages/df/62/43d4f926bc1f2b7375e422abd3c6aff1c7deb0a08df2f7431d34bb7d2f81/gama_mandate-1.0.11-py3-none-any.whl"
+   },
+   "index": 8,
+   "leaf": "9859fb9451da12d12118bbc4fdbdf8c09127e9bcca9397bbd245e93245d4b665"
+  },
+  {
+   "entry": {
+    "bytes": 452928,
+    "file": "gama_mandate-1.0.11.tar.gz",
+    "release": "1.0.11",
+    "sha256": "332559c5141e6c4bf030c95fbd2084fa9d3fa309273b6edbde30953b7a6ae149",
+    "uploaded": "2026-11-28T11:37:45.938792Z",
+    "url": "https://files.pythonhosted.org/packages/5b/db/257365039e883872eae68f6b32110416fa6eaed185f568a78375f490c199/gama_mandate-1.0.11.tar.gz"
+   },
+   "index": 9,
+   "leaf": "1af441689163808a527c4df9691a977b5e8370b82daef4b88e9b6763f8cd3f9a"
+  }
+ ],
+ "format": "mandate-tlog/1",
+ "root": "1518f30013f64a9500ab5ef3d734e0a778a5299908136c4b6da4bec0be6edcca",
+ "size": 10
+}

@@ -738,6 +738,18 @@ def main(argv=None) -> int:
     p_ctl.add_argument("--summary", action="store_true")
     p_ctl.add_argument("--out", "-o", default=None)
 
+    p_tlog = sub.add_parser("tlog", help="public transparency log for releases (RFC 6962)")
+    p_tlog.add_argument("action", choices=("build", "prove", "verify", "head", "anchor"))
+    p_tlog.add_argument("--manifest", default=None, help="JSON array of entries for action=build")
+    p_tlog.add_argument("--log", default="tlog.json")
+    p_tlog.add_argument("--index", type=int, default=None)
+    p_tlog.add_argument("--entry", default=None)
+    p_tlog.add_argument("--proof", default=None)
+    p_tlog.add_argument("--checkpoint", default=None)
+    p_tlog.add_argument("--key", default=None, help="signing key (build) or public key (verify)")
+    p_tlog.add_argument("--signer", default="log")
+    p_tlog.add_argument("--out", default=None)
+
     p_ap2 = sub.add_parser("ap2", help="AP2 / Verifiable Intent sidecar: inspect, map, link")
     p_ap2.add_argument("action", choices=("inspect", "intent", "sidecar"))
     p_ap2.add_argument("--token", required=True, help="file with the compact JWS")
@@ -1837,6 +1849,93 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "tlog":
+            from . import tlog as tlog_mod
+            if args.action == "build":
+                if not args.manifest:
+                    _emit({"error": "Usage", "message": "tlog build --manifest entries.json"}, None)
+                    return 2
+                from . import core as _core
+                entries = [_core.jcs(item).encode("utf-8")
+                           for item in json.loads(pathlib.Path(args.manifest).read_text(
+                               encoding="utf-8"))]
+                out = tlog_mod.build(entries, sign_key=args.key or "", signer=args.signer)
+                _emit(out, args.out)
+                return 0
+            if args.action == "head":
+                log = json.loads(pathlib.Path(args.log).read_text(encoding="utf-8"))
+                _emit({"size": log.get("size"), "root": log.get("root"),
+                       "created": log.get("created"),
+                       "checkpoint": (log.get("checkpoint") or {}).get("signature", "")[:16]},
+                      None)
+                return 0
+            if args.action == "anchor":
+                from . import anchor as _anchor
+                ckpt_path = args.checkpoint or args.log
+                ckpt = json.loads(pathlib.Path(ckpt_path).read_text(encoding="utf-8"))
+                if "checkpoint" in ckpt:
+                    ckpt = ckpt["checkpoint"]
+                canonical = tlog_mod._canonical(ckpt)
+                digest = __import__("hashlib").sha256(canonical.encode("utf-8")).hexdigest()
+                try:
+                    token = _anchor.request_token(digest, args.key or _anchor.DEFAULT_TSA)
+                except Exception as exc:  # noqa: BLE001
+                    _emit({"error": "AnchorError", "message": str(exc)[:200]}, None)
+                    return 4
+                out_dir = args.out or "tlog-anchors"
+                pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
+                token_path = pathlib.Path(out_dir) / ("%s.tsr" % digest)
+                token_path.write_bytes(token)
+                info = _anchor.parse_response(token)
+                side = {"format": "mandate-tlog-anchor/1", "root": ckpt.get("root"),
+                        "size": ckpt.get("size"), "digest": digest,
+                        "token": token_path.name, "tsa": args.key or _anchor.DEFAULT_TSA,
+                        **{k: v for k, v in info.items() if not k.startswith("_")}}
+                (pathlib.Path(out_dir) / ("%s.json" % digest)).write_text(
+                    json.dumps(side, indent=1, sort_keys=True), encoding="utf-8")
+                _emit(side, None)
+                return 0
+
+            if args.action == "prove":
+                log = json.loads(pathlib.Path(args.log).read_text(encoding="utf-8"))
+                from . import core as _core
+                entries = [_core.jcs(e["entry"]).encode("utf-8")
+                           if "raw_sha256" not in (e.get("entry") or {})
+                           else None for e in log["entries"]]
+                if any(e is None for e in entries):
+                    _emit({"error": "Usage", "message": "this log has raw entries only; rebuild it "
+                           "with JSON entries to prove inclusion"}, None)
+                    return 2
+                index = int(args.index if args.index is not None else 0)
+                proof = {"format": "mandate-tlog-proof/1", "index": index,
+                         "size": log["size"], "root": log["root"],
+                         "proof": tlog_mod.inclusion_proof(entries, index)}
+                _emit(proof, args.out)
+                return 0
+            if args.action == "verify":
+                if not (args.entry and args.proof and args.checkpoint):
+                    _emit({"error": "Usage", "message":
+                           "tlog verify --entry e.json --proof p.json --checkpoint c.json"}, None)
+                    return 2
+                raw_entry = pathlib.Path(args.entry).read_text(encoding="utf-8")
+                # an entry is identified by its canonical JSON, the same bytes build() hashed
+                from . import core as _core
+                entry = _core.jcs(json.loads(raw_entry))
+                proof = json.loads(pathlib.Path(args.proof).read_text(encoding="utf-8"))
+                ckpt = json.loads(pathlib.Path(args.checkpoint).read_text(encoding="utf-8"))
+                check = tlog_mod.verify_checkpoint(ckpt, args.key or "")
+                leaf = entry.encode("utf-8").rstrip(b"\n")
+                included = tlog_mod.verify_inclusion(leaf, int(proof["index"]), int(proof["size"]),
+                                                     proof["proof"], str(proof["root"]))
+                same_head = str(ckpt.get("root")) == str(proof.get("root")) \
+                    and int(ckpt.get("size") or -1) == int(proof.get("size") or -2)
+                ok = check["ok"] and included and same_head
+                _emit({"ok": ok, "checkpoint": check, "inclusion": included,
+                       "same_head": same_head, "index": proof.get("index"),
+                       "size": proof.get("size")}, None)
+                return 0 if ok else 4
+            return 2
 
         if args.cmd == "ap2":
             from . import ap2 as ap2_mod

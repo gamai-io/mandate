@@ -221,6 +221,16 @@ def verify(payload: str, name: str, signature: str, signers_path: str,
     return False
 
 
+def public_key_of_keyfile(key_path: str) -> str:
+    """The public half of a private key, in `ssh-ed25519 AAAA…` form ('' if unreadable)."""
+    try:
+        proc = subprocess.run(["ssh-keygen", "-y", "-f", str(key_path)],
+                              capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
 def public_key_for(name: str, signers_path: str) -> str | None:
     for entry in list_signers(signers_path):
         if _principal_match(entry["principal"], name):

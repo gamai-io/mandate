@@ -344,6 +344,32 @@
     }
   }
 
+  // ---------- RFC 6962 inclusion proof ----------
+  function hexBytes(hexText) {
+    var clean = String(hexText || "").replace(/[^0-9a-fA-F]/g, "");
+    var out = new Uint8Array(clean.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
+    return out;
+  }
+  async function leafHash(entryText) {
+    return sha256hex(concat(new Uint8Array([0]), utf8(entryText)));
+  }
+  async function nodeHash(left, right) {
+    return sha256hex(concat(new Uint8Array([1]), left, right));
+  }
+  async function verifyInclusion(entryText, index, size, proof, rootHex) {
+    if (!(index >= 0) || index >= size || size <= 0) return false;
+    var node = hexBytes(await leafHash(entryText));
+    for (var i = 0; i < proof.length; i++) {
+      var sibling = hexBytes(proof[i].hash);
+      if (sibling.length !== 32) return false;
+      if (proof[i].side === "left") node = hexBytes(await nodeHash(sibling, node));
+      else if (proof[i].side === "right") node = hexBytes(await nodeHash(node, sibling));
+      else return false;
+    }
+    return hex(node) === String(rootHex || "").toLowerCase();
+  }
+
   root.MandateVerify = {
     verifyBundle: verifyBundle,
     jcs: jcs,
@@ -351,6 +377,8 @@
     sshSigVerify: sshSigVerify,
     parsePublicKey: parsePublicKey,
     commitmentOf: commitmentOf,
+    verifyInclusion: verifyInclusion,
+    leafHash: leafHash,
     sha256hex: sha256hex
   };
 })(typeof window !== "undefined" ? window : globalThis);
