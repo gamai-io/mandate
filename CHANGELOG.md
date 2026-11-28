@@ -1,4 +1,18 @@
 # Changelog
+## 1.0.7 — 2026-11-28
+
+### Provenance is checked, not claimed
+- **`mandate provenance [--version X] [--project P] [--text]`** reads PEP 740 attestations from
+  `pypi.org/integrity/...` per file and reports `ok` / `partial` / `none` / `network` /
+  `no_version`, naming the repository and workflow that built each artefact. On an air-gapped
+  host it says `network` and refuses to imply anything, because the fact is server-side.
+- **This release is published by CI only.** 1.0.0–1.0.6 were uploaded by hand with an API
+  token; the OIDC job then skipped the existing files, so those versions carry **no**
+  attestation (PyPI told us by mail). PyPI is immutable, so that cannot be repaired
+  retroactively — it can only be stated correctly and stopped from recurring.
+- `docs/PROCUREMENT_ANSWERS.md` corrected: the earlier text claimed provenance was live for
+  every release, which was not true for the versions a customer would have installed.
+
 ## 1.0.6 — 2026-11-28
 
 ### Change control that can fail (row 10)

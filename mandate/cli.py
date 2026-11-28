@@ -736,6 +736,12 @@ def main(argv=None) -> int:
     p_ctl.add_argument("--summary", action="store_true")
     p_ctl.add_argument("--out", "-o", default=None)
 
+    p_prov = sub.add_parser("provenance",
+                            help="check PEP 740 attestations for a published version")
+    p_prov.add_argument("--version", default=None, help="defaults to the installed version")
+    p_prov.add_argument("--project", default="gama-mandate")
+    p_prov.add_argument("--text", action="store_true", help="human summary instead of JSON")
+
     p_wv = sub.add_parser("worm-verify", help="verify an exported evidence pack offline")
     p_wv.add_argument("--dir", required=True)
 
@@ -1804,6 +1810,16 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "provenance":
+            from . import provenance as prov
+            version = args.version or __import__("mandate").__version__
+            res = prov.check(version, args.project)
+            if args.text:
+                print(prov.summary(res))
+            else:
+                _emit(res, None)
+            return 0 if res.get("ok") else 4
 
         if args.cmd == "worm-verify":
             res = anchor.worm_verify(args.dir)

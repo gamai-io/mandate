@@ -4,7 +4,7 @@ Pre-filled answers to the questions a bank's security/procurement process asks.
 Every "no" is a real gap with a plan; a questionnaire that answers "yes" to
 everything is the first thing a reviewer distrusts.
 
-Product: `gama-mandate` 1.0.6 and the four companion packages (`gamai-trust`,
+Product: `gama-mandate` 1.0.7 and the four companion packages (`gamai-trust`,
 `gamai-guard`, `gamai-plugins`, `gama-l`). Vendor: GAMA TRADE d.o.o. / gamAI,
 Usora, Bosnia and Herzegovina.
 
@@ -77,7 +77,7 @@ Usora, Bosnia and Herzegovina.
 |---|---|
 | Dependencies | **Zero runtime dependencies.** `sbom` emits CycloneDX 1.5 with empty `components`. |
 | SBOM | `mandate sbom` (shipped). |
-| Signed releases | **Gap.** Wheels are published to PyPI with hashes; Sigstore build attestation and PyPI PEP 740 provenance are both live. Tags exist per release. |
+| Signed releases | **Partial, and stated per version.** Every artefact has a PyPI hash and a git tag. PEP 740 provenance exists from **1.0.7** (CI publishes with OIDC). **1.0.0–1.0.7 were uploaded with an API token, so they carry no attestation** — PyPI is immutable and cannot add one retroactively. `mandate provenance --version X` reports the truth per file: `attested`, `partial`, `none`, or `network`. |
 | Vulnerability handling | `SECURITY.md` with a contact; fixes are released as patch versions and listed in `SECURITY.md`. No formal CVE process, no bounty. |
 | Pentest | **Not done.** Booked as a prerequisite for a pilot; the red-team review we ran internally is public in spirit (findings and fixes are in `SECURITY.md`). |
 
@@ -113,13 +113,24 @@ Usora, Bosnia and Herzegovina.
 
 ### Release provenance (PEP 740)
 
-Releases use OIDC trusted publishing with `attestations: true`. The trusted
-publisher for `gamai-io/mandate` + `release.yml` exists and `PYPI_OIDC=true` is
-set, so every artefact carries a PyPI provenance attestation. Check it without
-trusting us:
+The trusted publisher for `gamai-io/mandate` + `release.yml` exists and
+`PYPI_OIDC=true` is set, so a release published **by CI** carries an attestation.
+
+**What actually happened:** 1.0.0–1.0.7 were uploaded by hand with an API token
+*before* the CI job ran. The OIDC job then skipped the already-existing files
+(`skip_existing: true`), so those versions have **no** attestation — PyPI told us
+so by email ("API token used to upload … despite Trusted Publishing enabled").
+From 1.0.7 the tag is published only by CI; the token path is not used for this
+package.
+
+Check it without trusting us — the command does the same thing:
 
 ```bash
+mandate provenance --version 1.0.7 --text
+# gama-mandate 1.0.7: 2/2 files attested
+#   gama_mandate-1.0.7-py3-none-any.whl   yes <- GitHub gamai-io/mandate release.yml
+
 curl -s -o /dev/null -w "%{http_code}\n" \
-  https://pypi.org/integrity/gama-mandate/<version>/\
-gama_mandate-<version>-py3-none-any.whl/provenance    # 200 = attestation exists
+  https://pypi.org/integrity/gama-mandate/1.0.7/\
+gama_mandate-1.0.7-py3-none-any.whl/provenance    # 404 = no attestation (token upload)
 ```
