@@ -1,9 +1,16 @@
 # Changelog
+## 1.0.14 — 2026-11-28
+
+### Fixed
+- **1.0.13 was refused for the same reason it fixed**: the new changelog entry itself contained a
+  literal absolute home path, which `tools/prepublish_scan.py` blocks. Reworded; nothing else
+  changed. The rule is doing its job on our own text, which is the point.
+
 ## 1.0.13 — 2026-11-28
 
 ### Fixed
 - **The release job refused 1.0.12** because `tools/prepublish_scan.py` found a literal absolute
-  path (`/root/…`) in the new `tools/publish_tlog.py` docstring. The scanner is right — that is the
+  home path in the new `tools/publish_tlog.py` docstring. The scanner is right — that is the
   rule that caught the 0.10.x leak — so the tool now takes the log key from `MANDATE_TLOG_KEY` or
   `~/.mandate_tlog_key` and the docstring names no absolute path. Same content as 1.0.12.
 

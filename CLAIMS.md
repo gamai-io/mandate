@@ -5,7 +5,7 @@ reproduces it does not belong in a sales conversation.
 
 | claim | value | command |
 |---|---|---|
-| version | 1.0.13 | `python3 tools/claims.py --version` |
+| version | 1.0.14 | `python3 tools/claims.py --version` |
 | tests collected | 748 | `python3 -m pytest -q --collect-only tests/` |
 | tests failed | 0 | `python3 -m pytest -q tests/` (failures must be 0) |
 | runtime dependencies | 0 | `grep -A2 '^dependencies' pyproject.toml` |
