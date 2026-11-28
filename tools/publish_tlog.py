@@ -3,7 +3,7 @@
 
 Every artifact we ship is a leaf: tag, filename, sha256, size, upload time. The log is rebuilt from
 PyPI's own metadata, so an entry cannot disagree with what the registry serves without the hash
-changing. The checkpoint is signed with a log key kept at /root/.mandate_tlog_key (0600) and is
+changing. The checkpoint is signed with a log key kept at ~/.mandate_tlog_key (0600) and is
 later timestamped by an RFC 3161 authority, which is what stops us from rewriting history quietly.
 
     python3 tools/publish_tlog.py --site-dir /opt/gama-harness/site/tlog --versions 1.0.7 1.0.8 1.0.9 1.0.10 1.0.11
@@ -21,7 +21,7 @@ import urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from mandate import core, tlog  # noqa: E402
 
-KEY = "/root/.mandate_tlog_key"
+KEY = os.environ.get("MANDATE_TLOG_KEY", os.path.expanduser("~/.mandate_tlog_key"))
 
 
 def fetch(version: str) -> list[dict]:
