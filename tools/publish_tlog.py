@@ -94,7 +94,8 @@ def main() -> int:
         pathlib.Path(args.out_json).write_text(json.dumps(log, indent=1, sort_keys=True),
                                                encoding="utf-8")
     print(json.dumps({"entries": log["size"], "root": log["root"],
-                      "checkpoint": site / "checkpoint.json",
+                      "checkpoint": str(site / "checkpoint.json"),
+                      "proofs": str(site / "proofs.json"),
                       "public_key": log["checkpoint"]["public_key"]}, indent=1))
     return 0
 

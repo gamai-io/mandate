@@ -738,6 +738,18 @@ def main(argv=None) -> int:
     p_ctl.add_argument("--summary", action="store_true")
     p_ctl.add_argument("--out", "-o", default=None)
 
+    p_exec = sub.add_parser("exec", help="run a command only with a signed grant for its argv")
+    p_exec.add_argument("--intent", default=None)
+    p_exec.add_argument("--grant", default=None)
+    p_exec.add_argument("--agent", default="agent@exec")
+    p_exec.add_argument("--approver", default="operator")
+    p_exec.add_argument("--session", default="")
+    p_exec.add_argument("--ledger", default="ledger.jsonl")
+    p_exec.add_argument("--timeout", type=int, default=0)
+    p_exec.add_argument("--check", action="store_true", help="print the intent, run nothing")
+    p_exec.add_argument("--out", default=None, help="write the intent here (for approval)")
+    p_exec.add_argument("rest", nargs=argparse.REMAINDER)
+
     p_tlog = sub.add_parser("tlog", help="public transparency log for releases (RFC 6962)")
     p_tlog.add_argument("action", choices=("build", "prove", "verify", "head", "anchor"))
     p_tlog.add_argument("--manifest", default=None, help="JSON array of entries for action=build")
@@ -1849,6 +1861,47 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "exec":
+            from . import exec as exec_mod
+            argv = [a for a in (args.rest or []) if a != "--"]
+            if not argv:
+                _emit({"error": "Usage", "message": "mandate exec [--intent I --grant G] -- cmd ..."},
+                      None)
+                return 2
+            try:
+                intent = _read(args.intent) if args.intent \
+                    else exec_mod.build_intent(argv, args.agent, args.approver, args.session)
+            except exec_mod.ExecError as exc:
+                _emit({"error": "ExecError", "message": str(exc)}, None)
+                return 2
+            policy = core.load_policy(args.policy)
+            if args.check or not (args.intent and args.grant):
+                decision = exec_mod.check_allowed(intent, policy)
+                out = exec_mod.describe(argv, intent)
+                out["policy"] = decision.get("decision")
+                out["needs_grant"] = decision.get("decision") != "allow"
+                if args.out and not args.intent:
+                    pathlib.Path(args.out).write_text(json.dumps(intent, indent=1, sort_keys=True),
+                                                      encoding="utf-8")
+                    out["intent_written"] = args.out
+                _emit(out, None)
+                return 0 if decision.get("decision") == "allow" else 3
+            try:
+                res = exec_mod.run(argv, intent, _read(args.grant), args.signers, args.ledger,
+                                   policy, timeout_s=args.timeout)
+            except (exec_mod.ExecError, core.MandateError) as exc:
+                _emit({"error": type(exc).__name__, "message": str(exc)[:300]}, None)
+                return 3
+            sys.stdout.buffer.write(res["stdout"] or b"")
+            sys.stdout.flush()
+            if res["stderr"]:
+                sys.stderr.buffer.write(res["stderr"])
+                sys.stderr.flush()
+            _emit({"exit_code": res["exit_code"], "duration_ms": res["duration_ms"],
+                   "receipt": res["receipt"].get("hash"),
+                   "outcome": res["outcome"].get("hash")}, None)
+            return res["exit_code"]
 
         if args.cmd == "tlog":
             from . import tlog as tlog_mod

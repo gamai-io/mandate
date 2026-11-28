@@ -83,6 +83,14 @@
         "target"
       ],
       "purpose": "publish an artefact to a registry"
+    },
+    "process.exec": {
+      "risk": "high",
+      "max_auto": 0,
+      "require_data_ref": [
+        "target"
+      ],
+      "purpose": "run a process on the host; every command is an effect that needs a grant"
     }
   }
 }

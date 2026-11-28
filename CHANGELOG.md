@@ -1,4 +1,19 @@
 # Changelog
+## 1.0.15 — 2026-11-28
+
+### `mandate exec`: a command is an effect, and it needs a grant
+- **`mandate exec [--intent I --grant G] -- cmd ...`** wraps a process: the policy is asked first
+  (`process.exec` is high risk with `max_auto: 0`, so every command needs approval), the grant is
+  redeemed, and only then does the process start. `--check --out intent.json` prints what would run
+  and writes the intent to approve.
+- **Outcome is evidence too**: after the process exits, an `outcome` record is appended with the
+  exit code, duration, and the **SHA-256 of stdout and stderr** — a hash, not the content.
+- **A security bug was caught by its own test**: the first version redeemed the intent but executed
+  the `argv` passed alongside it, so a grant approved for `echo ok` would run anything. Now the
+  wrapper refuses unless the executed `argv` equals the `argv` in the signed intent; the test proves
+  it by checking that the forbidden command's output file does not exist.
+- 7 tests (`tests/test_exec.py`), including replay refusal and "unknown effect is denied".
+
 ## 1.0.14 — 2026-11-28
 
 ### Fixed
