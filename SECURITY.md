@@ -10,16 +10,17 @@ later release are clean.
 **What did not leak:** no passwords, API keys, tokens, private keys, customer personal data or
 ledger contents. The exposed strings are schema/table names and one vendor example.
 
-**Why they are still downloadable:** PyPI treats uploaded files as immutable. We asked for
-removal on 9 Nov 2026; the PyPI team replied on 13 Nov that they cannot edit or delete files
-and that the maintainer must delete the releases, and that copies may exist in mirrors and
-object storage either way. Deletion is a web action behind the account's 2FA; until it is
-done, the three releases remain reachable **if someone asks for that exact version**.
+**Status: deleted on 28 Nov 2026.** PyPI treats uploaded files as immutable and has no delete
+API, so the three releases were removed through the account's web UI behind 2FA (the PyPI team's
+13 Nov reply said the maintainer must do it). Verified: `https://pypi.org/simple/gama-mandate/`
+no longer lists any of the three filenames (0.11.1 and 1.0.x do), and `pypi.org/pypi/gama-mandate/
+<version>/json` returns 404 for each. PyPI warned that copies may persist in mirrors and object
+storage regardless — the releases are gone from the index, not necessarily from every mirror.
 
 **Impact on installs:** `pip install gama-mandate` resolves to the newest release (1.0.x), so
 a normal install never receives the affected files.
 
-**What we changed:** `tools/prepublish_scan.py` now blocks a release whose artifact contains
+**What we changed:** the releases are deleted from the project (see above); `tools/prepublish_scan.py` now blocks a release whose artifact contains
 those identifiers (rule `customer schema`, `internal host name`, `private ip`); CI runs it on
 every artifact before publishing. Verified against the published 0.10.3 sdist — the scan
 reports `5 blocking` and exits 1 — and against 1.0.8, which reports `0 blocking`.
