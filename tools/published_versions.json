@@ -1,7 +1,7 @@
 {
-  "gama-mandate": "1.0.10",
+  "gama-mandate": "1.0.11",
   "gamai-tripwire": "0.8.15",
   "gamai-plugins": "0.2.11",
-  "gamai-guard": "1.0.10",
+  "gamai-guard": "1.0.11",
   "sigil-profile": "0.22.2"
 }

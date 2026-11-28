@@ -1,4 +1,17 @@
 # Changelog
+## 1.0.11 — 2026-11-28
+
+### AP2 / Verifiable Intent sidecar (we point at their authorisation, we do not imitate it)
+- **`mandate ap2 inspect|intent|sidecar`**: decode an AP2 mandate (compact JWS), verify an ES256
+  signature when a key is supplied, map amount/merchant/issuer into a legal intent with the
+  mandate's hash as provenance, and emit a sidecar binding the AP2 hash to our commitment, grant
+  nonce, receipt hash and render hash.
+- **Honest defaults**: without `cryptography` or a key, `signature_verified` is `false` with a
+  stated reason; unsigned JWS (2 parts or empty third part) is labelled unsecured; anything other
+  than ES256/P-256 is refused by name. The sidecar carries `not_claimed: [AP2 compatibility, …]`.
+- `docs/AP2.md` states the division of labour: AP2 authorises the rail, this adds a named human's
+  signature over the exact effect and an offline-verifiable chain. 9 tests (`tests/test_ap2.py`).
+
 ## 1.0.10 — 2026-11-28
 
 ### The proof verifies in the browser, with zero network calls

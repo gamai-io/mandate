@@ -738,6 +738,18 @@ def main(argv=None) -> int:
     p_ctl.add_argument("--summary", action="store_true")
     p_ctl.add_argument("--out", "-o", default=None)
 
+    p_ap2 = sub.add_parser("ap2", help="AP2 / Verifiable Intent sidecar: inspect, map, link")
+    p_ap2.add_argument("action", choices=("inspect", "intent", "sidecar"))
+    p_ap2.add_argument("--token", required=True, help="file with the compact JWS")
+    p_ap2.add_argument("--key", default=None,
+                       help="PEM or JWK public key of the AP2 issuer (enables ES256 verification)")
+    p_ap2.add_argument("--approver", default="")
+    p_ap2.add_argument("--agent", default="agent@ap2")
+    p_ap2.add_argument("--kind", default="payment.send")
+    p_ap2.add_argument("--grant", default=None)
+    p_ap2.add_argument("--ledger", default="")
+    p_ap2.add_argument("--out", default=None)
+
     p_bundle = sub.add_parser("export-bundle",
                               help="one JSON with receipt+intent+grant+public key, verifiable offline")
     p_bundle.add_argument("--intent", required=True)
@@ -1825,6 +1837,40 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "ap2":
+            from . import ap2 as ap2_mod
+            token = pathlib.Path(args.token).read_text(encoding="utf-8").strip()
+            decoded = ap2_mod.decode(token)
+            if args.key:
+                key_text = pathlib.Path(args.key).read_text(encoding="utf-8")
+                try:
+                    decoded["signature_verified"] = ap2_mod.verify(token, key_text)
+                    decoded["why_unverified"] = ""
+                except ap2_mod.MandateError as exc:
+                    decoded["why_unverified"] = str(exc)
+            if args.action == "inspect":
+                _emit(decoded, args.out)
+                return 0
+            if args.action == "intent":
+                _emit(ap2_mod.to_intent(decoded, args.approver, args.agent, args.kind),
+                      args.out)
+                return 0
+            if not args.grant:
+                _emit({"error": "Usage", "message": "ap2 sidecar --grant g.json [--ledger l]"}, None)
+                return 2
+            grant_obj = _read(args.grant)
+            receipt = None
+            if args.ledger:
+                from . import bundle as _bundle
+                try:
+                    receipt = _bundle._receipt_for(args.ledger,
+                                                   str((grant_obj.get("grant") or {}).get("nonce") or ""))
+                except _bundle.BundleError as exc:
+                    _emit({"error": "BundleError", "message": str(exc)}, None)
+                    return 3
+            _emit(ap2_mod.sidecar(decoded, grant_obj, receipt), args.out)
+            return 0
 
         if args.cmd == "export-bundle":
             from . import bundle as bundle_mod
