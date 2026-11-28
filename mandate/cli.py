@@ -473,6 +473,8 @@ def main(argv=None) -> int:
     p_prop = sub.add_parser("propose")
     p_prop.add_argument("--intent", required=True)
     p_prop.add_argument("--out", default=None)
+    p_prop.add_argument("--salted", action="store_true",
+                        help="salted commitment (sha256-jcs-salt-v1): salt travels in the grant")
 
     p_grant = sub.add_parser("grant")
     p_grant.add_argument("--proposal", required=True)
@@ -1067,13 +1069,17 @@ def main(argv=None) -> int:
             return {"allow": 0, "ask": 10, "deny": 20}.get(result["decision"], 2)
 
         if args.cmd == "propose":
-            _emit(core.propose(_read(args.intent)), args.out)
+            _emit(core.propose(_read(args.intent), salted=bool(getattr(args, "salted", False))),
+                  args.out)
             return 0
 
         if args.cmd == "grant":
             proposal = _read(args.proposal)
             intent = core.normalize_intent(proposal.get("intent") or {})
-            commitment = core.intent_commitment(intent)
+            _alg = str(proposal.get("commitment_alg") or "")
+            _salt = str(proposal.get("commitment_salt") or "") \
+                if _alg == core.COMMITMENT_V2 else ""
+            commitment = core.intent_commitment(intent, _salt)
             rhash = core.render_hash(intent)
             if (commitment != proposal.get("commitment")
                     or rhash != proposal.get("render_hash")
@@ -1092,7 +1098,8 @@ def main(argv=None) -> int:
                 render_hash=rhash,
                 agent=str(intent["actor"]["agent"]),
                 audience=args.audience,
-                policy_fingerprint=core.policy_digest(core.load_policy(args.policy)))
+                policy_fingerprint=core.policy_digest(core.load_policy(args.policy)),
+                commitment_alg=_alg, commitment_salt=_salt)
             _emit(core.make_grant(grant_core, args.key), args.out)
             return 0
 

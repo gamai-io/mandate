@@ -1,4 +1,20 @@
 # Changelog
+## 1.0.9 — 2026-11-28
+
+### Salted commitment (answer to AP2's deterministic-signature warning)
+- **`mandate propose --salted`** emits `commitment_alg: sha256-jcs-salt-v1` and a 128-bit salt;
+  the commitment becomes `sha256(DOMAIN ‖ salt ‖ jcs(intent_core))`. The salt travels **inside the
+  signed grant**, so the approver signs it and the verifier recomputes with it.
+- **Why:** AP2's specification forbids signing the checkout hash with a deterministic scheme "to
+  prevent rainbow table attacks" (Ed25519 is deterministic, RFC 8032). Our v1 commitment over a
+  low-entropy intent is guessable in principle, which leaks *which* payment was approved without
+  forging anything. Domain separation + 128-bit salt + per-intent nonce close it; `docs/COMMITMENT.md`
+  states the threat, the three defences and published test vectors.
+- **v1 is untouched.** 1.0 froze the format, so `sha256-jcs` records still verify; a verifier reads
+  `commitment_alg` from the *signed grant* and refuses a grant that claims v2 without a salt.
+- 10 tests (`tests/test_commitment_v2.py`): v1 still redeems, v2 redeems, a changed amount fails on
+  both, short/non-hex salts are refused, receipt verification works with the salted scheme.
+
 ## 1.0.8 — 2026-11-28
 
 ### Fixed

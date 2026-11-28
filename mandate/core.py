@@ -62,6 +62,11 @@ def jcs(obj) -> str:
     return _canonicalize(obj)
 
 
+COMMITMENT_V2 = "sha256-jcs-salt-v1"
+COMMITMENT_DOMAIN = b"mandate/commitment/v2\x00"
+SALT_BYTES = 16
+
+
 def sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -179,8 +184,36 @@ def intent_core(intent: dict) -> dict:
     }
 
 
-def intent_commitment(intent: dict) -> str:
-    return "sha256:" + sha256(jcs(intent_core(intent)))
+def intent_commitment(intent: dict, salt: str = "") -> str:
+    """Commitment over the canonical intent core, optionally salted (v2).
+
+    Why the salt exists: AP2's specification forbids a *deterministic* signature scheme over the
+    checkout hash, "to prevent rainbow table attacks" — an attacker who can guess the payload can
+    precompute the digest and match it against a signature they saw. Our v1 commitment is
+    `sha256(jcs(core))`, so a low-entropy intent (pay 1.00 to X) is guessable in principle. v2 puts
+    16 random bytes and a fixed domain prefix in front of the payload:
+
+        sha256(b"mandate/commitment/v2\x00" || salt[16] || jcs(intent_core))
+
+    The salt travels inside the signed grant, so the approver signs it too; a verifier recomputes
+    with the same salt. Guess-work now needs the salt, which is not in the intent, not in the
+    receipt, and not recoverable from the digest.
+    """
+    payload = jcs(intent_core(intent))
+    if salt:
+        try:
+            raw = bytes.fromhex(str(salt))
+        except ValueError as exc:
+            raise MandateError("commitment salt is not hex") from exc
+        if len(raw) < SALT_BYTES:
+            raise MandateError("commitment salt must be at least %d bytes" % SALT_BYTES)
+        digest = hashlib.sha256(COMMITMENT_DOMAIN + raw + payload.encode("utf-8")).hexdigest()
+        return "sha256:" + digest
+    return "sha256:" + sha256(payload)
+
+
+def new_salt() -> str:
+    return os.urandom(SALT_BYTES).hex()
 
 
 def proposal_id(intent: dict) -> str:
@@ -349,24 +382,30 @@ def check(intent: dict, policy: dict | None = None) -> dict:
     }
 
 
-def propose(intent: dict) -> dict:
+def propose(intent: dict, salted: bool = False) -> dict:
     intent = normalize_intent(intent)
-    return {
+    salt = new_salt() if salted else ""
+    out = {
         "v": VERSION,
         "proposal_id": proposal_id(intent),
-        "commitment": intent_commitment(intent),
+        "commitment": intent_commitment(intent, salt),
         "render_hash": render_hash(intent),
         "render": render(intent),
         "intent": intent,
     }
+    if salted:
+        out["commitment_alg"] = COMMITMENT_V2
+        out["commitment_salt"] = salt
+    return out
 
 
 def build_grant_core(commitment: str, approver: str, max_uses: int = 1,
                      ttl_s: int = 900, nonce: str | None = None,
                      render_hash: str = "", agent: str = "",
-                     audience: str = "", policy_fingerprint: str = "") -> dict:
+                     audience: str = "", policy_fingerprint: str = "",
+                     commitment_alg: str = "", commitment_salt: str = "") -> dict:
     now = int(time.time())
-    return {
+    body = {
         "v": VERSION,
         "commitment": str(commitment),
         "render_hash": str(render_hash or ""),
@@ -377,6 +416,11 @@ def build_grant_core(commitment: str, approver: str, max_uses: int = 1,
         "scope": {"max_uses": 1, "not_after": now + max(1, int(ttl_s))},
         "nonce": nonce or uuid.uuid4().hex,
     }
+    if commitment_alg:
+        body["commitment_alg"] = str(commitment_alg)
+    if commitment_salt:
+        body["commitment_salt"] = str(commitment_salt)
+    return body
 
 
 def make_grant(core: dict, key_path: str, namespace: str = "mandate") -> dict:
@@ -611,7 +655,7 @@ def verify_authorization(intent: dict, grant_obj: dict, signers_path: str,
     moment = time.time() if now is None else float(now)
     grant_core = (grant_obj or {}).get("grant") or {}
     signature = str((grant_obj or {}).get("sig") or "")
-    commitment = intent_commitment(intent)
+    commitment = intent_commitment(intent, _grant_salt(grant_core))
     if grant_core.get("commitment") != commitment:
         raise CommitmentMismatch("grant commitment does not match intent")
     if grant_core.get("render_hash") != render_hash(intent):
@@ -786,6 +830,16 @@ def _record_refusal(ledger_path: str, intent: dict, exc: Exception,
         pass          # a broken ledger must not turn a refusal into a crash
 
 
+def _grant_salt(grant_core: dict) -> str:
+    """Salt to use for this grant: only when the grant says it used the salted scheme."""
+    if str(grant_core.get("commitment_alg") or "") != COMMITMENT_V2:
+        return ""
+    salt = str(grant_core.get("commitment_salt") or "")
+    if not salt:
+        raise MandateError("grant declares %s but carries no salt" % COMMITMENT_V2)
+    return salt
+
+
 def _redeem(intent: dict, grant_obj: dict, signers_path: str,
             ledger_path: str, namespace: str = "mandate",
            allow_self: bool = False, now: float | None = None,
@@ -878,7 +932,8 @@ def verify_receipt(receipt_entry: dict, intent: dict, grant_obj: dict,
             _coverage.norm(body["coverage"])
         except _coverage.CoverageError:
             return False
-    if body.get("commitment") != intent_commitment(intent):
+    if body.get("commitment") != intent_commitment(
+            intent, _grant_salt((grant_obj or {}).get("grant") or {})):
         return False
     if body.get("render_hash") != render_hash(intent):
         return False
