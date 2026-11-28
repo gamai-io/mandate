@@ -5,3 +5,4 @@
 {"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795822676, "type": "control", "v": 1}
 {"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795823259, "type": "control", "v": 1}
 {"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795858404, "type": "control", "v": 1}
+{"action": "call", "audience": "", "decision": "allow", "tool": "pay", "ts": 1795858921, "type": "control", "v": 1}

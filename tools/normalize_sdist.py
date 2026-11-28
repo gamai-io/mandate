@@ -40,6 +40,13 @@ def normalize(path: str, when: int) -> bool:
         for member in source.getmembers():
             data = source.extractfile(member).read() if member.isfile() else None
             member.mtime = when
+            # i mode: `git archive` izvučen pod umask 0002 daje 0664, a checkout u CI daje
+            # 0644. Bez ovoga se sdist razlikuje samo po bitovima dozvole i reproducibilnost
+            # pada na stvari koja ne mijenja sadržaj.
+            # izvršni bit se ČUVA (skripte u examples/ moraju ostati 0755); normalizuje se
+            # samo razlika 0644/0664 koja dolazi od umask-a pri izvlačenju arhive
+            executable = bool(member.mode & 0o111)
+            member.mode = (0o755 if (member.isdir() or executable) else 0o644)
             member.uid = member.gid = 0
             member.uname = member.gname = ""
             member.pax_headers = {}

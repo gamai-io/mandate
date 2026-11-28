@@ -1,4 +1,19 @@
 # Changelog
+## 1.0.8 — 2026-11-28
+
+### Fixed
+- **The sdist was not byte-reproducible across checkouts.** `tools/normalize_sdist.py` fixed the
+  timestamp, uid/gid and owner names but not the mode, so `git archive` extracted under umask
+  0002 (0664) produced a different hash than the CI checkout (0644). Content was identical; only
+  the permission bits differed — which is exactly the kind of mismatch a customer sees when they
+  rebuild and compare. The normalizer now sets 0755 for directories and executables and 0644
+  otherwise, keeping the executable bit because `examples/*.sh` must stay runnable.
+- Verified by rebuilding `v1.0.7` from its tag with the fixed normalizer: the sdist hash matches
+  the CI-published one byte for byte
+  (`901ab8b2cbd470b662732c5d6b60b8ca0827df27e2bc22ffefbfe283efc55097`), and `tools/verify_pypi.py
+  --tag v1.0.8` reports `0 file(s) differ`. `tests/test_sdist_repro.py` covers the umask case,
+  the executable bit, owner stripping and idempotence.
+
 ## 1.0.7 — 2026-11-28
 
 ### Provenance is checked, not claimed
