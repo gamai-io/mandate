@@ -750,6 +750,19 @@ def main(argv=None) -> int:
     p_exec.add_argument("--out", default=None, help="write the intent here (for approval)")
     p_exec.add_argument("rest", nargs=argparse.REMAINDER)
 
+    p_siem = sub.add_parser("siem", help="send findings to a SIEM in ECS/OCSF/CEF/LEEF")
+    p_siem.add_argument("--ledger", default="ledger.jsonl")
+    p_siem.add_argument("--mcp-ledger", dest="mcp_ledger", default="")
+    p_siem.add_argument("--format", dest="fmt", default="ecs",
+                        choices=("ecs", "ocsf", "cef", "leef", "jsonl"))
+    p_siem.add_argument("--url", default="")
+    p_siem.add_argument("--token-env", dest="token_env", default="SPLUNK_TOKEN")
+    p_siem.add_argument("--checkpoint", default="")
+    p_siem.add_argument("--out", default="", help="also append the rendered events here")
+    p_siem.add_argument("--batch", type=int, default=50)
+    p_siem.add_argument("--resend", action="store_true", help="ignore the checkpoint (backfill)")
+    p_siem.add_argument("--dry-run", dest="dry_run", action="store_true")
+
     p_dora = sub.add_parser("dora", help="DORA pack: register row, Art. 30 clauses, incident clock")
     p_dora.add_argument("--provider", default="")
     p_dora.add_argument("--lei", default="")
@@ -1871,6 +1884,15 @@ def main(argv=None) -> int:
             res = anchor.verify_anchor(args.ledger, args.token, args.ca)
             _emit(res, None)
             return 0 if res.get("valid") else 4
+
+        if args.cmd == "siem":
+            from . import siem as siem_mod
+            token = os.environ.get(args.token_env, "") if args.token_env else ""
+            res = siem_mod.deliver(args.ledger, args.mcp_ledger, args.fmt, args.url, token,
+                                   args.checkpoint, args.out, args.batch, args.resend,
+                                   args.dry_run)
+            _emit(res, None)
+            return 0 if not res.get("failed") else 4
 
         if args.cmd == "dora":
             from . import dora as dora_mod

@@ -1,4 +1,21 @@
 # Changelog
+## 1.0.18 — 2026-11-28
+
+### A SIEM connector a SOC can test
+- **`mandate siem [--format ecs|ocsf|cef|leef|jsonl] [--url HEC] [--token-env SPLUNK_TOKEN]
+  [--checkpoint FILE] [--out FILE] [--resend] [--dry-run]`**: renders findings in the platform's
+  schema, wraps them in a Splunk HEC envelope (`index`, `sourcetype`, `event`), and delivers them.
+- **Retry semantics that matter**: 5xx and network errors are retried with exponential backoff,
+  4xx is not (it will never succeed and a retry hides a token/index mistake). Exhausted retries are
+  reported, not swallowed; the command exits 4 if anything failed.
+- **Replay without duplicates**: the event id is the SHA-256 of the finding, so it is stable across
+  formats and runs; a checkpoint of delivered ids makes a second run send nothing, and `--resend`
+  intentionally backfills.
+- **ECS and OCSF mappings**: ECS has `event.kind/action/severity`, `rule.name`, `user.name` and a
+  `mandate` block with the DORA class; OCSF is a Detection Finding (class_uid 2004).
+- 11 tests (`tests/test_siem.py`) against a real local HTTP server: HEC envelope, 503 retried, 400
+  not retried, checkpoint deduplication, and backfill.
+
 ## 1.0.17 — 2026-11-28
 
 ### DORA pack: register row, Art. 30 clauses, incident clock
